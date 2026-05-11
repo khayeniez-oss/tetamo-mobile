@@ -1,33 +1,77 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
-
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Tabs } from "expo-router";
+import {
+  Heart,
+  Home,
+  Plus,
+  Search,
+  UserRound,
+} from "lucide-react-native";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
+        tabBarActiveTintColor: "#ffffff",
+        tabBarInactiveTintColor: "#8f8f8f",
+        tabBarStyle: {
+          backgroundColor: "#050505",
+          borderTopColor: "#1f1f1f",
+          height: 86,
+          paddingTop: 8,
+          paddingBottom: 18,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "700",
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: "Home",
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
+
       <Tabs.Screen
-        name="explore"
+        name="property"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: "Property",
+          tabBarIcon: ({ color, size }) => <Search color={color} size={size} />,
+        }}
+      />
+
+      <Tabs.Screen
+        name="add-listing"
+        options={{
+          title: "Add Listing",
+          tabBarIcon: ({ color }) => (
+            <Plus
+              color={color}
+              size={34}
+              strokeWidth={2.6}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="saved"
+        options={{
+          title: "Saved",
+          tabBarIcon: ({ color, size }) => <Heart color={color} size={size} />,
+        }}
+      />
+
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color, size }) => (
+            <UserRound color={color} size={size} />
+          ),
         }}
       />
     </Tabs>
