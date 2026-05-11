@@ -32,7 +32,8 @@ import {
   UserRound,
 } from "lucide-react-native";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { ImageStyle, StyleProp, ViewStyle } from "react-native";
 import {
   Image,
   ImageBackground,
@@ -44,25 +45,28 @@ import {
   Text,
   View,
 } from "react-native";
+import {
+  fetchHomepageProperties,
+  type TetamoProperty,
+} from "../../services/properties";
 
 type Language = "en" | "id";
 type Currency = "IDR" | "USD" | "AUD";
-
-type Listing = {
-  id: string;
-  titleEn: string;
-  titleId: string;
-  location: string;
-  area: string;
-  image: string;
-  priceIdr: number;
-  beds: number;
-  baths: number;
-  size: number;
-  badge: string;
-};
+type Listing = TetamoProperty;
 
 const tetamoLogo = require("../../assets/images/tetamo-logo.png");
+
+const HERO_FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=1400&auto=format&fit=crop";
+
+const PROJECT_FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1600607687644-c7171b42498b?q=80&w=1000&auto=format&fit=crop";
+
+const ARTICLE_IMAGE_ONE =
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1000&auto=format&fit=crop";
+
+const ARTICLE_IMAGE_TWO =
+  "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?q=80&w=1000&auto=format&fit=crop";
 
 const currencyRates: Record<Currency, number> = {
   IDR: 1,
@@ -70,28 +74,31 @@ const currencyRates: Record<Currency, number> = {
   AUD: 0.000094,
 };
 
-const heroListings: Listing[] = [
+const fallbackListings: Listing[] = [
   {
-    id: "hero-1",
+    id: "fallback-1",
     titleEn: "Luxury 4BR Villa in Canggu",
     titleId: "Villa Mewah 4KT di Canggu",
+    descriptionEn:
+      "Modern tropical villa with private pool, open living area, and premium lifestyle access near cafes and beaches.",
+    descriptionId:
+      "Villa tropis modern dengan kolam pribadi, ruang terbuka, dan akses premium dekat kafe serta pantai.",
     location: "Canggu, Badung, Bali",
     area: "Canggu",
-    image:
-      "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=1400&auto=format&fit=crop",
+    image: HERO_FALLBACK_IMAGE,
     priceIdr: 18500000000,
     beds: 4,
     baths: 4,
     size: 450,
     badge: "Featured",
+    viewCount: 2100,
   },
-];
-
-const featuredListings: Listing[] = [
   {
-    id: "1",
+    id: "fallback-2",
     titleEn: "3BR Villa in Uluwatu",
     titleId: "Villa 3KT di Uluwatu",
+    descriptionEn: "Verified villa listing with direct inquiry.",
+    descriptionId: "Listing villa terverifikasi dengan inquiry langsung.",
     location: "Uluwatu, Bali",
     area: "Uluwatu",
     image:
@@ -101,11 +108,14 @@ const featuredListings: Listing[] = [
     baths: 3,
     size: 250,
     badge: "Featured",
+    viewCount: 845,
   },
   {
-    id: "2",
+    id: "fallback-3",
     titleEn: "2BR Apartment in SCBD",
     titleId: "Apartemen 2KT di SCBD",
+    descriptionEn: "Modern apartment listing in Jakarta.",
+    descriptionId: "Listing apartemen modern di Jakarta.",
     location: "Jakarta Selatan",
     area: "Jakarta",
     image:
@@ -115,11 +125,14 @@ const featuredListings: Listing[] = [
     baths: 2,
     size: 128,
     badge: "Boosted",
+    viewCount: 640,
   },
   {
-    id: "3",
+    id: "fallback-4",
     titleEn: "Modern Townhouse",
     titleId: "Townhouse Modern",
+    descriptionEn: "Modern townhouse with clean design.",
+    descriptionId: "Townhouse modern dengan desain bersih.",
     location: "Surabaya, Jawa Timur",
     area: "Surabaya",
     image:
@@ -129,39 +142,35 @@ const featuredListings: Listing[] = [
     baths: 3,
     size: 160,
     badge: "Spotlight",
-  },
-  {
-    id: "4",
-    titleEn: "Setiabudi Residences",
-    titleId: "Setiabudi Residences",
-    location: "Bali",
-    area: "Bali",
-    image:
-      "https://images.unsplash.com/photo-1613977257363-707ba9348227?q=80&w=900&auto=format&fit=crop",
-    priceIdr: 3900000000,
-    beds: 4,
-    baths: 4,
-    size: 220,
-    badge: "New Project",
+    viewCount: 520,
   },
 ];
 
-const projects = [
+const fallbackProjects: Listing[] = [
   {
     id: "project-1",
-    title: "The Banyan Residences",
+    titleEn: "The Banyan Residences",
+    titleId: "The Banyan Residences",
+    descriptionEn: "New project in Berawa, Canggu.",
+    descriptionId: "Proyek baru di Berawa, Canggu.",
     location: "Berawa, Canggu",
+    area: "Canggu",
     priceIdr: 2900000000,
-    image:
-      "https://images.unsplash.com/photo-1600607687644-c7171b42498b?q=80&w=800&auto=format&fit=crop",
+    image: PROJECT_FALLBACK_IMAGE,
+    badge: "New Project",
   },
   {
     id: "project-2",
-    title: "Luma Ubud",
+    titleEn: "Luma Ubud",
+    titleId: "Luma Ubud",
+    descriptionEn: "New project in Ubud, Bali.",
+    descriptionId: "Proyek baru di Ubud, Bali.",
     location: "Ubud, Bali",
+    area: "Ubud",
     priceIdr: 1750000000,
     image:
-      "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=1000&auto=format&fit=crop",
+    badge: "New Project",
   },
 ];
 
@@ -214,6 +223,8 @@ const copy = {
     listCtaSub: "Reach serious buyers & renters across Indonesia",
     getStarted: "Get Started",
     seeAll: "See all",
+    loading: "Loading latest Tetamo listings...",
+    fallback: "Showing preview listings until live listings are available.",
   },
   id: {
     subtitle: "Properti Marketplace",
@@ -263,20 +274,124 @@ const copy = {
     listCtaSub: "Jangkau pembeli & penyewa serius di Indonesia",
     getStarted: "Mulai",
     seeAll: "Lihat semua",
+    loading: "Memuat listing terbaru Tetamo...",
+    fallback: "Menampilkan preview listing sampai listing live tersedia.",
   },
 };
+
+function getShortText(value: string | undefined, fallback: string, max = 115) {
+  const text = (value || fallback).replace(/\s+/g, " ").trim();
+
+  if (text.length <= max) {
+    return text;
+  }
+
+  return `${text.slice(0, max).trim()}...`;
+}
 
 export default function HomeScreen() {
   const router = useRouter();
   const [language, setLanguage] = useState<Language>("en");
   const [currency, setCurrency] = useState<Currency>("IDR");
+  const [properties, setProperties] = useState<Listing[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [usedFallback, setUsedFallback] = useState(false);
 
   const t = copy[language];
-  const hero = heroListings[0];
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadHomepageProperties() {
+      try {
+        setIsLoading(true);
+        const rows = await fetchHomepageProperties(16);
+
+        if (!isMounted) return;
+
+        const liveRows = rows.filter((property) => property.priceIdr > 0);
+
+        if (liveRows.length > 0) {
+          setProperties(liveRows);
+          setUsedFallback(false);
+        } else {
+          setProperties(fallbackListings);
+          setUsedFallback(true);
+        }
+      } catch (error) {
+        console.log("Tetamo mobile homepage fallback:", error);
+
+        if (!isMounted) return;
+
+        setProperties(fallbackListings);
+        setUsedFallback(true);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadHomepageProperties();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const hero = properties[0] || fallbackListings[0];
+
+  const featuredListings = useMemo(() => {
+    const rows =
+      properties.length > 1 ? properties.slice(1, 9) : fallbackListings.slice(1);
+
+    return rows.length > 0 ? rows : fallbackListings.slice(1);
+  }, [properties]);
+
+  const projectListings = useMemo(() => {
+    const rows = properties.filter((property) =>
+      property.badge?.toLowerCase().includes("project")
+    );
+
+    if (rows.length > 0) {
+      return rows.slice(0, 3);
+    }
+
+    return fallbackProjects;
+  }, [properties]);
+
+  const popularAreas = useMemo(() => {
+    const areas = properties
+      .map((property) => property.area || property.location)
+      .filter(Boolean)
+      .map((area) => String(area).split(",")[0].trim())
+      .filter(Boolean);
+
+    const uniqueAreas = Array.from(new Set(areas));
+
+    if (uniqueAreas.length > 0) {
+      return uniqueAreas.slice(0, 8);
+    }
+
+    return [
+      "Bali",
+      "Jakarta",
+      "Surabaya",
+      "Bandung",
+      "Seminyak",
+      "Canggu",
+      "Uluwatu",
+      "BSD City",
+    ];
+  }, [properties]);
 
   const formatPrice = useMemo(() => {
     return (priceIdr: number) => {
       const converted = priceIdr * currencyRates[currency];
+
+      if (!priceIdr || priceIdr <= 0) {
+        return currency === "IDR" ? "Price on Request" : "Contact Us";
+      }
 
       if (currency === "IDR") {
         return `IDR ${Math.round(converted).toLocaleString("en-US")}`;
@@ -287,11 +402,13 @@ export default function HomeScreen() {
   }, [currency]);
 
   const goProperty = (query?: string) => {
-    router.push(query ? `/property?${query}` : "/property");
+    router.push(query ? (`/property?${query}` as any) : ("/property" as any));
   };
 
   const goAddListing = (audience?: string) => {
-    router.push(audience ? `/add-listing?audience=${audience}` : "/add-listing");
+    router.push(
+      audience ? (`/add-listing?audience=${audience}` as any) : ("/add-listing" as any)
+    );
   };
 
   const openWebsite = (path: string) => {
@@ -318,7 +435,10 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.headerControls}>
-            <Pressable style={styles.locationPill} onPress={() => goProperty("country=Indonesia")}>
+            <Pressable
+              style={styles.locationPill}
+              onPress={() => goProperty("country=Indonesia")}
+            >
               <MapPin color="#ffffff" size={12} />
               <Text style={styles.pillText}>Indonesia</Text>
               <ChevronDown color="#ffffff" size={12} />
@@ -378,9 +498,22 @@ export default function HomeScreen() {
           <SlidersHorizontal color="#ffffff" size={19} />
         </Pressable>
 
+        {isLoading && (
+          <View style={styles.statusBox}>
+            <Text style={styles.statusText}>{t.loading}</Text>
+          </View>
+        )}
+
+        {!isLoading && usedFallback && (
+          <View style={styles.statusBox}>
+            <Text style={styles.statusText}>{t.fallback}</Text>
+          </View>
+        )}
+
         <Pressable onPress={() => goProperty(`id=${hero.id}`)}>
-          <ImageBackground
-            source={{ uri: hero.image }}
+          <SafeImageBackground
+            uri={hero.image}
+            fallback={HERO_FALLBACK_IMAGE}
             style={styles.heroCard}
             imageStyle={styles.heroImage}
           >
@@ -402,7 +535,7 @@ export default function HomeScreen() {
             <View style={styles.heroBottom}>
               <Text style={styles.heroPrice}>{formatPrice(hero.priceIdr)}</Text>
 
-              {currency === "IDR" && (
+              {currency === "IDR" && hero.priceIdr > 0 && (
                 <Text style={styles.heroConverted}>
                   ≈ USD{" "}
                   {Math.round(hero.priceIdr * currencyRates.USD).toLocaleString(
@@ -415,19 +548,25 @@ export default function HomeScreen() {
                 </Text>
               )}
 
-              <Text style={styles.heroTitle}>
+              <Text style={styles.heroTitle} numberOfLines={2}>
                 {language === "en" ? hero.titleEn : hero.titleId}
               </Text>
 
               <View style={styles.locationRow}>
                 <MapPin color="#ffffff" size={13} />
-                <Text style={styles.heroLocation}>{hero.location}</Text>
+                <Text style={styles.heroLocation} numberOfLines={1}>
+                  {hero.location}
+                </Text>
               </View>
 
-              <Text style={styles.heroDescription}>
-                {language === "en"
-                  ? "Modern tropical villa with rice field view and private pool. Minutes to the beach and cafes."
-                  : "Villa tropis modern dengan pemandangan sawah dan kolam pribadi. Dekat pantai dan kafe."}
+              <Text style={styles.heroDescription} numberOfLines={2}>
+                {getShortText(
+                  language === "en" ? hero.descriptionEn : hero.descriptionId,
+                  language === "en"
+                    ? "Verified property listing with direct inquiry and schedule viewing."
+                    : "Listing properti terverifikasi dengan inquiry langsung dan jadwal viewing.",
+                  115
+                )}
               </Text>
 
               <View style={styles.metricRow}>
@@ -455,11 +594,15 @@ export default function HomeScreen() {
                 <Metric
                   bg="#16a34a"
                   icon={<Eye color="#ffffff" size={17} />}
-                  value="2.1K"
+                  value={
+                    hero.viewCount && hero.viewCount > 999
+                      ? `${(hero.viewCount / 1000).toFixed(1)}K`
+                      : String(hero.viewCount || "0")
+                  }
                 />
               </View>
             </View>
-          </ImageBackground>
+          </SafeImageBackground>
         </Pressable>
 
         <View style={styles.dots}>
@@ -579,17 +722,9 @@ export default function HomeScreen() {
             compact
             onPress={() => goProperty("section=popular-areas")}
           />
+
           <View style={styles.areaWrap}>
-            {[
-              "Bali",
-              "Jakarta",
-              "Surabaya",
-              "Bandung",
-              "Seminyak",
-              "Canggu",
-              "Uluwatu",
-              "BSD City",
-            ].map((area) => (
+            {popularAreas.map((area) => (
               <Pressable
                 key={area}
                 style={styles.areaPill}
@@ -609,17 +744,27 @@ export default function HomeScreen() {
             compact
             onPress={() => goProperty("section=new-projects")}
           />
-          {projects.map((project) => (
+
+          {projectListings.map((project) => (
             <Pressable
               key={project.id}
               style={styles.projectRow}
               onPress={() => goProperty(`project=${project.id}`)}
             >
-              <Image source={{ uri: project.image }} style={styles.projectImage} />
+              <SafeImage
+                uri={project.image}
+                fallback={PROJECT_FALLBACK_IMAGE}
+                style={styles.projectImage}
+              />
+
               <View style={styles.projectTextBox}>
-                <Text style={styles.projectTitle}>{project.title}</Text>
-                <Text style={styles.projectLocation}>{project.location}</Text>
-                <Text style={styles.projectPrice}>
+                <Text style={styles.projectTitle} numberOfLines={1}>
+                  {language === "en" ? project.titleEn : project.titleId}
+                </Text>
+                <Text style={styles.projectLocation} numberOfLines={1}>
+                  {project.location}
+                </Text>
+                <Text style={styles.projectPrice} numberOfLines={1}>
                   From {formatPrice(project.priceIdr)}
                 </Text>
               </View>
@@ -696,7 +841,8 @@ export default function HomeScreen() {
 
         <View style={styles.articleRow}>
           <ArticleCard
-            image="https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=900&auto=format&fit=crop"
+            image={ARTICLE_IMAGE_ONE}
+            fallback={ARTICLE_IMAGE_ONE}
             tag={language === "en" ? "Buying Guide" : "Panduan Beli"}
             title={t.articleOne}
             readTime="5 min read"
@@ -704,7 +850,8 @@ export default function HomeScreen() {
           />
 
           <ArticleCard
-            image="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=900&auto=format&fit=crop"
+            image={ARTICLE_IMAGE_TWO}
+            fallback={ARTICLE_IMAGE_TWO}
             tag={language === "en" ? "Investment Tips" : "Tips Investasi"}
             title={t.articleTwo}
             readTime="6 min read"
@@ -725,6 +872,61 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function SafeImage({
+  uri,
+  fallback,
+  style,
+}: {
+  uri?: string;
+  fallback: string;
+  style: StyleProp<ImageStyle>;
+}) {
+  const [imageUri, setImageUri] = useState(uri || fallback);
+
+  useEffect(() => {
+    setImageUri(uri || fallback);
+  }, [uri, fallback]);
+
+  return (
+    <Image
+      source={{ uri: imageUri }}
+      style={style}
+      onError={() => setImageUri(fallback)}
+    />
+  );
+}
+
+function SafeImageBackground({
+  uri,
+  fallback,
+  style,
+  imageStyle,
+  children,
+}: {
+  uri?: string;
+  fallback: string;
+  style: StyleProp<ViewStyle>;
+  imageStyle: StyleProp<ImageStyle>;
+  children: ReactNode;
+}) {
+  const [imageUri, setImageUri] = useState(uri || fallback);
+
+  useEffect(() => {
+    setImageUri(uri || fallback);
+  }, [uri, fallback]);
+
+  return (
+    <ImageBackground
+      source={{ uri: imageUri }}
+      style={style}
+      imageStyle={imageStyle}
+      onError={() => setImageUri(fallback)}
+    >
+      {children}
+    </ImageBackground>
   );
 }
 
@@ -840,8 +1042,9 @@ function PropertyCard({
 }) {
   return (
     <Pressable style={styles.propertyCard} onPress={onPress}>
-      <ImageBackground
-        source={{ uri: listing.image }}
+      <SafeImageBackground
+        uri={listing.image}
+        fallback={HERO_FALLBACK_IMAGE}
         style={styles.propertyImage}
         imageStyle={styles.propertyImageRadius}
       >
@@ -852,12 +1055,12 @@ function PropertyCard({
         <View style={styles.favoriteBubble}>
           <Heart color="#ffffff" size={16} />
         </View>
-      </ImageBackground>
+      </SafeImageBackground>
 
       <View style={styles.propertyBody}>
         <Text style={styles.propertyPrice}>{formatPrice(listing.priceIdr)}</Text>
 
-        {currency !== "IDR" && (
+        {currency !== "IDR" && listing.priceIdr > 0 && (
           <Text style={styles.propertySubPrice}>
             IDR {listing.priceIdr.toLocaleString("en-US")}
           </Text>
@@ -877,17 +1080,17 @@ function PropertyCard({
         <View style={styles.propertyMeta}>
           <View style={styles.metaItem}>
             <BedDouble color="#111111" size={12} />
-            <Text style={styles.metaText}>{listing.beds}</Text>
+            <Text style={styles.metaText}>{listing.beds || 0}</Text>
           </View>
 
           <View style={styles.metaItem}>
             <Bath color="#111111" size={12} />
-            <Text style={styles.metaText}>{listing.baths}</Text>
+            <Text style={styles.metaText}>{listing.baths || 0}</Text>
           </View>
 
           <View style={styles.metaItem}>
             <Ruler color="#111111" size={12} />
-            <Text style={styles.metaText}>{listing.size} m²</Text>
+            <Text style={styles.metaText}>{listing.size || 0} m²</Text>
           </View>
         </View>
       </View>
@@ -938,12 +1141,14 @@ function EntryCard({
 
 function ArticleCard({
   image,
+  fallback,
   tag,
   title,
   readTime,
   onPress,
 }: {
   image: string;
+  fallback: string;
   tag: string;
   title: string;
   readTime: string;
@@ -951,7 +1156,8 @@ function ArticleCard({
 }) {
   return (
     <Pressable style={styles.articleCard} onPress={onPress}>
-      <Image source={{ uri: image }} style={styles.articleImage} />
+      <SafeImage uri={image} fallback={fallback} style={styles.articleImage} />
+
       <View style={styles.articleTextBox}>
         <Text style={styles.articleTag}>{tag}</Text>
         <Text style={styles.articleTitle} numberOfLines={2}>
@@ -1085,8 +1291,22 @@ const styles = StyleSheet.create({
     color: "#9f9f9f",
     fontSize: 14,
   },
+  statusBox: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#2f2f2f",
+    backgroundColor: "#101010",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  statusText: {
+    color: "#cfcfcf",
+    fontSize: 11.5,
+    fontWeight: "700",
+  },
   heroCard: {
-    height: 330,
+    height: 350,
     borderRadius: 25,
     overflow: "hidden",
     justifyContent: "space-between",
@@ -1098,7 +1318,7 @@ const styles = StyleSheet.create({
   },
   heroShade: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.38)",
+    backgroundColor: "rgba(0,0,0,0.32)",
   },
   heroTop: {
     flexDirection: "row",
@@ -1137,7 +1357,7 @@ const styles = StyleSheet.create({
   },
   heroPrice: {
     color: "#ffffff",
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: "900",
     letterSpacing: -0.4,
   },
@@ -1149,7 +1369,8 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: 17,
+    lineHeight: 21,
     fontWeight: "900",
     marginTop: 6,
   },
@@ -1163,13 +1384,14 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 12,
     fontWeight: "700",
+    flex: 1,
   },
   heroDescription: {
     color: "#f0f0f0",
     fontSize: 12,
-    lineHeight: 18,
+    lineHeight: 17,
     marginTop: 6,
-    maxWidth: "88%",
+    maxWidth: "92%",
   },
   metricRow: {
     flexDirection: "row",
@@ -1457,6 +1679,7 @@ const styles = StyleSheet.create({
   },
   projectRow: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 11,
     marginBottom: 12,
   },

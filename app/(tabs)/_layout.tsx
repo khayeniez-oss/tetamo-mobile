@@ -1,11 +1,5 @@
 import { Tabs } from "expo-router";
-import {
-  Heart,
-  Home,
-  Plus,
-  Search,
-  UserRound,
-} from "lucide-react-native";
+import { Heart, Home, Plus, Search, UserRound } from "lucide-react-native";
 
 export default function TabLayout() {
   return (
@@ -48,11 +42,7 @@ export default function TabLayout() {
         options={{
           title: "Add Listing",
           tabBarIcon: ({ color }) => (
-            <Plus
-              color={color}
-              size={34}
-              strokeWidth={2.6}
-            />
+            <Plus color={color} size={34} strokeWidth={2.6} />
           ),
         }}
       />
@@ -72,6 +62,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <UserRound color={color} size={size} />
           ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="explore"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
