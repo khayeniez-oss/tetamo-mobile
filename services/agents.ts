@@ -4,137 +4,129 @@ export type TetamoAgent = {
   id: string;
   name: string;
   role: string;
-  agency?: string;
   phone?: string;
+  agency?: string;
   photoUrl?: string;
   initials: string;
-  rating: number;
   listings: number;
+
+  instagramUrl?: string;
+  facebookUrl?: string;
+  tiktokUrl?: string;
+  youtubeUrl?: string;
+  linkedinUrl?: string;
+  whatsappUrl?: string;
 };
 
-const FEATURED_AGENT_SEARCHES = [
-  {
-    keyword: "Franky",
-    displayName: "Franky Wardana (BERD)",
-    fallbackRole: "BERD",
-  },
-  {
-    keyword: "Gunawan",
-    displayName: "Ir. Gunawan",
-    fallbackRole: "Featured Agent",
-  },
-  {
-    keyword: "Lidia",
-    displayName: "Lidia M. Chandra",
-    fallbackRole: "Featured Agent",
-  },
-  {
-    keyword: "Stefanus",
-    displayName: "Stefanus Ricky",
-    fallbackRole: "Featured Agent",
-  },
+const FEATURED_AGENT_NAMES = [
+  "Franky Wardana",
+  "Ir. Gunawan",
+  "Lidia M. Chandra",
+  "Stefanus Ricky",
 ];
 
-function safeString(value: unknown): string {
-  if (typeof value !== "string") return "";
-  return value.trim();
+function safeString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function getInitials(name: string) {
-  const cleanedName = name.replace(/\bIr\.\s*/gi, "").replace(/\([^)]*\)/g, "");
-  const parts = cleanedName
-    .split(" ")
-    .map((part) => part.trim())
-    .filter(Boolean);
+  const parts = name.trim().split(" ").filter(Boolean);
 
   if (parts.length === 0) return "TA";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
 
-  const first = parts[0]?.[0] || "";
-  const second = parts.length > 1 ? parts[1]?.[0] || "" : "";
-
-  return `${first}${second || first}`.toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
-function cleanPhotoUrl(value: unknown): string {
-  const photoUrl = safeString(value);
+function normalizeWhatsappPhone(value?: string | null) {
+  const digits = String(value || "").replace(/[^\d]/g, "");
 
-  if (!photoUrl) return "";
+  if (!digits) return "";
+  if (digits.startsWith("62")) return digits;
+  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
+  if (digits.startsWith("8")) return `62${digits}`;
 
-  if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) {
-    return photoUrl;
-  }
-
-  return photoUrl;
+  return digits;
 }
 
-function fallbackAgent(
-  fallback: (typeof FEATURED_AGENT_SEARCHES)[number],
-  index: number
-): TetamoAgent {
-  return {
-    id: fallback.keyword,
-    name: fallback.displayName,
-    role: fallback.fallbackRole,
-    agency: fallback.fallbackRole,
-    phone: "",
-    photoUrl: "",
-    initials: getInitials(fallback.displayName),
-    rating: index <= 1 ? 4.9 : 4.8,
-    listings: index === 0 ? 128 : index === 1 ? 96 : index === 2 ? 142 : 105,
-  };
+function normalizeSocialUrl(platform: string, value?: string | null) {
+  const raw = safeString(value);
+
+  if (!raw) return "";
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+
+  const clean = raw.replace("@", "").replace(/^\/+/, "").trim();
+  if (!clean) return "";
+
+  if (platform === "instagram") return `https://instagram.com/${clean}`;
+  if (platform === "facebook") return `https://facebook.com/${clean}`;
+  if (platform === "tiktok") return `https://tiktok.com/@${clean}`;
+  if (platform === "linkedin") return `https://linkedin.com/in/${clean}`;
+  if (platform === "youtube") return `https://youtube.com/${clean}`;
+
+  return "";
 }
 
-function normalizeAgent(
-  row: any,
-  fallback: (typeof FEATURED_AGENT_SEARCHES)[number],
-  index: number
-): TetamoAgent {
-  const name = safeString(row?.full_name) || fallback.displayName;
-  const agency = safeString(row?.agency);
-  const role = agency || safeString(row?.role) || fallback.fallbackRole;
+function normalizeAgent(row: Record<string, any>): TetamoAgent {
+  const name = safeString(row.full_name) || "Tetamo Agent";
+  const phone = safeString(row.phone);
+  const whatsappPhone = normalizeWhatsappPhone(phone);
 
   return {
-    id: safeString(row?.id) || fallback.keyword,
+    id: String(row.id),
     name,
-    role,
-    agency,
-    phone: safeString(row?.phone),
-    photoUrl: cleanPhotoUrl(row?.photo_url),
+    role: safeString(row.role) || "agent",
+    phone,
+    agency: safeString(row.agency),
+    photoUrl: safeString(row.photo_url),
     initials: getInitials(name),
-    rating: index <= 1 ? 4.9 : 4.8,
-    listings: index === 0 ? 128 : index === 1 ? 96 : index === 2 ? 142 : 105,
+    listings: 0,
+
+    instagramUrl: normalizeSocialUrl("instagram", row.instagram_url),
+    facebookUrl: normalizeSocialUrl("facebook", row.facebook_url),
+    tiktokUrl: normalizeSocialUrl("tiktok", row.tiktok_url),
+    youtubeUrl: normalizeSocialUrl("youtube", row.youtube_url),
+    linkedinUrl: normalizeSocialUrl("linkedin", row.linkedin_url),
+    whatsappUrl: whatsappPhone ? `https://wa.me/${whatsappPhone}` : "",
   };
 }
 
 export async function fetchFeaturedAgents() {
-  const agents: TetamoAgent[] = [];
+  const results: TetamoAgent[] = [];
 
-  for (let index = 0; index < FEATURED_AGENT_SEARCHES.length; index += 1) {
-    const search = FEATURED_AGENT_SEARCHES[index];
+  for (const name of FEATURED_AGENT_NAMES) {
+    const searchName = name.replace("Ir. ", "");
 
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, full_name, role, phone, agency, photo_url")
-      .ilike("full_name", `%${search.keyword}%`)
+      .select(
+        `
+        id,
+        full_name,
+        role,
+        phone,
+        agency,
+        photo_url,
+        instagram_url,
+        facebook_url,
+        tiktok_url,
+        youtube_url,
+        linkedin_url
+      `
+      )
+      .ilike("full_name", `%${searchName}%`)
       .limit(1)
       .maybeSingle();
 
     if (error) {
-      console.error(
-        `Tetamo mobile featured agent fetch error: ${search.keyword}`,
-        error.message
-      );
-      agents.push(fallbackAgent(search, index));
+      console.log("Tetamo featured agent fetch error:", error.message);
       continue;
     }
 
-    if (!data) {
-      agents.push(fallbackAgent(search, index));
-      continue;
+    if (data) {
+      results.push(normalizeAgent(data));
     }
-
-    agents.push(normalizeAgent(data, search, index));
   }
 
-  return agents;
+  return results;
 }

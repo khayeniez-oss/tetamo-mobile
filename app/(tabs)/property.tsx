@@ -1,3 +1,4 @@
+import { FontAwesome5 } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
@@ -35,10 +36,7 @@ import {
     TextInput,
     View,
 } from "react-native";
-import {
-    fetchFeaturedAgents,
-    type TetamoAgent,
-} from "../../services/agents";
+import { fetchFeaturedAgents, type TetamoAgent } from "../../services/agents";
 import {
     fetchHomepageProperties,
     fetchPropertiesByCodes,
@@ -53,6 +51,12 @@ type AreaItem = {
   name: string;
   listings: string;
   image: string;
+};
+
+type AgentSocialItem = {
+  key: string;
+  url: string;
+  iconName: string;
 };
 
 const tetamoLogo = require("../../assets/images/tetamo-logo.png");
@@ -82,6 +86,12 @@ const AREA_IMAGES: Record<string, string> = {
     "https://images.unsplash.com/photo-1523059623039-a9ed027e7fad?q=80&w=500&auto=format&fit=crop",
   Surabaya:
     "https://images.unsplash.com/photo-1564507592333-c60657eea523?q=80&w=500&auto=format&fit=crop",
+  Badung:
+    "https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=500&auto=format&fit=crop",
+  Gianyar:
+    "https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?q=80&w=500&auto=format&fit=crop",
+  Denpasar:
+    "https://images.unsplash.com/photo-1555400038-63f5ba517a47?q=80&w=500&auto=format&fit=crop",
 };
 
 const fallbackFeaturedSale: TetamoProperty = {
@@ -268,9 +278,9 @@ const copy = {
     rentSmall: "Rent",
     from: "From",
     priceRequest: "Price on Request",
-    photos: "Photos",
     listing: "Listing",
     listings: "Listings",
+    verifiedAgent: "Verified Agent",
   },
   id: {
     subtitle: "Properti Marketplace",
@@ -296,9 +306,9 @@ const copy = {
     rentSmall: "Sewa",
     from: "Mulai",
     priceRequest: "Hubungi Kami",
-    photos: "Foto",
     listing: "Listing",
     listings: "Listing",
+    verifiedAgent: "Agen Terverifikasi",
   },
 };
 
@@ -345,11 +355,13 @@ export default function PropertyScreen() {
         setFeaturedAgents(agents);
 
         const saleFeature = featured.find(
-          (property) => normalizeKode(property.kode) === normalizeKode("TTM0 - E2")
+          (property) =>
+            normalizeKode(property.kode) === normalizeKode("TTM0 - E2")
         );
 
         const rentFeature = featured.find(
-          (property) => normalizeKode(property.kode) === normalizeKode("TTM TNH 83")
+          (property) =>
+            normalizeKode(property.kode) === normalizeKode("TTM TNH 83")
         );
 
         if (saleFeature) setFeaturedSale(saleFeature);
@@ -403,15 +415,24 @@ export default function PropertyScreen() {
 
       const normalizedRental = normalizeValue(rentalType);
 
-      if (normalizedRental.includes("monthly") || normalizedRental.includes("bulanan")) {
+      if (
+        normalizedRental.includes("monthly") ||
+        normalizedRental.includes("bulanan")
+      ) {
         base += language === "id" ? " /bln" : " /mo";
       }
 
-      if (normalizedRental.includes("yearly") || normalizedRental.includes("tahunan")) {
+      if (
+        normalizedRental.includes("yearly") ||
+        normalizedRental.includes("tahunan")
+      ) {
         base += language === "id" ? " /thn" : " /yr";
       }
 
-      if (normalizedRental.includes("daily") || normalizedRental.includes("harian")) {
+      if (
+        normalizedRental.includes("daily") ||
+        normalizedRental.includes("harian")
+      ) {
         base += language === "id" ? " /hari" : " /day";
       }
 
@@ -492,7 +513,7 @@ Price: ${formatPrice(property.priceIdr, property.rentalType)}
 
 Is this property still available?`;
 
-    Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+    void safeOpenUrl(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
   };
 
   return (
@@ -506,7 +527,11 @@ Is this property still available?`;
       >
         <View style={styles.header}>
           <View style={styles.brandRow}>
-            <Image source={tetamoLogo} style={styles.logoImage} resizeMode="contain" />
+            <Image
+              source={tetamoLogo}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
             <View style={styles.brandTextWrap}>
               <Text style={styles.brandText}>TETAMO</Text>
               <Text style={styles.brandSub}>{t.subtitle}</Text>
@@ -612,7 +637,6 @@ Is this property still available?`;
                   approxUsd={approxUsd}
                   whatsappLabel={t.whatsapp}
                   scheduleLabel={t.schedule}
-                  photosLabel={t.photos}
                   onWhatsapp={() => openWhatsapp(property)}
                   onSchedule={() => goDetails(property, true)}
                   onDetails={() => goDetails(property)}
@@ -626,7 +650,6 @@ Is this property still available?`;
               buttonText={t.viewDetails}
               whatsappLabel={t.whatsapp}
               scheduleLabel={t.schedule}
-              photosLabel={t.photos}
               language={language}
               formatPrice={formatPrice}
               approxUsd={approxUsd}
@@ -661,7 +684,6 @@ Is this property still available?`;
                   approxUsd={approxUsd}
                   whatsappLabel={t.whatsapp}
                   scheduleLabel={t.schedule}
-                  photosLabel={t.photos}
                   onWhatsapp={() => openWhatsapp(property)}
                   onSchedule={() => goDetails(property, true)}
                   onDetails={() => goDetails(property)}
@@ -675,7 +697,6 @@ Is this property still available?`;
               buttonText={t.viewDetails}
               whatsappLabel={t.whatsapp}
               scheduleLabel={t.schedule}
-              photosLabel={t.photos}
               language={language}
               formatPrice={formatPrice}
               approxUsd={approxUsd}
@@ -748,7 +769,11 @@ Is this property still available?`;
           contentContainerStyle={styles.agentCarousel}
         >
           {featuredAgents.map((agent) => (
-            <AgentCard key={agent.id} agent={agent} listingsText={t.listings} />
+            <AgentCard
+              key={agent.id}
+              agent={agent}
+              verifiedText={t.verifiedAgent}
+            />
           ))}
         </ScrollView>
 
@@ -805,6 +830,38 @@ function normalizeWhatsappPhone(value?: string | null) {
   if (digits.startsWith("8")) return `62${digits}`;
 
   return digits;
+}
+
+function cleanExternalUrl(value?: string | null) {
+  let url = String(value || "").trim();
+
+  if (!url) return "";
+
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    return "";
+  }
+
+  if (url.includes("tiktok.com")) {
+    url = url.split("?")[0];
+  }
+
+  return url;
+}
+
+function isSafeUrl(value?: string | null) {
+  return cleanExternalUrl(value).length > 0;
+}
+
+async function safeOpenUrl(value?: string | null) {
+  const url = cleanExternalUrl(value);
+
+  if (!url) return;
+
+  try {
+    await Linking.openURL(url);
+  } catch (error) {
+    console.log("Tetamo social link could not open:", url, error);
+  }
 }
 
 function isSaleProperty(property: TetamoProperty) {
@@ -904,6 +961,44 @@ function buildPopularAreas(properties: TetamoProperty[], language: Language): Ar
   ];
 }
 
+function getAgentSocialItems(agent: TetamoAgent): AgentSocialItem[] {
+  const socials: AgentSocialItem[] = [];
+
+  if (isSafeUrl(agent.instagramUrl)) {
+    socials.push({
+      key: "instagram",
+      url: agent.instagramUrl || "",
+      iconName: "instagram",
+    });
+  }
+
+  if (isSafeUrl(agent.facebookUrl)) {
+    socials.push({
+      key: "facebook",
+      url: agent.facebookUrl || "",
+      iconName: "facebook-f",
+    });
+  }
+
+  if (isSafeUrl(agent.tiktokUrl)) {
+    socials.push({
+      key: "tiktok",
+      url: agent.tiktokUrl || "",
+      iconName: "tiktok",
+    });
+  }
+
+  if (isSafeUrl(agent.linkedinUrl)) {
+    socials.push({
+      key: "linkedin",
+      url: agent.linkedinUrl || "",
+      iconName: "linkedin-in",
+    });
+  }
+
+  return socials;
+}
+
 function SectionTitle({
   icon,
   title,
@@ -932,51 +1027,38 @@ function SectionTitle({
   );
 }
 
-function EngagementMetrics({
-  property,
-  photosLabel,
-  small = false,
-}: {
-  property: TetamoProperty;
-  photosLabel: string;
-  small?: boolean;
-}) {
+function EngagementMetrics({ property }: { property: TetamoProperty }) {
   return (
-    <View style={[styles.engagementRow, small && styles.engagementRowSmall]}>
+    <View style={styles.engagementRow}>
       <RealMetric
-        icon={<Heart color="#ffffff" size={small ? 9 : 11} />}
+        icon={<Heart color="#ffffff" size={9} />}
         value={formatCompactNumber(property.likeCount)}
-        small={small}
       />
 
       <RealMetric
-        icon={<Bookmark color="#ffffff" size={small ? 9 : 11} />}
+        icon={<Bookmark color="#ffffff" size={9} />}
         value={formatCompactNumber(property.saveCount)}
-        small={small}
       />
 
       <RealMetric
-        icon={<Star color="#e6c15c" size={small ? 9 : 11} />}
+        icon={<Star color="#e6c15c" size={9} />}
         value={formatRating(property)}
-        small={small}
+        wide
       />
 
       <RealMetric
-        icon={<Share2 color="#ffffff" size={small ? 9 : 11} />}
+        icon={<Share2 color="#ffffff" size={9} />}
         value={formatCompactNumber(property.shareCount)}
-        small={small}
       />
 
       <RealMetric
-        icon={<Eye color="#ffffff" size={small ? 9 : 11} />}
+        icon={<Eye color="#ffffff" size={9} />}
         value={formatCompactNumber(property.viewCount)}
-        small={small}
       />
 
       <RealMetric
-        icon={<Camera color="#ffffff" size={small ? 9 : 11} />}
-        value={`${getPhotoCount(property)} ${photosLabel}`}
-        small={small}
+        icon={<Camera color="#ffffff" size={9} />}
+        value={formatCompactNumber(getPhotoCount(property))}
       />
     </View>
   );
@@ -989,7 +1071,6 @@ function MarketPropertyCard({
   approxUsd,
   whatsappLabel,
   scheduleLabel,
-  photosLabel,
   onWhatsapp,
   onSchedule,
   onDetails,
@@ -1000,7 +1081,6 @@ function MarketPropertyCard({
   approxUsd: (priceIdr: number) => string;
   whatsappLabel: string;
   scheduleLabel: string;
-  photosLabel: string;
   onWhatsapp: () => void;
   onSchedule: () => void;
   onDetails: () => void;
@@ -1053,7 +1133,7 @@ function MarketPropertyCard({
             </Text>
           </View>
 
-          <EngagementMetrics property={property} photosLabel={photosLabel} small />
+          <EngagementMetrics property={property} />
 
           <View style={styles.marketActionRow}>
             <Pressable
@@ -1090,7 +1170,6 @@ function FeaturedBanner({
   buttonText,
   whatsappLabel,
   scheduleLabel,
-  photosLabel,
   language,
   formatPrice,
   approxUsd,
@@ -1104,7 +1183,6 @@ function FeaturedBanner({
   buttonText: string;
   whatsappLabel: string;
   scheduleLabel: string;
-  photosLabel: string;
   language: Language;
   formatPrice: (priceIdr: number, rentalType?: string | null) => string;
   approxUsd: (priceIdr: number) => string;
@@ -1167,7 +1245,7 @@ function FeaturedBanner({
           </Text>
         </View>
 
-        <EngagementMetrics property={property} photosLabel={photosLabel} small />
+        <EngagementMetrics property={property} />
 
         <View style={styles.featuredButtonRow}>
           <Pressable style={styles.featuredGhostButton} onPress={onWhatsapp}>
@@ -1206,19 +1284,16 @@ function FeaturedBanner({
 function RealMetric({
   icon,
   value,
-  small = false,
+  wide = false,
 }: {
   icon: ReactNode;
   value: string;
-  small?: boolean;
+  wide?: boolean;
 }) {
   return (
-    <View style={[styles.realMetricPill, small && styles.realMetricPillSmall]}>
+    <View style={[styles.realMetricPill, wide && styles.realMetricPillWide]}>
       {icon}
-      <Text
-        style={[styles.realMetricText, small && styles.realMetricTextSmall]}
-        numberOfLines={1}
-      >
+      <Text style={styles.realMetricText} numberOfLines={1}>
         {value}
       </Text>
     </View>
@@ -1280,12 +1355,13 @@ function ProjectCard({
 
 function AgentCard({
   agent,
-  listingsText,
+  verifiedText,
 }: {
   agent: TetamoAgent;
-  listingsText: string;
+  verifiedText: string;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const socialItems = getAgentSocialItems(agent);
 
   return (
     <Pressable style={styles.agentCard}>
@@ -1309,13 +1385,34 @@ function AgentCard({
         <View style={styles.agentRoleRow}>
           <ShieldCheck color="#e6c15c" size={11} />
           <Text style={styles.agentRole} numberOfLines={1}>
-            {agent.agency || agent.role}
+            {agent.agency || verifiedText}
           </Text>
         </View>
 
-        <Text style={styles.agentMeta}>
-          {agent.listings} {listingsText}
-        </Text>
+        {socialItems.length > 0 ? (
+          <View style={styles.agentSocialRow}>
+            {socialItems.map((item) => (
+              <Pressable
+                key={`${agent.id}-${item.key}`}
+                style={styles.agentSocialPill}
+                onPress={() => void safeOpenUrl(item.url)}
+              >
+                <FontAwesome5
+                  name={item.iconName as any}
+                  size={13}
+                  color="#ffffff"
+                />
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.agentSocialRow}>
+            <View style={styles.agentSocialPill}>
+              <ShieldCheck color="#e6c15c" size={13} />
+            </View>
+            <Text style={styles.agentSocialFallback}>{verifiedText}</Text>
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -1534,11 +1631,11 @@ const styles = StyleSheet.create({
   },
   cardCarousel: {
     gap: 12,
-    paddingBottom: 14,
+    paddingBottom: 16,
   },
   marketCard: {
     width: 270,
-    height: 302,
+    height: 285,
     borderRadius: 18,
     overflow: "hidden",
     borderWidth: 1,
@@ -1581,7 +1678,7 @@ const styles = StyleSheet.create({
   },
   marketOverlay: {
     borderRadius: 14,
-    backgroundColor: "rgba(0,0,0,0.68)",
+    backgroundColor: "rgba(0,0,0,0.66)",
     paddingHorizontal: 9,
     paddingVertical: 8,
   },
@@ -1616,38 +1713,30 @@ const styles = StyleSheet.create({
   },
   engagementRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     alignItems: "center",
-    gap: 5,
-    marginTop: 7,
-  },
-  engagementRowSmall: {
     gap: 4,
     marginTop: 6,
   },
   realMetricPill: {
+    minWidth: 31,
+    height: 23,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
     backgroundColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 7,
-    paddingVertical: 4,
+    paddingHorizontal: 5,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-  },
-  realMetricPillSmall: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
+    justifyContent: "center",
     gap: 3,
+  },
+  realMetricPillWide: {
+    minWidth: 46,
   },
   realMetricText: {
     color: "#ffffff",
-    fontSize: 8.5,
+    fontSize: 7.4,
     fontWeight: "900",
-  },
-  realMetricTextSmall: {
-    fontSize: 7.8,
   },
   marketActionRow: {
     flexDirection: "row",
@@ -1680,8 +1769,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#101010",
     overflow: "hidden",
     flexDirection: "row",
-    height: 168,
-    marginBottom: 22,
+    height: 215,
+    marginBottom: 24,
   },
   featuredImageWrap: {
     width: "70%",
@@ -1724,31 +1813,31 @@ const styles = StyleSheet.create({
   },
   featuredTitle: {
     color: "#ffffff",
-    fontSize: 11.2,
+    fontSize: 11,
     lineHeight: 14,
     fontWeight: "900",
     marginTop: 4,
   },
   featuredPrice: {
     color: "#ffffff",
-    fontSize: 9.8,
+    fontSize: 9.5,
     fontWeight: "900",
     marginTop: 4,
   },
   featuredUsd: {
     color: "#bdbdbd",
-    fontSize: 7.6,
+    fontSize: 7.3,
     fontWeight: "700",
     marginTop: 1,
   },
   featuredButtonRow: {
     flexDirection: "row",
     gap: 4,
-    marginTop: 6,
+    marginTop: 7,
   },
   featuredGhostButton: {
     flex: 1,
-    minHeight: 23,
+    minHeight: 24,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "#2b2b2b",
@@ -1767,11 +1856,11 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     borderRadius: 9,
     paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingVertical: 6,
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
-    marginTop: 6,
+    marginTop: 7,
   },
   viewButtonText: {
     fontSize: 7.8,
@@ -1855,7 +1944,7 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
   agentCard: {
-    width: 208,
+    width: 230,
     borderRadius: 15,
     borderWidth: 1,
     borderColor: "#333333",
@@ -1906,11 +1995,26 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     flex: 1,
   },
-  agentMeta: {
-    color: "#ffffff",
-    fontSize: 9.5,
+  agentSocialRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 7,
+  },
+  agentSocialPill: {
+    width: 26,
+    height: 26,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#3a3a3a",
+    backgroundColor: "#161616",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  agentSocialFallback: {
+    color: "#bfbfbf",
+    fontSize: 9,
     fontWeight: "800",
-    marginTop: 5,
   },
   ctaBanner: {
     borderRadius: 18,
