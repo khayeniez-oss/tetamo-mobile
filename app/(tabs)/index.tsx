@@ -4,12 +4,12 @@ import {
   BadgeCheck,
   Bath,
   BedDouble,
-  Bookmark,
   BrainCircuit,
   BriefcaseBusiness,
   Building2,
   Calculator,
   CalendarDays,
+  Camera,
   ChevronDown,
   ChevronRight,
   Eye,
@@ -26,7 +26,6 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  Star,
   Store,
   Trees,
   UserRound,
@@ -43,10 +42,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import {
   fetchHomepageProperties,
+  fetchPropertiesByCodes,
   type TetamoProperty,
 } from "../../services/properties";
 
@@ -55,6 +56,21 @@ type Currency = "IDR" | "USD" | "AUD";
 type Listing = TetamoProperty;
 
 const tetamoLogo = require("../../assets/images/tetamo-logo.png");
+
+const HERO_PROPERTY_CODES = ["TTM TBB 81", "TTM0 - UB", "TTM TNH 83"];
+
+const FEATURED_PROPERTY_CODES = [
+  "TTM BRW 85",
+  "TTM BRW 85Y",
+  "TTM-OK26",
+  "TTM0 -RTLO",
+  "TTM0 - BPB",
+  "TTM0 - SBI",
+  "TTM0 - E4R",
+  "TTM PDD 77",
+  "TTM0 -BALIFKB8",
+  "TTM0 - E2",
+];
 
 const HERO_FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=1400&auto=format&fit=crop";
@@ -74,75 +90,54 @@ const currencyRates: Record<Currency, number> = {
   AUD: 0.000094,
 };
 
-const fallbackListings: Listing[] = [
+const fallbackHeroListings: Listing[] = [
   {
-    id: "fallback-1",
+    id: "fallback-hero-1",
+    kode: "FALLBACK HERO",
     titleEn: "Luxury 4BR Villa in Canggu",
     titleId: "Villa Mewah 4KT di Canggu",
-    descriptionEn:
-      "Modern tropical villa with private pool, open living area, and premium lifestyle access near cafes and beaches.",
-    descriptionId:
-      "Villa tropis modern dengan kolam pribadi, ruang terbuka, dan akses premium dekat kafe serta pantai.",
+    descriptionEn: "",
+    descriptionId: "",
     location: "Canggu, Badung, Bali",
     area: "Canggu",
     image: HERO_FALLBACK_IMAGE,
+    images: [HERO_FALLBACK_IMAGE],
     priceIdr: 18500000000,
     beds: 4,
     baths: 4,
     size: 450,
-    badge: "Featured",
+    badge: "Spotlight",
     viewCount: 2100,
+    listingType: "sale",
+    rentalType: "",
+    propertyType: "Villa",
   },
+];
+
+const fallbackFeaturedListings: Listing[] = [
   {
-    id: "fallback-2",
+    id: "fallback-featured-1",
+    kode: "FALLBACK FEATURED",
     titleEn: "3BR Villa in Uluwatu",
     titleId: "Villa 3KT di Uluwatu",
-    descriptionEn: "Verified villa listing with direct inquiry.",
-    descriptionId: "Listing villa terverifikasi dengan inquiry langsung.",
+    descriptionEn: "",
+    descriptionId: "",
     location: "Uluwatu, Bali",
     area: "Uluwatu",
     image:
       "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?q=80&w=900&auto=format&fit=crop",
+    images: [
+      "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?q=80&w=900&auto=format&fit=crop",
+    ],
     priceIdr: 7950000000,
     beds: 3,
     baths: 3,
     size: 250,
     badge: "Featured",
     viewCount: 845,
-  },
-  {
-    id: "fallback-3",
-    titleEn: "2BR Apartment in SCBD",
-    titleId: "Apartemen 2KT di SCBD",
-    descriptionEn: "Modern apartment listing in Jakarta.",
-    descriptionId: "Listing apartemen modern di Jakarta.",
-    location: "Jakarta Selatan",
-    area: "Jakarta",
-    image:
-      "https://images.unsplash.com/photo-1600607688969-a5bfcd646154?q=80&w=900&auto=format&fit=crop",
-    priceIdr: 3200000000,
-    beds: 2,
-    baths: 2,
-    size: 128,
-    badge: "Boosted",
-    viewCount: 640,
-  },
-  {
-    id: "fallback-4",
-    titleEn: "Modern Townhouse",
-    titleId: "Townhouse Modern",
-    descriptionEn: "Modern townhouse with clean design.",
-    descriptionId: "Townhouse modern dengan desain bersih.",
-    location: "Surabaya, Jawa Timur",
-    area: "Surabaya",
-    image:
-      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=900&auto=format&fit=crop",
-    priceIdr: 2750000000,
-    beds: 3,
-    baths: 3,
-    size: 160,
-    badge: "Spotlight",
-    viewCount: 520,
+    listingType: "sale",
+    rentalType: "",
+    propertyType: "Villa",
   },
 ];
 
@@ -157,6 +152,7 @@ const fallbackProjects: Listing[] = [
     area: "Canggu",
     priceIdr: 2900000000,
     image: PROJECT_FALLBACK_IMAGE,
+    images: [PROJECT_FALLBACK_IMAGE],
     badge: "New Project",
   },
   {
@@ -170,6 +166,9 @@ const fallbackProjects: Listing[] = [
     priceIdr: 1750000000,
     image:
       "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=1000&auto=format&fit=crop",
+    images: [
+      "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=1000&auto=format&fit=crop",
+    ],
     badge: "New Project",
   },
 ];
@@ -182,6 +181,11 @@ const copy = {
     rent: "For Rent",
     monthly: "Monthly",
     yearly: "Yearly",
+    daily: "Daily",
+    featured: "Featured",
+    boosted: "Boosted",
+    spotlight: "Spotlight",
+    verified: "Verified",
     find: "Find your property with TETAMO",
     why: "Why Choose TETAMO",
     verifiedListings: "Verified Listings",
@@ -192,9 +196,16 @@ const copy = {
     verifiedOwnersSub: "Real & verified owners",
     trustedPlatform: "Trusted Platform",
     trustedPlatformSub: "Secure & transparent",
-    smart: "Smart System for\nSmarter Buyers & Renters",
-    learnMore: "Learn More",
-    featured: "Featured Listings",
+    smart: "Smart System for Smarter Buyers & Renters",
+    smartSub:
+      "AI-assisted bilingual listings, direct inquiries, viewing schedule, AI Powered tools, and commission system for agents.",
+    smartBilingual: "Bilingual",
+    smartMedia: "Media",
+    smartSeo: "SEO",
+    smartExposure: "Exposure",
+    smartAiPowered: "AI Powered",
+    smartCommission: "Commission System",
+    featuredListings: "Featured Listings",
     popular: "Popular Areas",
     newProjects: "New Projects",
     whyList: "Why list with Tetamo?",
@@ -223,8 +234,7 @@ const copy = {
     listCtaSub: "Reach serious buyers & renters across Indonesia",
     getStarted: "Get Started",
     seeAll: "See all",
-    loading: "Loading latest Tetamo listings...",
-    fallback: "Showing preview listings until live listings are available.",
+    photos: "Photos",
   },
   id: {
     subtitle: "Properti Marketplace",
@@ -233,6 +243,11 @@ const copy = {
     rent: "Disewa",
     monthly: "Bulanan",
     yearly: "Tahunan",
+    daily: "Harian",
+    featured: "Unggulan",
+    boosted: "Boosted",
+    spotlight: "Spotlight",
+    verified: "Terverifikasi",
     find: "Temukan properti Anda dengan TETAMO",
     why: "Mengapa Pilih TETAMO",
     verifiedListings: "Listing Terverifikasi",
@@ -243,9 +258,16 @@ const copy = {
     verifiedOwnersSub: "Pemilik asli & jelas",
     trustedPlatform: "Platform Terpercaya",
     trustedPlatformSub: "Aman & transparan",
-    smart: "Sistem Pintar untuk\nPembeli & Penyewa",
-    learnMore: "Pelajari",
-    featured: "Listing Unggulan",
+    smart: "Sistem Pintar untuk Buyer & Renter",
+    smartSub:
+      "Listing bilingual dengan AI, inquiry langsung, jadwal viewing, AI Powered tools, dan sistem komisi untuk agen.",
+    smartBilingual: "Bilingual",
+    smartMedia: "Media",
+    smartSeo: "SEO",
+    smartExposure: "Exposure",
+    smartAiPowered: "AI Powered",
+    smartCommission: "Sistem Komisi",
+    featuredListings: "Listing Unggulan",
     popular: "Area Populer",
     newProjects: "Proyek Baru",
     whyList: "Kenapa listing di Tetamo?",
@@ -274,94 +296,68 @@ const copy = {
     listCtaSub: "Jangkau pembeli & penyewa serius di Indonesia",
     getStarted: "Mulai",
     seeAll: "Lihat semua",
-    loading: "Memuat listing terbaru Tetamo...",
-    fallback: "Menampilkan preview listing sampai listing live tersedia.",
+    photos: "Foto",
   },
 };
 
-function getShortText(value: string | undefined, fallback: string, max = 115) {
-  const text = (value || fallback).replace(/\s+/g, " ").trim();
-
-  if (text.length <= max) {
-    return text;
-  }
-
-  return `${text.slice(0, max).trim()}...`;
-}
-
 export default function HomeScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+
   const [language, setLanguage] = useState<Language>("en");
   const [currency, setCurrency] = useState<Currency>("IDR");
-  const [properties, setProperties] = useState<Listing[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [usedFallback, setUsedFallback] = useState(false);
+  const [heroListings, setHeroListings] = useState<Listing[]>([]);
+  const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);
+  const [allProperties, setAllProperties] = useState<Listing[]>([]);
+  const [heroIndex, setHeroIndex] = useState(0);
 
   const t = copy[language];
+  const heroCardWidth = width - 36;
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadHomepageProperties() {
+    async function loadHomepageData() {
       try {
-        setIsLoading(true);
-        const rows = await fetchHomepageProperties(16);
+        const [heroRows, featuredRows, areaRows] = await Promise.all([
+          fetchPropertiesByCodes(HERO_PROPERTY_CODES),
+          fetchPropertiesByCodes(FEATURED_PROPERTY_CODES),
+          fetchHomepageProperties(24),
+        ]);
 
         if (!isMounted) return;
 
-        const liveRows = rows.filter((property) => property.priceIdr > 0);
-
-        if (liveRows.length > 0) {
-          setProperties(liveRows);
-          setUsedFallback(false);
-        } else {
-          setProperties(fallbackListings);
-          setUsedFallback(true);
-        }
+        setHeroListings(heroRows.length > 0 ? heroRows : fallbackHeroListings);
+        setFeaturedListings(
+          featuredRows.length > 0 ? featuredRows : fallbackFeaturedListings
+        );
+        setAllProperties(areaRows.length > 0 ? areaRows : featuredRows);
       } catch (error) {
-        console.log("Tetamo mobile homepage fallback:", error);
+        console.log("Tetamo curated homepage fallback:", error);
 
         if (!isMounted) return;
 
-        setProperties(fallbackListings);
-        setUsedFallback(true);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        setHeroListings(fallbackHeroListings);
+        setFeaturedListings(fallbackFeaturedListings);
+        setAllProperties(fallbackFeaturedListings);
       }
     }
 
-    loadHomepageProperties();
+    loadHomepageData();
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const hero = properties[0] || fallbackListings[0];
+  const heroItems =
+    heroListings.length > 0 ? heroListings : fallbackHeroListings;
 
-  const featuredListings = useMemo(() => {
-    const rows =
-      properties.length > 1 ? properties.slice(1, 9) : fallbackListings.slice(1);
-
-    return rows.length > 0 ? rows : fallbackListings.slice(1);
-  }, [properties]);
-
-  const projectListings = useMemo(() => {
-    const rows = properties.filter((property) =>
-      property.badge?.toLowerCase().includes("project")
-    );
-
-    if (rows.length > 0) {
-      return rows.slice(0, 3);
-    }
-
-    return fallbackProjects;
-  }, [properties]);
+  const featuredItems =
+    featuredListings.length > 0 ? featuredListings : fallbackFeaturedListings;
 
   const popularAreas = useMemo(() => {
-    const areas = properties
+    const areas = allProperties
       .map((property) => property.area || property.location)
       .filter(Boolean)
       .map((area) => String(area).split(",")[0].trim())
@@ -383,7 +379,7 @@ export default function HomeScreen() {
       "Uluwatu",
       "BSD City",
     ];
-  }, [properties]);
+  }, [allProperties]);
 
   const formatPrice = useMemo(() => {
     return (priceIdr: number) => {
@@ -405,14 +401,29 @@ export default function HomeScreen() {
     router.push(query ? (`/property?${query}` as any) : ("/property" as any));
   };
 
+  const goDetails = (property: Listing) => {
+    const pathKey = encodeURIComponent(property.slug || property.id);
+    router.push(`/properti/${pathKey}` as any);
+  };
+
   const goAddListing = (audience?: string) => {
     router.push(
-      audience ? (`/add-listing?audience=${audience}` as any) : ("/add-listing" as any)
+      audience
+        ? (`/add-listing?audience=${audience}` as any)
+        : ("/add-listing" as any)
     );
   };
 
   const openWebsite = (path: string) => {
     Linking.openURL(`https://www.tetamo.com${path}`);
+  };
+
+  const handleHeroScrollEnd = (event: any) => {
+    const nextIndex = Math.round(
+      event.nativeEvent.contentOffset.x / heroCardWidth
+    );
+
+    setHeroIndex(Math.max(0, Math.min(nextIndex, heroItems.length - 1)));
   };
 
   return (
@@ -426,7 +437,11 @@ export default function HomeScreen() {
       >
         <View style={styles.header}>
           <View style={styles.brandRow}>
-            <Image source={tetamoLogo} style={styles.logoImage} resizeMode="contain" />
+            <Image
+              source={tetamoLogo}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
 
             <View>
               <Text style={styles.brandText}>TETAMO</Text>
@@ -498,116 +513,98 @@ export default function HomeScreen() {
           <SlidersHorizontal color="#ffffff" size={19} />
         </Pressable>
 
-        {isLoading && (
-          <View style={styles.statusBox}>
-            <Text style={styles.statusText}>{t.loading}</Text>
-          </View>
-        )}
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={handleHeroScrollEnd}
+          scrollEventThrottle={16}
+          style={styles.heroCarousel}
+        >
+          {heroItems.map((hero, index) => (
+            <Pressable
+              key={`${hero.id}-${index}`}
+              style={[styles.heroSlide, { width: heroCardWidth }]}
+              onPress={() => goDetails(hero)}
+            >
+              <SafeImageBackground
+                uri={hero.image}
+                fallback={HERO_FALLBACK_IMAGE}
+                style={styles.heroCard}
+                imageStyle={styles.heroImage}
+              >
+                <View style={styles.heroShade} />
 
-        {!isLoading && usedFallback && (
-          <View style={styles.statusBox}>
-            <Text style={styles.statusText}>{t.fallback}</Text>
-          </View>
-        )}
+                <View style={styles.heroTop}>
+                  <View style={styles.badgeRow}>
+                    {getStatusBadges(hero, language).map((badge) => (
+                      <Badge
+                        key={`${hero.id}-${badge.label}`}
+                        label={badge.label}
+                        color={badge.color}
+                        textColor={badge.textColor}
+                      />
+                    ))}
+                  </View>
 
-        <Pressable onPress={() => goProperty(`id=${hero.id}`)}>
-          <SafeImageBackground
-            uri={hero.image}
-            fallback={HERO_FALLBACK_IMAGE}
-            style={styles.heroCard}
-            imageStyle={styles.heroImage}
-          >
-            <View style={styles.heroShade} />
+                  <View style={styles.counterBadge}>
+                    <Text style={styles.counterText}>
+                      {index + 1} / {heroItems.length}
+                    </Text>
+                  </View>
+                </View>
 
-            <View style={styles.heroTop}>
-              <View style={styles.badgeRow}>
-                <Badge label={t.sale} color="#ffffff" textColor="#111111" />
-                <Badge label={t.rent} color="#2563eb" textColor="#ffffff" />
-                <Badge label={t.monthly} color="#16a34a" textColor="#ffffff" />
-                <Badge label={t.yearly} color="#f59e0b" textColor="#111111" />
-              </View>
+                <View style={styles.heroBottom}>
+                  <Text style={styles.heroPrice}>
+                    {formatPrice(hero.priceIdr)}
+                  </Text>
 
-              <View style={styles.counterBadge}>
-                <Text style={styles.counterText}>1 / 5</Text>
-              </View>
-            </View>
-
-            <View style={styles.heroBottom}>
-              <Text style={styles.heroPrice}>{formatPrice(hero.priceIdr)}</Text>
-
-              {currency === "IDR" && hero.priceIdr > 0 && (
-                <Text style={styles.heroConverted}>
-                  ≈ USD{" "}
-                  {Math.round(hero.priceIdr * currencyRates.USD).toLocaleString(
-                    "en-US"
-                  )}{" "}
-                  · AUD{" "}
-                  {Math.round(hero.priceIdr * currencyRates.AUD).toLocaleString(
-                    "en-US"
+                  {currency === "IDR" && hero.priceIdr > 0 && (
+                    <Text style={styles.heroConverted}>
+                      ≈ USD{" "}
+                      {Math.round(
+                        hero.priceIdr * currencyRates.USD
+                      ).toLocaleString("en-US")}{" "}
+                      · AUD{" "}
+                      {Math.round(
+                        hero.priceIdr * currencyRates.AUD
+                      ).toLocaleString("en-US")}
+                    </Text>
                   )}
-                </Text>
-              )}
 
-              <Text style={styles.heroTitle} numberOfLines={2}>
-                {language === "en" ? hero.titleEn : hero.titleId}
-              </Text>
+                  <Text style={styles.heroTitle} numberOfLines={2}>
+                    {language === "en" ? hero.titleEn : hero.titleId}
+                  </Text>
 
-              <View style={styles.locationRow}>
-                <MapPin color="#ffffff" size={13} />
-                <Text style={styles.heroLocation} numberOfLines={1}>
-                  {hero.location}
-                </Text>
-              </View>
+                  <View style={styles.locationRow}>
+                    <MapPin color="#ffffff" size={13} />
+                    <Text style={styles.heroLocation} numberOfLines={1}>
+                      {hero.location}
+                    </Text>
+                  </View>
 
-              <Text style={styles.heroDescription} numberOfLines={2}>
-                {getShortText(
-                  language === "en" ? hero.descriptionEn : hero.descriptionId,
-                  language === "en"
-                    ? "Verified property listing with direct inquiry and schedule viewing."
-                    : "Listing properti terverifikasi dengan inquiry langsung dan jadwal viewing.",
-                  115
-                )}
-              </Text>
-
-              <View style={styles.metricRow}>
-                <Metric
-                  bg="#e11d48"
-                  icon={<Heart color="#ffffff" size={17} />}
-                  value="256"
-                />
-                <Metric
-                  bg="#7c3aed"
-                  icon={<Bookmark color="#ffffff" size={17} />}
-                  value="314"
-                />
-                <Metric
-                  bg="#f59e0b"
-                  icon={<Star color="#111111" size={17} />}
-                  value="4.9"
-                  textColor="#111111"
-                />
-                <Metric
-                  bg="#0284c7"
-                  icon={<Share2 color="#ffffff" size={17} />}
-                  value="128"
-                />
-                <Metric
-                  bg="#16a34a"
-                  icon={<Eye color="#ffffff" size={17} />}
-                  value={
-                    hero.viewCount && hero.viewCount > 999
-                      ? `${(hero.viewCount / 1000).toFixed(1)}K`
-                      : String(hero.viewCount || "0")
-                  }
-                />
-              </View>
-            </View>
-          </SafeImageBackground>
-        </Pressable>
+                  <View style={styles.metricRow}>
+                    <Metric
+                      icon={<Eye color="#ffffff" size={15} />}
+                      value={formatCompactNumber(hero.viewCount || 0)}
+                    />
+                    <Metric
+                      icon={<Camera color="#ffffff" size={15} />}
+                      value={`${getPhotoCount(hero)} ${t.photos}`}
+                    />
+                  </View>
+                </View>
+              </SafeImageBackground>
+            </Pressable>
+          ))}
+        </ScrollView>
 
         <View style={styles.dots}>
-          {[0, 1, 2, 3, 4].map((dot) => (
-            <View key={dot} style={[styles.dot, dot === 0 && styles.activeDot]} />
+          {heroItems.map((_, dot) => (
+            <View
+              key={dot}
+              style={[styles.dot, dot === heroIndex && styles.activeDot]}
+            />
           ))}
         </View>
 
@@ -654,6 +651,29 @@ export default function HomeScreen() {
           />
         </ScrollView>
 
+        <SectionHeader
+          title={t.featuredListings}
+          action={t.seeAll}
+          onPress={() => goProperty("section=featured")}
+        />
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.listingRow}
+        >
+          {featuredItems.map((listing) => (
+            <PropertyCard
+              key={listing.id}
+              listing={listing}
+              currency={currency}
+              language={language}
+              formatPrice={formatPrice}
+              onPress={() => goDetails(listing)}
+            />
+          ))}
+        </ScrollView>
+
         <Text style={styles.sectionTitle}>{t.why}</Text>
 
         <View style={styles.trustGrid}>
@@ -681,47 +701,44 @@ export default function HomeScreen() {
 
         <View style={styles.smartBanner}>
           <View style={styles.smartIconBox}>
-            <BrainCircuit color="#ffffff" size={30} />
+            <BrainCircuit color="#e6c15c" size={28} />
           </View>
 
-          <Text style={styles.smartText}>{t.smart}</Text>
+          <View style={styles.smartContent}>
+            <Text style={styles.smartText}>{t.smart}</Text>
+            <Text style={styles.smartSub}>{t.smartSub}</Text>
 
-          <Pressable onPress={() => openWebsite("/about-us")} style={styles.learnButton}>
-            <Text style={styles.learnButtonText}>{t.learnMore}</Text>
-            <ChevronRight color="#111111" size={15} />
-          </Pressable>
+            <View style={styles.smartChipRow}>
+              <SmartChip
+                icon={<Languages color="#ffffff" size={11} />}
+                label={t.smartBilingual}
+              />
+              <SmartChip
+                icon={<Camera color="#ffffff" size={11} />}
+                label={t.smartMedia}
+              />
+              <SmartChip
+                icon={<Search color="#ffffff" size={11} />}
+                label={t.smartSeo}
+              />
+              <SmartChip
+                icon={<Share2 color="#ffffff" size={11} />}
+                label={t.smartExposure}
+              />
+              <SmartChip
+                icon={<Sparkles color="#ffffff" size={11} />}
+                label={t.smartAiPowered}
+              />
+              <SmartChip
+                icon={<Calculator color="#ffffff" size={11} />}
+                label={t.smartCommission}
+              />
+            </View>
+          </View>
         </View>
 
-        <SectionHeader
-          title={t.featured}
-          action={t.seeAll}
-          onPress={() => goProperty("section=featured")}
-        />
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.listingRow}
-        >
-          {featuredListings.map((listing) => (
-            <PropertyCard
-              key={listing.id}
-              listing={listing}
-              currency={currency}
-              language={language}
-              formatPrice={formatPrice}
-              onPress={() => goProperty(`id=${listing.id}`)}
-            />
-          ))}
-        </ScrollView>
-
         <View style={styles.panel}>
-          <SectionHeader
-            title={t.popular}
-            action={t.seeAll}
-            compact
-            onPress={() => goProperty("section=popular-areas")}
-          />
+          <SectionHeader title={t.popular} compact />
 
           <View style={styles.areaWrap}>
             {popularAreas.map((area) => (
@@ -738,19 +755,10 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.panel}>
-          <SectionHeader
-            title={t.newProjects}
-            action={t.seeAll}
-            compact
-            onPress={() => goProperty("section=new-projects")}
-          />
+          <SectionHeader title={t.newProjects} compact />
 
-          {projectListings.map((project) => (
-            <Pressable
-              key={project.id}
-              style={styles.projectRow}
-              onPress={() => goProperty(`project=${project.id}`)}
-            >
+          {fallbackProjects.map((project) => (
+            <View key={project.id} style={styles.projectRow}>
               <SafeImage
                 uri={project.image}
                 fallback={PROJECT_FALLBACK_IMAGE}
@@ -768,7 +776,7 @@ export default function HomeScreen() {
                   From {formatPrice(project.priceIdr)}
                 </Text>
               </View>
-            </Pressable>
+            </View>
           ))}
         </View>
 
@@ -875,6 +883,116 @@ export default function HomeScreen() {
   );
 }
 
+function getPhotoCount(listing: Listing) {
+  if (listing.images?.length) return listing.images.length;
+  if (listing.image) return 1;
+  return 0;
+}
+
+function formatCompactNumber(value: number) {
+  if (!value || value <= 0) return "0";
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+  return String(value);
+}
+
+function getStatusBadges(listing: Listing, language: Language) {
+  const t = copy[language];
+
+  const listingType = String(listing.listingType || "").toLowerCase();
+  const rentalType = String(listing.rentalType || "").toLowerCase();
+  const badge = String(listing.badge || "").toLowerCase();
+
+  const badges: { label: string; color: string; textColor: string }[] = [];
+
+  if (
+    listingType.includes("sale") ||
+    listingType.includes("sell") ||
+    listingType.includes("jual")
+  ) {
+    badges.push({
+      label: t.sale,
+      color: "#ffffff",
+      textColor: "#111111",
+    });
+  }
+
+  if (
+    listingType.includes("rent") ||
+    listingType.includes("sewa") ||
+    rentalType.length > 0
+  ) {
+    badges.push({
+      label: t.rent,
+      color: "#2563eb",
+      textColor: "#ffffff",
+    });
+  }
+
+  if (rentalType.includes("month") || rentalType.includes("bulan")) {
+    badges.push({
+      label: t.monthly,
+      color: "#16a34a",
+      textColor: "#ffffff",
+    });
+  }
+
+  if (
+    rentalType.includes("year") ||
+    rentalType.includes("annual") ||
+    rentalType.includes("tahun")
+  ) {
+    badges.push({
+      label: t.yearly,
+      color: "#f59e0b",
+      textColor: "#111111",
+    });
+  }
+
+  if (rentalType.includes("daily") || rentalType.includes("hari")) {
+    badges.push({
+      label: t.daily,
+      color: "#ec4899",
+      textColor: "#ffffff",
+    });
+  }
+
+  if (badge.includes("spotlight")) {
+    badges.push({
+      label: t.spotlight,
+      color: "#7c3aed",
+      textColor: "#ffffff",
+    });
+  } else if (badge.includes("boost")) {
+    badges.push({
+      label: t.boosted,
+      color: "#0284c7",
+      textColor: "#ffffff",
+    });
+  } else if (badge.includes("featured")) {
+    badges.push({
+      label: t.featured,
+      color: "#f59e0b",
+      textColor: "#111111",
+    });
+  } else if (badge.includes("verified")) {
+    badges.push({
+      label: t.verified,
+      color: "#111111",
+      textColor: "#ffffff",
+    });
+  }
+
+  if (badges.length === 0) {
+    badges.push({
+      label: t.verified,
+      color: "#111111",
+      textColor: "#ffffff",
+    });
+  }
+
+  return badges.slice(0, 4);
+}
+
 function SafeImage({
   uri,
   fallback,
@@ -946,21 +1064,11 @@ function Badge({
   );
 }
 
-function Metric({
-  icon,
-  value,
-  bg,
-  textColor = "#ffffff",
-}: {
-  icon: ReactNode;
-  value: string;
-  bg: string;
-  textColor?: string;
-}) {
+function Metric({ icon, value }: { icon: ReactNode; value: string }) {
   return (
-    <View style={[styles.metric, { backgroundColor: bg }]}>
+    <View style={styles.metric}>
       {icon}
-      <Text style={[styles.metricText, { color: textColor }]}>{value}</Text>
+      <Text style={styles.metricText}>{value}</Text>
     </View>
   );
 }
@@ -972,7 +1080,7 @@ function SectionHeader({
   onPress,
 }: {
   title: string;
-  action: string;
+  action?: string;
   compact?: boolean;
   onPress?: () => void;
 }) {
@@ -982,10 +1090,12 @@ function SectionHeader({
         {title}
       </Text>
 
-      <Pressable style={styles.seeAllRow} onPress={onPress}>
-        <Text style={styles.seeAllText}>{action}</Text>
-        <ChevronRight color="#ffffff" size={13} />
-      </Pressable>
+      {action ? (
+        <Pressable style={styles.seeAllRow} onPress={onPress}>
+          <Text style={styles.seeAllText}>{action}</Text>
+          <ChevronRight color="#ffffff" size={13} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -1023,6 +1133,15 @@ function TrustCard({
         <Text style={styles.trustTitle}>{title}</Text>
         <Text style={styles.trustSubtitle}>{subtitle}</Text>
       </View>
+    </View>
+  );
+}
+
+function SmartChip({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <View style={styles.smartChip}>
+      {icon}
+      <Text style={styles.smartChipText}>{label}</Text>
     </View>
   );
 }
@@ -1291,22 +1410,14 @@ const styles = StyleSheet.create({
     color: "#9f9f9f",
     fontSize: 14,
   },
-  statusBox: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#2f2f2f",
-    backgroundColor: "#101010",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
+  heroCarousel: {
+    overflow: "visible",
   },
-  statusText: {
-    color: "#cfcfcf",
-    fontSize: 11.5,
-    fontWeight: "700",
+  heroSlide: {
+    paddingRight: 0,
   },
   heroCard: {
-    height: 350,
+    height: 330,
     borderRadius: 25,
     overflow: "hidden",
     justifyContent: "space-between",
@@ -1318,7 +1429,7 @@ const styles = StyleSheet.create({
   },
   heroShade: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.32)",
+    backgroundColor: "rgba(0,0,0,0.24)",
   },
   heroTop: {
     flexDirection: "row",
@@ -1386,30 +1497,28 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     flex: 1,
   },
-  heroDescription: {
-    color: "#f0f0f0",
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 6,
-    maxWidth: "92%",
-  },
   metricRow: {
     flexDirection: "row",
-    gap: 7,
+    alignItems: "center",
+    gap: 8,
     marginTop: 13,
   },
   metric: {
-    width: 50,
-    height: 50,
-    borderRadius: 17,
+    minWidth: 74,
+    height: 36,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)",
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(0,0,0,0.58)",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
+    gap: 5,
+    paddingHorizontal: 10,
   },
   metricText: {
-    fontSize: 9.5,
+    color: "#ffffff",
+    fontSize: 10,
     fontWeight: "900",
   },
   dots: {
@@ -1520,11 +1629,11 @@ const styles = StyleSheet.create({
   smartBanner: {
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#0f0f0f",
-    padding: 16,
+    borderColor: "#705d2c",
+    backgroundColor: "#211a0b",
+    padding: 15,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 12,
     marginBottom: 24,
   },
@@ -1532,33 +1641,50 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 19,
-    backgroundColor: "#191919",
+    backgroundColor: "#151106",
     borderWidth: 1,
-    borderColor: "#343434",
+    borderColor: "#705d2c",
     alignItems: "center",
     justifyContent: "center",
   },
-  smartText: {
+  smartContent: {
     flex: 1,
+  },
+  smartText: {
     color: "#ffffff",
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 15.5,
+    lineHeight: 19,
     fontWeight: "900",
     letterSpacing: -0.25,
   },
-  learnButton: {
-    backgroundColor: "#ffffff",
+  smartSub: {
+    color: "#d8d8d8",
+    fontSize: 10.7,
+    lineHeight: 16,
+    fontWeight: "700",
+    marginTop: 5,
+  },
+  smartChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 10,
+  },
+  smartChip: {
     borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: "#705d2c",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
+    gap: 4,
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
-  learnButtonText: {
-    color: "#111111",
-    fontSize: 10.5,
-    fontWeight: "900",
+  smartChipText: {
+    color: "#ffffff",
+    fontSize: 8.7,
+    fontWeight: "800",
   },
   listingRow: {
     gap: 12,

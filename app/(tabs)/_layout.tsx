@@ -1,5 +1,11 @@
 import { Tabs } from "expo-router";
-import { Heart, Home, Plus, Search, UserRound } from "lucide-react-native";
+import {
+  Building2,
+  Heart,
+  Home,
+  Plus,
+  UserRound,
+} from "lucide-react-native";
 
 export default function TabLayout() {
   return (
@@ -33,7 +39,9 @@ export default function TabLayout() {
         name="property"
         options={{
           title: "Property",
-          tabBarIcon: ({ color, size }) => <Search color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <Building2 color={color} size={size} />
+          ),
         }}
       />
 
