@@ -1,5 +1,8 @@
+import { FontAwesome5 } from "@expo/vector-icons";
+import { makeRedirectUri } from "expo-auth-session";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import * as WebBrowser from "expo-web-browser";
 import {
     AlertCircle,
     ChevronRight,
@@ -20,9 +23,11 @@ import {
     StyleSheet,
     Text,
     TextInput,
-    View
+    View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
+
+WebBrowser.maybeCompleteAuthSession();
 
 type UserRole =
   | "owner"
@@ -31,6 +36,8 @@ type UserRole =
   | "admin"
   | "buyer"
   | "unknown";
+
+type OAuthProvider = "google" | "apple";
 
 const ROUTES = {
   signup: "/signup",
@@ -63,6 +70,9 @@ export default function LoginScreen() {
   const [loginError, setLoginError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [socialLoading, setSocialLoading] = useState<OAuthProvider | null>(
+    null
+  );
 
   const signupRoute = useMemo(() => {
     const query = new URLSearchParams();
@@ -140,9 +150,12 @@ export default function LoginScreen() {
 
       if (error || !profile) {
         redirectingRef.current = false;
-        setLoginError("User profile not found. Please contact Tetamo support.");
+        setLoginError(
+          "User profile not found. Please sign up first or contact Tetamo support."
+        );
         setLoading(false);
         setCheckingSession(false);
+        setSocialLoading(null);
         return;
       }
 
@@ -157,6 +170,7 @@ export default function LoginScreen() {
     } finally {
       setLoading(false);
       setCheckingSession(false);
+      setSocialLoading(null);
     }
   }
 
@@ -177,6 +191,7 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
+    setSocialLoading(null);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -204,7 +219,65 @@ export default function LoginScreen() {
     }
   }
 
-  const isBusy = loading || checkingSession;
+  async function handleOAuthLogin(provider: OAuthProvider) {
+    setLoginError("");
+    setLoading(true);
+    setSocialLoading(provider);
+
+    try {
+      const redirectTo = makeRedirectUri({
+        scheme: "tetamomobile",
+        path: "auth/callback",
+      });
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+          ...(provider === "google"
+            ? {
+                queryParams: {
+                  prompt: "select_account",
+                },
+              }
+            : {}),
+        },
+      });
+
+      if (error) {
+        setLoginError(error.message);
+        return;
+      }
+
+      if (!data?.url) {
+        setLoginError("No OAuth URL was returned.");
+        return;
+      }
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+      if (result.type !== "success") {
+        return;
+      }
+
+      const session = await createSessionFromUrl(result.url);
+
+      if (!session?.user?.id) {
+        setLoginError("Unable to complete social login.");
+        return;
+      }
+
+      await finishLogin(session.user.id);
+    } catch (error: any) {
+      setLoginError(error?.message || "Unable to complete social login.");
+    } finally {
+      setLoading(false);
+      setSocialLoading(null);
+    }
+  }
+
+  const isBusy = loading || checkingSession || socialLoading !== null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -252,7 +325,7 @@ export default function LoginScreen() {
               <View style={styles.formHeaderText}>
                 <Text style={styles.formTitle}>Log in to TETAMO</Text>
                 <Text style={styles.formSub}>
-                  Use the email and password you registered with.
+                  Use your email, Google, or Apple account.
                 </Text>
               </View>
             </View>
@@ -271,6 +344,30 @@ export default function LoginScreen() {
                 </View>
               </View>
             ) : null}
+
+            <OAuthButton
+              provider="google"
+              label="Continue with Google"
+              loadingLabel="Connecting to Google..."
+              loading={socialLoading === "google"}
+              disabled={isBusy}
+              onPress={() => void handleOAuthLogin("google")}
+            />
+
+            <OAuthButton
+              provider="apple"
+              label="Continue with Apple"
+              loadingLabel="Connecting to Apple..."
+              loading={socialLoading === "apple"}
+              disabled={isBusy}
+              onPress={() => void handleOAuthLogin("apple")}
+            />
+
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.dividerLine} />
+            </View>
 
             <View>
               <Text style={styles.inputLabel}>Email</Text>
@@ -331,7 +428,7 @@ export default function LoginScreen() {
               disabled={isBusy}
               onPress={handleLogin}
             >
-              {isBusy ? (
+              {isBusy && !socialLoading ? (
                 <ActivityIndicator color="#111111" />
               ) : (
                 <>
@@ -364,6 +461,42 @@ export default function LoginScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+function OAuthButton({
+  provider,
+  label,
+  loadingLabel,
+  loading,
+  disabled,
+  onPress,
+}: {
+  provider: OAuthProvider;
+  label: string;
+  loadingLabel: string;
+  loading: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={[styles.oauthButton, disabled && styles.oauthDisabled]}
+      disabled={disabled}
+      onPress={onPress}
+    >
+      {loading ? (
+        <ActivityIndicator color="#ffffff" />
+      ) : (
+        <FontAwesome5
+          name={provider === "google" ? "google" : "apple"}
+          color="#ffffff"
+          size={16}
+        />
+      )}
+
+      <Text style={styles.oauthText}>{loading ? loadingLabel : label}</Text>
+    </Pressable>
   );
 }
 
@@ -415,7 +548,6 @@ function normalizeNextPath(value: string) {
   if (!raw) return "";
   if (raw.startsWith("http://") || raw.startsWith("https://")) return "";
   if (raw.startsWith("//")) return "";
-
   if (raw.startsWith("/")) return raw;
 
   return `/${raw}`;
@@ -435,6 +567,62 @@ function getDestinationPath(role: UserRole, safeNext: string) {
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function extractAuthParamsFromUrl(url: string) {
+  const queryString = url.includes("?") ? url.split("?")[1]?.split("#")[0] : "";
+  const hashString = url.includes("#") ? url.split("#")[1] : "";
+
+  const queryParams = new URLSearchParams(queryString || "");
+  const hashParams = new URLSearchParams(hashString || "");
+
+  return {
+    code: queryParams.get("code") || hashParams.get("code") || "",
+    accessToken:
+      queryParams.get("access_token") || hashParams.get("access_token") || "",
+    refreshToken:
+      queryParams.get("refresh_token") || hashParams.get("refresh_token") || "",
+    error:
+      queryParams.get("error_description") ||
+      hashParams.get("error_description") ||
+      queryParams.get("error") ||
+      hashParams.get("error") ||
+      "",
+  };
+}
+
+async function createSessionFromUrl(url: string) {
+  const { code, accessToken, refreshToken, error } = extractAuthParamsFromUrl(url);
+
+  if (error) {
+    throw new Error(error);
+  }
+
+  if (code) {
+    const { data, error: exchangeError } =
+      await supabase.auth.exchangeCodeForSession(code);
+
+    if (exchangeError) {
+      throw exchangeError;
+    }
+
+    return data.session;
+  }
+
+  if (!accessToken || !refreshToken) {
+    throw new Error("Missing OAuth session tokens.");
+  }
+
+  const { data, error: sessionError } = await supabase.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+
+  if (sessionError) {
+    throw sessionError;
+  }
+
+  return data.session;
 }
 
 const styles = StyleSheet.create({
@@ -578,6 +766,43 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 5,
     textDecorationLine: "underline",
+  },
+  oauthButton: {
+    minHeight: 49,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#343434",
+    backgroundColor: "#050505",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    paddingHorizontal: 14,
+  },
+  oauthDisabled: {
+    opacity: 0.55,
+  },
+  oauthText: {
+    color: "#ffffff",
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    marginVertical: 2,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#303030",
+  },
+  dividerText: {
+    color: "#777777",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
   },
   inputLabel: {
     color: "#ffffff",
