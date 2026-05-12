@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   Bath,
   BedDouble,
+  Bookmark,
   BrainCircuit,
   BriefcaseBusiness,
   Building2,
@@ -26,6 +27,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  Star,
   Store,
   Trees,
   UserRound,
@@ -42,6 +44,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -108,6 +111,11 @@ const fallbackHeroListings: Listing[] = [
     size: 450,
     badge: "Spotlight",
     viewCount: 2100,
+    likeCount: 0,
+    saveCount: 0,
+    ratingCount: 0,
+    ratingAverage: 0,
+    shareCount: 0,
     listingType: "sale",
     rentalType: "",
     propertyType: "Villa",
@@ -135,6 +143,11 @@ const fallbackFeaturedListings: Listing[] = [
     size: 250,
     badge: "Featured",
     viewCount: 845,
+    likeCount: 0,
+    saveCount: 0,
+    ratingCount: 0,
+    ratingAverage: 0,
+    shareCount: 0,
     listingType: "sale",
     rentalType: "",
     propertyType: "Villa",
@@ -306,6 +319,7 @@ export default function HomeScreen() {
 
   const [language, setLanguage] = useState<Language>("en");
   const [currency, setCurrency] = useState<Currency>("IDR");
+  const [searchInput, setSearchInput] = useState("");
   const [heroListings, setHeroListings] = useState<Listing[]>([]);
   const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);
   const [allProperties, setAllProperties] = useState<Listing[]>([]);
@@ -397,8 +411,26 @@ export default function HomeScreen() {
     };
   }, [currency]);
 
-  const goProperty = (query?: string) => {
-    router.push(query ? (`/property?${query}` as any) : ("/property" as any));
+  const goSearch = (params?: Record<string, string>) => {
+    const query = new URLSearchParams();
+
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value.trim()) query.set(key, value.trim());
+    });
+
+    const qs = query.toString();
+    router.push(qs ? (`/search?${qs}` as any) : ("/search" as any));
+  };
+
+  const submitSearch = () => {
+    const keyword = searchInput.trim();
+
+    if (keyword) {
+      goSearch({ query: keyword });
+      return;
+    }
+
+    goSearch();
   };
 
   const goDetails = (property: Listing) => {
@@ -452,7 +484,7 @@ export default function HomeScreen() {
           <View style={styles.headerControls}>
             <Pressable
               style={styles.locationPill}
-              onPress={() => goProperty("country=Indonesia")}
+              onPress={() => goSearch({ query: "Indonesia" })}
             >
               <MapPin color="#ffffff" size={12} />
               <Text style={styles.pillText}>Indonesia</Text>
@@ -507,11 +539,23 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <Pressable onPress={() => goProperty()} style={styles.searchBar}>
+        <View style={styles.searchBar}>
           <Search color="#ffffff" size={20} />
-          <Text style={styles.searchText}>{t.search}</Text>
-          <SlidersHorizontal color="#ffffff" size={19} />
-        </Pressable>
+
+          <TextInput
+            value={searchInput}
+            onChangeText={setSearchInput}
+            placeholder={t.search}
+            placeholderTextColor="#9f9f9f"
+            style={styles.searchInput}
+            returnKeyType="search"
+            onSubmitEditing={submitSearch}
+          />
+
+          <Pressable onPress={() => goSearch()}>
+            <SlidersHorizontal color="#ffffff" size={19} />
+          </Pressable>
+        </View>
 
         <ScrollView
           horizontal
@@ -583,16 +627,11 @@ export default function HomeScreen() {
                     </Text>
                   </View>
 
-                  <View style={styles.metricRow}>
-                    <Metric
-                      icon={<Eye color="#ffffff" size={15} />}
-                      value={formatCompactNumber(hero.viewCount || 0)}
-                    />
-                    <Metric
-                      icon={<Camera color="#ffffff" size={15} />}
-                      value={`${getPhotoCount(hero)} ${t.photos}`}
-                    />
-                  </View>
+                  <EngagementMetrics
+                    listing={hero}
+                    photosLabel={t.photos}
+                    variant="dark"
+                  />
                 </View>
               </SafeImageBackground>
             </Pressable>
@@ -611,7 +650,7 @@ export default function HomeScreen() {
         <SectionHeader
           title={t.find}
           action={t.seeAll}
-          onPress={() => goProperty("section=categories")}
+          onPress={() => goSearch()}
         />
 
         <ScrollView
@@ -622,39 +661,39 @@ export default function HomeScreen() {
           <Category
             icon={<Palmtree color="#22c55e" size={24} />}
             label="Villa"
-            onPress={() => goProperty("category=Villa")}
+            onPress={() => goSearch({ category: "Villa" })}
           />
           <Category
             icon={<House color="#60a5fa" size={24} />}
             label="House"
-            onPress={() => goProperty("category=House")}
+            onPress={() => goSearch({ category: "House" })}
           />
           <Category
             icon={<Hotel color="#f59e0b" size={24} />}
             label="Hotel"
-            onPress={() => goProperty("category=Hotel")}
+            onPress={() => goSearch({ category: "Hotel" })}
           />
           <Category
             icon={<Store color="#fb7185" size={24} />}
             label="Ruko"
-            onPress={() => goProperty("category=Ruko")}
+            onPress={() => goSearch({ category: "Ruko" })}
           />
           <Category
             icon={<Building2 color="#a78bfa" size={24} />}
             label="Apartment"
-            onPress={() => goProperty("category=Apartment")}
+            onPress={() => goSearch({ category: "Apartment" })}
           />
           <Category
             icon={<Trees color="#34d399" size={24} />}
             label="Land"
-            onPress={() => goProperty("category=Land")}
+            onPress={() => goSearch({ category: "Land" })}
           />
         </ScrollView>
 
         <SectionHeader
           title={t.featuredListings}
           action={t.seeAll}
-          onPress={() => goProperty("section=featured")}
+          onPress={() => goSearch()}
         />
 
         <ScrollView
@@ -669,6 +708,7 @@ export default function HomeScreen() {
               currency={currency}
               language={language}
               formatPrice={formatPrice}
+              photosLabel={t.photos}
               onPress={() => goDetails(listing)}
             />
           ))}
@@ -745,7 +785,7 @@ export default function HomeScreen() {
               <Pressable
                 key={area}
                 style={styles.areaPill}
-                onPress={() => goProperty(`area=${encodeURIComponent(area)}`)}
+                onPress={() => goSearch({ area })}
               >
                 <MapPin color="#ffffff" size={12} />
                 <Text style={styles.areaText}>{area}</Text>
@@ -837,7 +877,7 @@ export default function HomeScreen() {
             icon={<House color="#ffffff" size={25} />}
             title={t.buyRent}
             subtitle={t.buyRentSub}
-            onPress={() => goProperty("purpose=buy-rent")}
+            onPress={() => goSearch()}
           />
         </View>
 
@@ -889,10 +929,24 @@ function getPhotoCount(listing: Listing) {
   return 0;
 }
 
-function formatCompactNumber(value: number) {
-  if (!value || value <= 0) return "0";
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
-  return String(value);
+function formatCompactNumber(value?: number) {
+  const count = Number(value || 0);
+
+  if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+  if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
+
+  return String(count);
+}
+
+function formatRating(listing: Listing) {
+  const average = Number(listing.ratingAverage || 0);
+  const count = Number(listing.ratingCount || 0);
+
+  if (average > 0) {
+    return `${average.toFixed(1)} (${formatCompactNumber(count)})`;
+  }
+
+  return "0";
 }
 
 function getStatusBadges(listing: Listing, language: Language) {
@@ -1064,11 +1118,91 @@ function Badge({
   );
 }
 
-function Metric({ icon, value }: { icon: ReactNode; value: string }) {
+function EngagementMetrics({
+  listing,
+  photosLabel,
+  variant,
+}: {
+  listing: Listing;
+  photosLabel: string;
+  variant: "dark" | "light";
+}) {
+  const isLight = variant === "light";
+
   return (
-    <View style={styles.metric}>
+    <View
+      style={[
+        styles.engagementRow,
+        isLight && styles.engagementRowLight,
+      ]}
+    >
+      <EngagementMetric
+        icon={<Heart color={isLight ? "#111111" : "#ffffff"} size={11} />}
+        value={formatCompactNumber(listing.likeCount)}
+        variant={variant}
+      />
+
+      <EngagementMetric
+        icon={<Bookmark color={isLight ? "#111111" : "#ffffff"} size={11} />}
+        value={formatCompactNumber(listing.saveCount)}
+        variant={variant}
+      />
+
+      <EngagementMetric
+        icon={<Star color="#e6c15c" size={11} />}
+        value={formatRating(listing)}
+        variant={variant}
+      />
+
+      <EngagementMetric
+        icon={<Share2 color={isLight ? "#111111" : "#ffffff"} size={11} />}
+        value={formatCompactNumber(listing.shareCount)}
+        variant={variant}
+      />
+
+      <EngagementMetric
+        icon={<Eye color={isLight ? "#111111" : "#ffffff"} size={11} />}
+        value={formatCompactNumber(listing.viewCount)}
+        variant={variant}
+      />
+
+      <EngagementMetric
+        icon={<Camera color={isLight ? "#111111" : "#ffffff"} size={11} />}
+        value={`${getPhotoCount(listing)} ${photosLabel}`}
+        variant={variant}
+      />
+    </View>
+  );
+}
+
+function EngagementMetric({
+  icon,
+  value,
+  variant,
+}: {
+  icon: ReactNode;
+  value: string;
+  variant: "dark" | "light";
+}) {
+  const isLight = variant === "light";
+
+  return (
+    <View
+      style={[
+        styles.engagementMetric,
+        isLight && styles.engagementMetricLight,
+      ]}
+    >
       {icon}
-      <Text style={styles.metricText}>{value}</Text>
+      <Text
+        style={[
+          styles.engagementMetricText,
+          isLight && styles.engagementMetricTextLight,
+        ]}
+        numberOfLines={1}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
@@ -1151,12 +1285,14 @@ function PropertyCard({
   currency,
   language,
   formatPrice,
+  photosLabel,
   onPress,
 }: {
   listing: Listing;
   currency: Currency;
   language: Language;
   formatPrice: (priceIdr: number) => string;
+  photosLabel: string;
   onPress: () => void;
 }) {
   return (
@@ -1212,6 +1348,12 @@ function PropertyCard({
             <Text style={styles.metaText}>{listing.size || 0} m²</Text>
           </View>
         </View>
+
+        <EngagementMetrics
+          listing={listing}
+          photosLabel={photosLabel}
+          variant="light"
+        />
       </View>
     </Pressable>
   );
@@ -1405,10 +1547,11 @@ const styles = StyleSheet.create({
     gap: 11,
     marginBottom: 12,
   },
-  searchText: {
+  searchInput: {
     flex: 1,
-    color: "#9f9f9f",
+    color: "#ffffff",
     fontSize: 14,
+    paddingVertical: 0,
   },
   heroCarousel: {
     overflow: "visible",
@@ -1417,7 +1560,7 @@ const styles = StyleSheet.create({
     paddingRight: 0,
   },
   heroCard: {
-    height: 330,
+    height: 350,
     borderRadius: 25,
     overflow: "hidden",
     justifyContent: "space-between",
@@ -1497,15 +1640,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     flex: 1,
   },
-  metricRow: {
+  engagementRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginTop: 13,
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 10,
   },
-  metric: {
-    minWidth: 74,
-    height: 36,
+  engagementRowLight: {
+    marginTop: 10,
+    gap: 5,
+  },
+  engagementMetric: {
+    minHeight: 27,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.18)",
@@ -1513,13 +1660,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
-    paddingHorizontal: 10,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
   },
-  metricText: {
+  engagementMetricLight: {
+    backgroundColor: "#f2f2f2",
+    borderColor: "#e2e2e2",
+    minHeight: 25,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+  },
+  engagementMetricText: {
     color: "#ffffff",
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: "900",
+  },
+  engagementMetricTextLight: {
+    color: "#111111",
+    fontSize: 8.6,
   },
   dots: {
     flexDirection: "row",
@@ -1691,7 +1850,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   propertyCard: {
-    width: 196,
+    width: 210,
     backgroundColor: "#ffffff",
     borderRadius: 20,
     overflow: "hidden",

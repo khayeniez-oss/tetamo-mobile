@@ -1,15 +1,19 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
+    Bookmark,
     Building2,
     CalendarDays,
+    Camera,
     ChevronDown,
     ChevronRight,
+    Eye,
     Heart,
     Home,
     MapPin,
     MessageCircle,
     Search,
+    Share2,
     ShieldCheck,
     SlidersHorizontal,
     Star,
@@ -64,6 +68,22 @@ const currencyRates: Record<Currency, number> = {
   AUD: 0.000094,
 };
 
+const AREA_IMAGES: Record<string, string> = {
+  Bali: "https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=500&auto=format&fit=crop",
+  Jakarta:
+    "https://images.unsplash.com/photo-1525625293386-3f8f99389edd?q=80&w=500&auto=format&fit=crop",
+  Canggu:
+    "https://images.unsplash.com/photo-1577717903315-1691ae25ab3f?q=80&w=500&auto=format&fit=crop",
+  Seminyak:
+    "https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=500&auto=format&fit=crop",
+  Uluwatu:
+    "https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?q=80&w=500&auto=format&fit=crop",
+  Bandung:
+    "https://images.unsplash.com/photo-1523059623039-a9ed027e7fad?q=80&w=500&auto=format&fit=crop",
+  Surabaya:
+    "https://images.unsplash.com/photo-1564507592333-c60657eea523?q=80&w=500&auto=format&fit=crop",
+};
+
 const fallbackFeaturedSale: TetamoProperty = {
   id: "featured-sale-fallback",
   kode: "TTM0 - E2",
@@ -75,12 +95,20 @@ const fallbackFeaturedSale: TetamoProperty = {
   area: "Indonesia",
   image:
     "https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=1400&auto=format&fit=crop",
+  images: [
+    "https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=1400&auto=format&fit=crop",
+  ],
   priceIdr: 0,
   beds: 0,
   baths: 0,
   size: 0,
   badge: "Verified",
   viewCount: 0,
+  likeCount: 0,
+  saveCount: 0,
+  ratingCount: 0,
+  ratingAverage: 0,
+  shareCount: 0,
   listingType: "sale",
 };
 
@@ -95,12 +123,20 @@ const fallbackFeaturedRent: TetamoProperty = {
   area: "Indonesia",
   image:
     "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?q=80&w=1400&auto=format&fit=crop",
+  images: [
+    "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?q=80&w=1400&auto=format&fit=crop",
+  ],
   priceIdr: 0,
   beds: 0,
   baths: 0,
   size: 0,
   badge: "Verified",
   viewCount: 0,
+  likeCount: 0,
+  saveCount: 0,
+  ratingCount: 0,
+  ratingAverage: 0,
+  shareCount: 0,
   listingType: "rent",
   rentalType: "yearly",
 };
@@ -117,12 +153,20 @@ const fallbackSaleProperties: TetamoProperty[] = [
     area: "Uluwatu",
     image:
       "https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=1400&auto=format&fit=crop",
+    images: [
+      "https://images.unsplash.com/photo-1613490493576-7fde63acd811?q=80&w=1400&auto=format&fit=crop",
+    ],
     priceIdr: 2550000000,
     beds: 3,
     baths: 3,
     size: 250,
     badge: "Verified",
     viewCount: 1200,
+    likeCount: 0,
+    saveCount: 0,
+    ratingCount: 0,
+    ratingAverage: 0,
+    shareCount: 0,
     listingType: "sale",
     propertyType: "villa",
   },
@@ -140,12 +184,20 @@ const fallbackRentProperties: TetamoProperty[] = [
     area: "Seminyak",
     image:
       "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?q=80&w=1400&auto=format&fit=crop",
+    images: [
+      "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?q=80&w=1400&auto=format&fit=crop",
+    ],
     priceIdr: 28000000,
     beds: 2,
     baths: 2,
     size: 120,
     badge: "Verified",
     viewCount: 540,
+    likeCount: 0,
+    saveCount: 0,
+    ratingCount: 0,
+    ratingAverage: 0,
+    shareCount: 0,
     listingType: "rent",
     rentalType: "monthly",
     propertyType: "villa",
@@ -191,33 +243,6 @@ const newProjects = [
   },
 ];
 
-const popularAreas: AreaItem[] = [
-  {
-    name: "Bali",
-    listings: "2,356 Listings",
-    image:
-      "https://images.unsplash.com/photo-1537996194471-e657df975ab4?q=80&w=500&auto=format&fit=crop",
-  },
-  {
-    name: "Jakarta",
-    listings: "1,820 Listings",
-    image:
-      "https://images.unsplash.com/photo-1525625293386-3f8f99389edd?q=80&w=500&auto=format&fit=crop",
-  },
-  {
-    name: "Canggu",
-    listings: "1,140 Listings",
-    image:
-      "https://images.unsplash.com/photo-1577717903315-1691ae25ab3f?q=80&w=500&auto=format&fit=crop",
-  },
-  {
-    name: "Seminyak",
-    listings: "990 Listings",
-    image:
-      "https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=500&auto=format&fit=crop",
-  },
-];
-
 const copy = {
   en: {
     subtitle: "Properti Marketplace",
@@ -243,6 +268,9 @@ const copy = {
     rentSmall: "Rent",
     from: "From",
     priceRequest: "Price on Request",
+    photos: "Photos",
+    listing: "Listing",
+    listings: "Listings",
   },
   id: {
     subtitle: "Properti Marketplace",
@@ -268,6 +296,9 @@ const copy = {
     rentSmall: "Sewa",
     from: "Mulai",
     priceRequest: "Hubungi Kami",
+    photos: "Foto",
+    listing: "Listing",
+    listings: "Listing",
   },
 };
 
@@ -277,7 +308,7 @@ export default function PropertyScreen() {
 
   const [language, setLanguage] = useState<Language>("en");
   const [currency, setCurrency] = useState<Currency>("IDR");
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("all");
   const [latestProperties, setLatestProperties] = useState<TetamoProperty[]>([]);
   const [featuredSale, setFeaturedSale] =
@@ -353,13 +384,9 @@ export default function PropertyScreen() {
     return rows.length > 0 ? rows : fallbackRentProperties;
   }, [featuredRent.id, latestProperties]);
 
-  const filteredSale = useMemo(() => {
-    return filterProperties(saleProperties, search);
-  }, [saleProperties, search]);
-
-  const filteredRent = useMemo(() => {
-    return filterProperties(rentProperties, search);
-  }, [rentProperties, search]);
+  const dynamicPopularAreas = useMemo(() => {
+    return buildPopularAreas(latestProperties, language);
+  }, [latestProperties, language]);
 
   const formatPrice = useMemo(() => {
     return (priceIdr: number, rentalType?: string | null) => {
@@ -399,10 +426,40 @@ export default function PropertyScreen() {
     )}`;
   };
 
+  const goSearch = (searchParams?: Record<string, string>) => {
+    const query = new URLSearchParams();
+
+    Object.entries(searchParams || {}).forEach(([key, value]) => {
+      if (value.trim()) query.set(key, value.trim());
+    });
+
+    const qs = query.toString();
+    router.push(qs ? (`/search?${qs}` as any) : ("/search" as any));
+  };
+
+  const submitSearch = () => {
+    const keyword = searchInput.trim();
+
+    if (keyword) {
+      goSearch({ query: keyword });
+      return;
+    }
+
+    goSearch();
+  };
+
   const goSeeAll = (type: ViewMode) => {
-    setSearch("");
-    setViewMode(type);
-    router.push(type === "all" ? "/property" : (`/property?listingType=${type}` as any));
+    if (type === "sale") {
+      goSearch({ listingType: "sale" });
+      return;
+    }
+
+    if (type === "rent") {
+      goSearch({ listingType: "rent" });
+      return;
+    }
+
+    goSearch();
   };
 
   const goDetails = (property: TetamoProperty, schedule = false) => {
@@ -457,7 +514,10 @@ Is this property still available?`;
           </View>
 
           <View style={styles.headerControls}>
-            <Pressable style={styles.locationPill}>
+            <Pressable
+              style={styles.locationPill}
+              onPress={() => goSearch({ query: "Indonesia" })}
+            >
               <MapPin color="#e6c15c" size={12} />
               <Text style={styles.pillText}>Indonesia</Text>
               <ChevronDown color="#e6c15c" size={12} />
@@ -513,14 +573,20 @@ Is this property still available?`;
 
         <View style={styles.searchBar}>
           <Search color="#ffffff" size={22} />
+
           <TextInput
-            value={search}
-            onChangeText={setSearch}
+            value={searchInput}
+            onChangeText={setSearchInput}
             placeholder={t.search}
             placeholderTextColor="#9b9b9b"
             style={styles.searchInput}
+            returnKeyType="search"
+            onSubmitEditing={submitSearch}
           />
-          <SlidersHorizontal color="#ffffff" size={21} />
+
+          <Pressable onPress={() => goSearch()}>
+            <SlidersHorizontal color="#ffffff" size={21} />
+          </Pressable>
         </View>
 
         {(viewMode === "all" || viewMode === "sale") && (
@@ -537,7 +603,7 @@ Is this property still available?`;
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.cardCarousel}
             >
-              {filteredSale.map((property) => (
+              {saleProperties.map((property) => (
                 <MarketPropertyCard
                   key={property.id}
                   property={property}
@@ -546,6 +612,7 @@ Is this property still available?`;
                   approxUsd={approxUsd}
                   whatsappLabel={t.whatsapp}
                   scheduleLabel={t.schedule}
+                  photosLabel={t.photos}
                   onWhatsapp={() => openWhatsapp(property)}
                   onSchedule={() => goDetails(property, true)}
                   onDetails={() => goDetails(property)}
@@ -559,6 +626,7 @@ Is this property still available?`;
               buttonText={t.viewDetails}
               whatsappLabel={t.whatsapp}
               scheduleLabel={t.schedule}
+              photosLabel={t.photos}
               language={language}
               formatPrice={formatPrice}
               approxUsd={approxUsd}
@@ -584,7 +652,7 @@ Is this property still available?`;
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.cardCarousel}
             >
-              {filteredRent.map((property) => (
+              {rentProperties.map((property) => (
                 <MarketPropertyCard
                   key={property.id}
                   property={property}
@@ -593,6 +661,7 @@ Is this property still available?`;
                   approxUsd={approxUsd}
                   whatsappLabel={t.whatsapp}
                   scheduleLabel={t.schedule}
+                  photosLabel={t.photos}
                   onWhatsapp={() => openWhatsapp(property)}
                   onSchedule={() => goDetails(property, true)}
                   onDetails={() => goDetails(property)}
@@ -606,6 +675,7 @@ Is this property still available?`;
               buttonText={t.viewDetails}
               whatsappLabel={t.whatsapp}
               scheduleLabel={t.schedule}
+              photosLabel={t.photos}
               language={language}
               formatPrice={formatPrice}
               approxUsd={approxUsd}
@@ -628,21 +698,25 @@ Is this property still available?`;
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.areaCarousel}
         >
-          {popularAreas.map((area) => (
-            <View key={area.name} style={styles.areaCard}>
+          {dynamicPopularAreas.map((area) => (
+            <Pressable
+              key={area.name}
+              style={styles.areaCard}
+              onPress={() => goSearch({ area: area.name })}
+            >
               <Image source={{ uri: area.image }} style={styles.areaImage} />
               <View>
                 <Text style={styles.areaName}>{area.name}</Text>
                 <Text style={styles.areaListings}>{area.listings}</Text>
               </View>
-            </View>
+            </Pressable>
           ))}
         </ScrollView>
 
         <SectionTitle
           icon={<Building2 color="#ffffff" size={20} />}
           title={t.newProjects}
-          action={t.seeAll}
+          action=""
         />
 
         <ScrollView
@@ -657,6 +731,7 @@ Is this property still available?`;
               language={language}
               formatPrice={formatPrice}
               fromText={t.from}
+              onPress={() => goSearch({ query: project.location })}
             />
           ))}
         </ScrollView>
@@ -673,7 +748,7 @@ Is this property still available?`;
           contentContainerStyle={styles.agentCarousel}
         >
           {featuredAgents.map((agent) => (
-            <AgentCard key={agent.id} agent={agent} />
+            <AgentCard key={agent.id} agent={agent} listingsText={t.listings} />
           ))}
         </ScrollView>
 
@@ -725,10 +800,9 @@ function normalizeWhatsappPhone(value?: string | null) {
   const digits = String(value || "").replace(/[^\d]/g, "");
 
   if (!digits) return "";
-
-  if (digits.startsWith("0")) {
-    return `62${digits.slice(1)}`;
-  }
+  if (digits.startsWith("62")) return digits;
+  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
+  if (digits.startsWith("8")) return `62${digits}`;
 
   return digits;
 }
@@ -755,28 +829,79 @@ function isRentProperty(property: TetamoProperty) {
   );
 }
 
-function filterProperties(properties: TetamoProperty[], search: string) {
-  const keyword = search.trim().toLowerCase();
+function getPhotoCount(property: TetamoProperty) {
+  if (property.images?.length) return property.images.length;
+  if (property.image) return 1;
+  return 0;
+}
 
-  if (!keyword) return properties;
+function formatCompactNumber(value?: number) {
+  const count = Number(value || 0);
 
-  return properties.filter((property) => {
-    const text = [
-      property.titleEn,
-      property.titleId,
-      property.location,
-      property.area,
-      property.kode,
-      property.listingType,
-      property.rentalType,
-      property.propertyType,
-      property.badge,
-    ]
-      .join(" ")
-      .toLowerCase();
+  if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+  if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
 
-    return text.includes(keyword);
+  return String(count);
+}
+
+function formatRating(property: TetamoProperty) {
+  const average = Number(property.ratingAverage || 0);
+  const count = Number(property.ratingCount || 0);
+
+  if (average > 0) {
+    return `${average.toFixed(1)} (${formatCompactNumber(count)})`;
+  }
+
+  return "0";
+}
+
+function buildPopularAreas(properties: TetamoProperty[], language: Language): AreaItem[] {
+  const label = language === "id" ? "Listing" : "Listings";
+  const counts = new Map<string, number>();
+
+  properties.forEach((property) => {
+    const area = String(property.area || property.city || property.province || "")
+      .split(",")[0]
+      .trim();
+
+    if (!area) return;
+
+    counts.set(area, (counts.get(area) || 0) + 1);
   });
+
+  const rows = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([name, count]) => ({
+      name,
+      listings: `${count.toLocaleString("en-US")} ${label}`,
+      image: AREA_IMAGES[name] || AREA_IMAGES.Bali,
+    }));
+
+  if (rows.length > 0) return rows;
+
+  return [
+    {
+      name: "Bali",
+      listings: `0 ${label}`,
+      image: AREA_IMAGES.Bali,
+    },
+    {
+      name: "Jakarta",
+      listings: `0 ${label}`,
+      image: AREA_IMAGES.Jakarta,
+    },
+    {
+      name: "Canggu",
+      listings: `0 ${label}`,
+      image: AREA_IMAGES.Canggu,
+    },
+    {
+      name: "Seminyak",
+      listings: `0 ${label}`,
+      image: AREA_IMAGES.Seminyak,
+    },
+  ];
 }
 
 function SectionTitle({
@@ -807,6 +932,56 @@ function SectionTitle({
   );
 }
 
+function EngagementMetrics({
+  property,
+  photosLabel,
+  small = false,
+}: {
+  property: TetamoProperty;
+  photosLabel: string;
+  small?: boolean;
+}) {
+  return (
+    <View style={[styles.engagementRow, small && styles.engagementRowSmall]}>
+      <RealMetric
+        icon={<Heart color="#ffffff" size={small ? 9 : 11} />}
+        value={formatCompactNumber(property.likeCount)}
+        small={small}
+      />
+
+      <RealMetric
+        icon={<Bookmark color="#ffffff" size={small ? 9 : 11} />}
+        value={formatCompactNumber(property.saveCount)}
+        small={small}
+      />
+
+      <RealMetric
+        icon={<Star color="#e6c15c" size={small ? 9 : 11} />}
+        value={formatRating(property)}
+        small={small}
+      />
+
+      <RealMetric
+        icon={<Share2 color="#ffffff" size={small ? 9 : 11} />}
+        value={formatCompactNumber(property.shareCount)}
+        small={small}
+      />
+
+      <RealMetric
+        icon={<Eye color="#ffffff" size={small ? 9 : 11} />}
+        value={formatCompactNumber(property.viewCount)}
+        small={small}
+      />
+
+      <RealMetric
+        icon={<Camera color="#ffffff" size={small ? 9 : 11} />}
+        value={`${getPhotoCount(property)} ${photosLabel}`}
+        small={small}
+      />
+    </View>
+  );
+}
+
 function MarketPropertyCard({
   property,
   language,
@@ -814,6 +989,7 @@ function MarketPropertyCard({
   approxUsd,
   whatsappLabel,
   scheduleLabel,
+  photosLabel,
   onWhatsapp,
   onSchedule,
   onDetails,
@@ -824,6 +1000,7 @@ function MarketPropertyCard({
   approxUsd: (priceIdr: number) => string;
   whatsappLabel: string;
   scheduleLabel: string;
+  photosLabel: string;
   onWhatsapp: () => void;
   onSchedule: () => void;
   onDetails: () => void;
@@ -852,10 +1029,6 @@ function MarketPropertyCard({
               />
             ))}
           </View>
-
-          <View style={styles.heartCircle}>
-            <Heart color="#ffffff" size={17} />
-          </View>
         </View>
 
         <View style={styles.marketOverlay}>
@@ -880,10 +1053,12 @@ function MarketPropertyCard({
             </Text>
           </View>
 
+          <EngagementMetrics property={property} photosLabel={photosLabel} small />
+
           <View style={styles.marketActionRow}>
             <Pressable
               style={styles.marketActionPill}
-              onPress={(event) => {
+              onPress={(event: any) => {
                 event.stopPropagation?.();
                 onWhatsapp();
               }}
@@ -894,7 +1069,7 @@ function MarketPropertyCard({
 
             <Pressable
               style={styles.marketActionPill}
-              onPress={(event) => {
+              onPress={(event: any) => {
                 event.stopPropagation?.();
                 onSchedule();
               }}
@@ -915,6 +1090,7 @@ function FeaturedBanner({
   buttonText,
   whatsappLabel,
   scheduleLabel,
+  photosLabel,
   language,
   formatPrice,
   approxUsd,
@@ -928,6 +1104,7 @@ function FeaturedBanner({
   buttonText: string;
   whatsappLabel: string;
   scheduleLabel: string;
+  photosLabel: string;
   language: Language;
   formatPrice: (priceIdr: number, rentalType?: string | null) => string;
   approxUsd: (priceIdr: number) => string;
@@ -990,6 +1167,8 @@ function FeaturedBanner({
           </Text>
         </View>
 
+        <EngagementMetrics property={property} photosLabel={photosLabel} small />
+
         <View style={styles.featuredButtonRow}>
           <Pressable style={styles.featuredGhostButton} onPress={onWhatsapp}>
             <MessageCircle color="#25D366" size={11} />
@@ -1024,11 +1203,34 @@ function FeaturedBanner({
   );
 }
 
+function RealMetric({
+  icon,
+  value,
+  small = false,
+}: {
+  icon: ReactNode;
+  value: string;
+  small?: boolean;
+}) {
+  return (
+    <View style={[styles.realMetricPill, small && styles.realMetricPillSmall]}>
+      {icon}
+      <Text
+        style={[styles.realMetricText, small && styles.realMetricTextSmall]}
+        numberOfLines={1}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 function ProjectCard({
   project,
   language,
   formatPrice,
   fromText,
+  onPress,
 }: {
   project: {
     id: string;
@@ -1041,11 +1243,12 @@ function ProjectCard({
   language: Language;
   formatPrice: (priceIdr: number, rentalType?: string | null) => string;
   fromText: string;
+  onPress: () => void;
 }) {
   const title = language === "en" ? project.titleEn : project.titleId;
 
   return (
-    <Pressable style={styles.projectCard}>
+    <Pressable style={styles.projectCard} onPress={onPress}>
       <ImageBackground
         source={{ uri: project.image }}
         resizeMode="cover"
@@ -1075,7 +1278,13 @@ function ProjectCard({
   );
 }
 
-function AgentCard({ agent }: { agent: TetamoAgent }) {
+function AgentCard({
+  agent,
+  listingsText,
+}: {
+  agent: TetamoAgent;
+  listingsText: string;
+}) {
   const [imageFailed, setImageFailed] = useState(false);
 
   return (
@@ -1105,7 +1314,7 @@ function AgentCard({ agent }: { agent: TetamoAgent }) {
         </View>
 
         <Text style={styles.agentMeta}>
-          {agent.rating} ★  |  {agent.listings} Listings
+          {agent.listings} {listingsText}
         </Text>
       </View>
     </Pressable>
@@ -1328,8 +1537,8 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   marketCard: {
-    width: 258,
-    height: 270,
+    width: 270,
+    height: 302,
     borderRadius: 18,
     overflow: "hidden",
     borderWidth: 1,
@@ -1370,19 +1579,11 @@ const styles = StyleSheet.create({
     fontSize: 9.3,
     fontWeight: "900",
   },
-  heartCircle: {
-    width: 33,
-    height: 33,
-    borderRadius: 13,
-    backgroundColor: "rgba(0,0,0,0.42)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   marketOverlay: {
     borderRadius: 14,
-    backgroundColor: "rgba(0,0,0,0.62)",
+    backgroundColor: "rgba(0,0,0,0.68)",
     paddingHorizontal: 9,
-    paddingVertical: 7,
+    paddingVertical: 8,
   },
   marketPrice: {
     color: "#ffffff",
@@ -1412,6 +1613,41 @@ const styles = StyleSheet.create({
     fontSize: 9.2,
     flex: 1,
     fontWeight: "700",
+  },
+  engagementRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 7,
+  },
+  engagementRowSmall: {
+    gap: 4,
+    marginTop: 6,
+  },
+  realMetricPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  realMetricPillSmall: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    gap: 3,
+  },
+  realMetricText: {
+    color: "#ffffff",
+    fontSize: 8.5,
+    fontWeight: "900",
+  },
+  realMetricTextSmall: {
+    fontSize: 7.8,
   },
   marketActionRow: {
     flexDirection: "row",
@@ -1444,7 +1680,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#101010",
     overflow: "hidden",
     flexDirection: "row",
-    height: 140,
+    height: 168,
     marginBottom: 22,
   },
   featuredImageWrap: {
@@ -1488,7 +1724,7 @@ const styles = StyleSheet.create({
   },
   featuredTitle: {
     color: "#ffffff",
-    fontSize: 11.4,
+    fontSize: 11.2,
     lineHeight: 14,
     fontWeight: "900",
     marginTop: 4,
