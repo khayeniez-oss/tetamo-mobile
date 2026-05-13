@@ -1,22 +1,21 @@
-import { FontAwesome5 } from "@expo/vector-icons";
-import { makeRedirectUri } from "expo-auth-session";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import * as Linking from "expo-linking";
+import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as WebBrowser from "expo-web-browser";
 import {
     ArrowLeft,
+    BriefcaseBusiness,
     Building2,
     Check,
-    ChevronRight,
     Eye,
     EyeOff,
-    Home,
-    Search,
+    LockKeyhole,
+    Mail,
+    Phone,
     ShieldCheck,
     UserRound,
 } from "lucide-react-native";
-import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -34,188 +33,262 @@ import { supabase } from "../lib/supabase";
 
 WebBrowser.maybeCompleteAuthSession();
 
-type SignupRole = "owner" | "agent" | "developer" | "buyer" | "admin" | "unknown";
-type OAuthProvider = "google" | "apple";
+type AllowedRole = "owner" | "agent" | "developer";
+type Language = "en" | "id";
 
-type RoleCardData = {
-  key: SignupRole;
-  title: string;
-  subtitle: string;
-  icon: ReactNode;
-  tone: "gold" | "blue" | "purple" | "green";
-  badge?: string;
-};
+function normalizePhoneNumber(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
 
-const ROUTES = {
-  login: "/login",
-  ownerPackages: "/owner/packages",
-  agentPackages: "/agent/packages",
-  developerPackages: "/developer/packages",
-  adminDashboard: "/admin",
-  search: "/search",
-};
+  const cleaned = raw.replace(/[^\d+]/g, "");
+  if (!cleaned) return "";
 
-const ROLE_CARDS: RoleCardData[] = [
-  {
-    key: "owner",
-    title: "Property Owner",
-    subtitle: "For owners who want to list and manage their property on TETAMO.",
-    icon: <Home color="#e6c15c" size={23} />,
-    tone: "gold",
-  },
-  {
-    key: "agent",
-    title: "Property Agent",
-    subtitle: "For agents who want packages, listing tools, leads, and dashboard access.",
-    icon: <UserRound color="#60a5fa" size={23} />,
-    tone: "blue",
-  },
-  {
-    key: "developer",
-    title: "Developer",
-    subtitle: "For developers or project owners who want a package or license option.",
-    icon: <Building2 color="#a78bfa" size={23} />,
-    tone: "purple",
-    badge: "Package / License",
-  },
-  {
-    key: "buyer",
-    title: "Buyer / Renter",
-    subtitle: "For users who want to search, save, and contact owners or agents.",
-    icon: <Search color="#22c55e" size={23} />,
-    tone: "green",
-  },
-];
+  if (cleaned.startsWith("+")) return cleaned;
+  if (cleaned.startsWith("00")) return `+${cleaned.slice(2)}`;
+  if (cleaned.startsWith("0")) return `+62${cleaned.slice(1)}`;
+  if (cleaned.startsWith("62")) return `+${cleaned}`;
+  if (cleaned.startsWith("8")) return `+62${cleaned}`;
+
+  return `+${cleaned}`;
+}
+
+function isValidInternationalPhone(value: string) {
+  if (!value) return false;
+  return /^\+[1-9]\d{7,14}$/.test(value);
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 export default function SignupScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
 
-  const roleFromUrl = useMemo(() => normalizeRole(readParam(params.role)), [params.role]);
-  const nextFromUrl = normalizeNextPath(readParam(params.next));
-  const packageFromUrl = readParam(params.package);
-  const planFromUrl = readParam(params.plan);
-  const from = readParam(params.from);
-
-  const [selectedRole, setSelectedRole] = useState<SignupRole>(
-    roleFromUrl !== "unknown" ? roleFromUrl : "unknown"
-  );
-
+  const [language, setLanguage] = useState<Language>("en");
+  const [selectedRole, setSelectedRole] = useState<AllowedRole | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  const [agreed, setAgreed] = useState(false);
+  const [agreedToPolicies, setAgreedToPolicies] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<OAuthProvider | null>(null);
+  const [loadingEmail, setLoadingEmail] = useState(false);
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
 
-  const currentRole = selectedRole;
-  const roleSelected = currentRole !== "unknown";
-  const isDeveloper = currentRole === "developer";
-  const isBuyer = currentRole === "buyer";
-  const selectedRoleLabel = formatRole(currentRole);
+  const isId = language === "id";
 
-  const loginRoute =
-    currentRole !== "unknown"
-      ? `${ROUTES.login}?role=${currentRole}&next=${encodeURIComponent(
-          getNextPath(currentRole, nextFromUrl)
-        )}`
-      : ROUTES.login;
-
-  const isBusy = loading || socialLoading !== null;
-
-  useEffect(() => {
-    if (roleFromUrl !== "unknown") {
-      setSelectedRole(roleFromUrl);
-    }
-  }, [roleFromUrl]);
-
-  const goBackToRoleSelect = () => {
-    setSelectedRole("unknown");
-    setAgreed(false);
-    setSocialLoading(null);
-  };
-
-  const continueDeveloper = () => {
-    router.push(ROUTES.developerPackages as any);
-  };
-
-  const continueBuyer = () => {
-    router.push(ROUTES.search as any);
-  };
-
-  const handleRolePress = (role: SignupRole) => {
-    if (role === "developer") {
-      router.push(ROUTES.developerPackages as any);
-      return;
-    }
-
-    if (role === "buyer") {
-      router.push(ROUTES.search as any);
-      return;
-    }
-
-    setSelectedRole(role);
-  };
-
-  const handleEmailSignup = async () => {
-    if (!roleSelected) {
-      Alert.alert("Choose your role", "Please choose your account type first.");
-      return;
+  const ui = useMemo(() => {
+    if (isId) {
+      return {
+        badge: "TETAMO SIGNUP",
+        title: "Buat akun Tetamo",
+        subtitle: "Pilih peran Anda dan lanjutkan ke alur yang sesuai.",
+        chooseRole: "Pilih Peran",
+        chooseRoleDesc: "Pilih bagaimana Anda ingin menggunakan Tetamo.",
+        ownerTitle: "Pemilik Properti",
+        ownerDesc: "Untuk pemilik yang ingin memasang listing.",
+        agentTitle: "Agent Properti",
+        agentDesc: "Untuk agent yang ingin mengelola listing dan leads.",
+        developerTitle: "Developer",
+        developerDesc: "Untuk developer yang ingin meminta quotation.",
+        requestQuote: "Request Quote",
+        selectedRole: "Peran terpilih",
+        change: "Ganti",
+        phone: "Nomor WhatsApp / Telepon",
+        phonePlaceholder: "+62 812 3456 7890",
+        fullName: "Nama Lengkap",
+        fullNamePlaceholder: "Nama lengkap",
+        email: "Email",
+        password: "Kata Sandi",
+        createAccount: "Buat Akun",
+        creating: "Membuat akun...",
+        continueGoogle: "Lanjutkan dengan Google",
+        connecting: "Menghubungkan...",
+        or: "atau",
+        already: "Sudah punya akun?",
+        login: "Masuk",
+        policyPrefix: "Saya menyetujui Syarat & Ketentuan, Kebijakan Privasi, dan Kebijakan Berlangganan Tetamo.",
+        emptyRole: "Silakan pilih peran terlebih dahulu.",
+        emptyName: "Mohon masukkan nama lengkap Anda.",
+        emptyPhone: "Mohon masukkan nomor WhatsApp / telepon Anda.",
+        invalidPhone: "Mohon masukkan nomor WhatsApp / telepon yang valid.",
+        emptyEmailPassword: "Mohon lengkapi email dan kata sandi.",
+        invalidEmail: "Format email tidak valid.",
+        shortPassword: "Kata sandi minimal 6 karakter.",
+        policyRequired:
+          "Silakan setujui Syarat & Ketentuan, Kebijakan Privasi, dan Kebijakan Berlangganan terlebih dahulu.",
+        signupSuccess:
+          "Akun berhasil dibuat. Silakan cek email Anda jika diminta konfirmasi.",
+        secureTitle: "Akun Anda lebih aman",
+        secureText:
+          "Email digunakan untuk login, reset password, receipt, invoice, dan pemulihan akun.",
+      };
     }
 
-    if (isDeveloper) {
-      continueDeveloper();
-      return;
+    return {
+      badge: "TETAMO SIGNUP",
+      title: "Create your Tetamo account",
+      subtitle: "Choose your role and continue to the right flow.",
+      chooseRole: "Choose Role",
+      chooseRoleDesc: "Choose how you want to use Tetamo.",
+      ownerTitle: "Property Owner",
+      ownerDesc: "For owners who want to list properties.",
+      agentTitle: "Property Agent",
+      agentDesc: "For agents who want to manage listings and leads.",
+      developerTitle: "Developer",
+      developerDesc: "For developers who want to request a quotation.",
+      requestQuote: "Request Quote",
+      selectedRole: "Selected role",
+      change: "Change",
+      phone: "WhatsApp / Phone Number",
+      phonePlaceholder: "+62 812 3456 7890",
+      fullName: "Full Name",
+      fullNamePlaceholder: "Full name",
+      email: "Email",
+      password: "Password",
+      createAccount: "Create Account",
+      creating: "Creating account...",
+      continueGoogle: "Continue with Google",
+      connecting: "Connecting...",
+      or: "or",
+      already: "Already have an account?",
+      login: "Log in",
+      policyPrefix:
+        "I agree to Tetamo’s Terms & Conditions, Privacy Policy, and Subscription Policy.",
+      emptyRole: "Please choose a role first.",
+      emptyName: "Please enter your full name.",
+      emptyPhone: "Please enter your WhatsApp / phone number.",
+      invalidPhone: "Please enter a valid WhatsApp / phone number.",
+      emptyEmailPassword: "Please complete email and password.",
+      invalidEmail: "Please enter a valid email address.",
+      shortPassword: "Password must be at least 6 characters.",
+      policyRequired:
+        "Please agree to the Terms, Privacy Policy, and Subscription Policy first.",
+      signupSuccess:
+        "Account created successfully. Please check your email if confirmation is required.",
+      secureTitle: "Your account is safer",
+      secureText:
+        "Email is used for login, password reset, receipts, invoices, and account recovery.",
+    };
+  }, [isId]);
+
+  const roleLabel = useMemo(() => {
+    if (selectedRole === "owner") return isId ? "Pemilik" : "Owner";
+    if (selectedRole === "agent") return "Agent";
+    if (selectedRole === "developer") return "Developer";
+    return "";
+  }, [selectedRole, isId]);
+
+  const isBusy = loadingEmail || loadingGoogle;
+
+  function getRoleRedirect(role: AllowedRole) {
+    if (role === "owner") return "/owner/packages";
+    if (role === "agent") return "/agent/packages";
+    return "/developer-license";
+  }
+
+  function validateBaseFields() {
+    if (!selectedRole) {
+      Alert.alert(ui.emptyRole);
+      return null;
     }
 
-    if (isBuyer) {
-      continueBuyer();
-      return;
+    if (selectedRole === "developer") {
+      router.push("/developer-license" as any);
+      return null;
     }
 
-    if (!agreed) {
-      Alert.alert(
-        "Policy Agreement Required",
-        "Please agree to TETAMO’s Terms, Privacy Policy, and Subscription Policy first."
-      );
-      return;
+    const trimmedFullName = fullName.trim();
+    if (!trimmedFullName) {
+      Alert.alert(ui.emptyName);
+      return null;
     }
 
-    const trimmedName = fullName.trim();
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (!normalizedPhone) {
+      Alert.alert(ui.emptyPhone);
+      return null;
+    }
+
+    if (!isValidInternationalPhone(normalizedPhone)) {
+      Alert.alert(ui.invalidPhone);
+      return null;
+    }
+
+    if (!agreedToPolicies) {
+      Alert.alert(ui.policyRequired);
+      return null;
+    }
+
+    return {
+      role: selectedRole,
+      fullName: trimmedFullName,
+      phone: normalizedPhone,
+    };
+  }
+
+  async function saveProfile({
+    userId,
+    userEmail,
+    role,
+    name,
+    phone,
+  }: {
+    userId: string;
+    userEmail: string;
+    role: "owner" | "agent";
+    name: string;
+    phone: string;
+  }) {
+    const { error } = await supabase.from("profiles").upsert(
+      {
+        id: userId,
+        email: userEmail,
+        full_name: name,
+        phone,
+        role,
+      },
+      {
+        onConflict: "id",
+      }
+    );
+
+    if (error) throw error;
+  }
+
+  async function handleEmailSignup() {
+    const base = validateBaseFields();
+    if (!base) return;
+
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedPassword = password.trim();
 
-    if (!trimmedName || !trimmedEmail || !trimmedPassword) {
-      Alert.alert("Missing details", "Please complete your name, email, and password.");
+    if (!trimmedEmail || !trimmedPassword) {
+      Alert.alert(ui.emptyEmailPassword);
       return;
     }
 
     if (!isValidEmail(trimmedEmail)) {
-      Alert.alert("Invalid email", "Please enter a valid email address.");
+      Alert.alert(ui.invalidEmail);
       return;
     }
 
     if (trimmedPassword.length < 6) {
-      Alert.alert("Password too short", "Password must be at least 6 characters.");
+      Alert.alert(ui.shortPassword);
       return;
     }
 
-    setLoading(true);
-
     try {
+      setLoadingEmail(true);
+
       const { data, error } = await supabase.auth.signUp({
         email: trimmedEmail,
         password: trimmedPassword,
         options: {
           data: {
-            full_name: trimmedName,
-            role: currentRole,
-            package: packageFromUrl,
-            plan: planFromUrl,
-            from,
-            next: nextFromUrl,
+            full_name: base.fullName,
+            role: base.role,
+            phone: base.phone,
             agreed_to_terms: true,
             agreed_to_policies_at: new Date().toISOString(),
           },
@@ -223,152 +296,126 @@ export default function SignupScreen() {
       });
 
       if (error) {
-        Alert.alert("Signup failed", error.message);
+        Alert.alert(error.message);
         return;
       }
 
       if (data.user) {
-        const profileError = await upsertProfile({
+        await saveProfile({
           userId: data.user.id,
-          email: trimmedEmail,
-          fullName: trimmedName,
-          role: currentRole,
+          userEmail: trimmedEmail,
+          role: base.role,
+          name: base.fullName,
+          phone: base.phone,
         });
-
-        if (profileError) {
-          Alert.alert("Profile error", profileError);
-          return;
-        }
       }
 
-      const nextPath = getNextPath(currentRole, nextFromUrl);
-
       if (data.session) {
-        router.replace(nextPath as any);
+        router.replace(getRoleRedirect(base.role) as any);
         return;
       }
 
-      Alert.alert(
-        "Account created",
-        "Please log in to continue. If email confirmation is required, check your email first.",
-        [
-          {
-            text: "Continue",
-            onPress: () => router.replace(loginRoute as any),
-          },
-        ]
+      Alert.alert(ui.signupSuccess);
+      router.replace(
+        `/login?role=${base.role}&next=${encodeURIComponent(
+          getRoleRedirect(base.role)
+        )}` as any
       );
     } catch (error: any) {
-      Alert.alert("Signup failed", error?.message || "Something went wrong.");
+      Alert.alert(error?.message || "Signup failed.");
     } finally {
-      setLoading(false);
+      setLoadingEmail(false);
     }
-  };
+  }
 
-  const handleOAuthSignup = async (provider: OAuthProvider) => {
-    if (!roleSelected) {
-      Alert.alert("Choose your role", "Please choose your account type first.");
-      return;
-    }
-
-    if (isDeveloper) {
-      continueDeveloper();
-      return;
-    }
-
-    if (isBuyer) {
-      continueBuyer();
-      return;
-    }
-
-    if (!agreed) {
-      Alert.alert(
-        "Policy Agreement Required",
-        "Please agree to TETAMO’s Terms, Privacy Policy, and Subscription Policy first."
-      );
-      return;
-    }
-
-    setLoading(true);
-    setSocialLoading(provider);
+  async function handleGoogleSignup() {
+    const base = validateBaseFields();
+    if (!base) return;
 
     try {
-      const redirectTo = makeRedirectUri({
-        scheme: "tetamomobile",
-        path: "auth/callback",
-      });
+      setLoadingGoogle(true);
+
+      const redirectTo = Linking.createURL("auth/callback");
 
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
+        provider: "google",
         options: {
           redirectTo,
           skipBrowserRedirect: true,
-          ...(provider === "google"
-            ? {
-                queryParams: {
-                  prompt: "select_account",
-                },
-              }
-            : {}),
+          queryParams: {
+            prompt: "select_account",
+          },
         },
       });
 
       if (error) {
-        Alert.alert("Signup failed", error.message);
+        Alert.alert(error.message);
         return;
       }
 
       if (!data?.url) {
-        Alert.alert("Signup failed", "No OAuth URL was returned.");
+        Alert.alert("Google signup URL was not created.");
         return;
       }
 
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
-      if (result.type !== "success") {
+      if (result.type !== "success" || !result.url) {
         return;
       }
 
-      const session = await createSessionFromUrl(result.url);
+      const returnedUrl = new URL(result.url);
+      const code = returnedUrl.searchParams.get("code");
+
+      if (!code) {
+        Alert.alert("Google signup did not return an auth code.");
+        return;
+      }
+
+      const { error: exchangeError } =
+        await supabase.auth.exchangeCodeForSession(code);
+
+      if (exchangeError) {
+        Alert.alert(exchangeError.message);
+        return;
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
       if (!session?.user) {
-        Alert.alert("Signup failed", "Unable to complete social signup.");
+        Alert.alert("Google signup session was not created.");
         return;
       }
 
-      const metadata = session.user.user_metadata || {};
-      const profileName =
-        fullName.trim() ||
-        safeString(metadata.full_name) ||
-        safeString(metadata.name) ||
-        safeString(metadata.display_name) ||
-        "Tetamo User";
-
-      const profileEmail =
-        safeString(session.user.email) ||
-        safeString(metadata.email) ||
-        email.trim().toLowerCase();
-
-      const profileError = await upsertProfile({
+      await saveProfile({
         userId: session.user.id,
-        email: profileEmail,
-        fullName: profileName,
-        role: currentRole,
+        userEmail: session.user.email || "",
+        role: base.role,
+        name:
+          base.fullName ||
+          String(session.user.user_metadata?.full_name || "") ||
+          String(session.user.user_metadata?.name || ""),
+        phone: base.phone,
       });
 
-      if (profileError) {
-        Alert.alert("Profile error", profileError);
-        return;
-      }
-
-      router.replace(getNextPath(currentRole, nextFromUrl) as any);
+      router.replace(getRoleRedirect(base.role) as any);
     } catch (error: any) {
-      Alert.alert("Signup failed", error?.message || "Unable to complete social signup.");
+      Alert.alert(error?.message || "Google signup failed.");
     } finally {
-      setLoading(false);
-      setSocialLoading(null);
+      setLoadingGoogle(false);
     }
-  };
+  }
+
+  function handleSelectRole(role: AllowedRole) {
+    if (role === "developer") {
+      router.push("/developer-license" as any);
+      return;
+    }
+
+    setSelectedRole(role);
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -378,182 +425,231 @@ export default function SignupScreen() {
         style={styles.keyboard}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
+        <View style={styles.topBar}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <ArrowLeft color="#ffffff" size={15} />
+            <Text style={styles.backText}>{isId ? "Kembali" : "Back"}</Text>
+          </Pressable>
+
+          <View style={styles.langToggle}>
+            {(["en", "id"] as Language[]).map((item) => (
+              <Pressable
+                key={item}
+                style={[
+                  styles.langButton,
+                  language === item && styles.langButtonActive,
+                ]}
+                onPress={() => setLanguage(item)}
+              >
+                <Text
+                  style={[
+                    styles.langText,
+                    language === item && styles.langTextActive,
+                  ]}
+                >
+                  {item.toUpperCase()}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.header}>
-            <Text style={styles.kicker}>TETAMO SIGNUP</Text>
-            <Text style={styles.title}>Create Your TETAMO Account</Text>
-            <Text style={styles.subtitle}>
-              Choose your role and continue to the right TETAMO flow for owners,
-              agents, developers, or buyers.
-            </Text>
+          <View style={styles.heroCard}>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{ui.badge}</Text>
+            </View>
+
+            <Text style={styles.title}>{ui.title}</Text>
+            <Text style={styles.subtitle}>{ui.subtitle}</Text>
           </View>
 
-          {!roleSelected ? (
-            <>
-              <View style={styles.roleHeader}>
-                <Text style={styles.sectionTitle}>Choose your role</Text>
-                <Text style={styles.sectionSub}>
-                  This helps TETAMO guide you to the correct package and next step.
-                </Text>
+          {!selectedRole ? (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{ui.chooseRole}</Text>
+              <Text style={styles.cardSub}>{ui.chooseRoleDesc}</Text>
+
+              <View style={styles.roleList}>
+                <RoleCard
+                  active={selectedRole === "owner"}
+                  tone="amber"
+                  icon={<UserRound color="#111111" size={19} />}
+                  title={ui.ownerTitle}
+                  description={ui.ownerDesc}
+                  onPress={() => handleSelectRole("owner")}
+                />
+
+                <RoleCard
+                  active={selectedRole === "agent"}
+                  tone="emerald"
+                  icon={<BriefcaseBusiness color="#111111" size={19} />}
+                  title={ui.agentTitle}
+                  description={ui.agentDesc}
+                  onPress={() => handleSelectRole("agent")}
+                />
+
+                <RoleCard
+                  active={false}
+                  tone="slate"
+                  icon={<Building2 color="#111111" size={19} />}
+                  title={ui.developerTitle}
+                  description={ui.developerDesc}
+                  badge={ui.requestQuote}
+                  onPress={() => handleSelectRole("developer")}
+                />
               </View>
 
-              <View style={styles.roleGrid}>
-                {ROLE_CARDS.map((role) => (
-                  <RoleCard
-                    key={role.key}
-                    role={role}
-                    active={selectedRole === role.key}
-                    onPress={() => handleRolePress(role.key)}
-                  />
-                ))}
-              </View>
-
-              <Pressable
-                style={styles.loginButton}
-                onPress={() => router.push(ROUTES.login as any)}
-              >
-                <Text style={styles.loginButtonText}>I already have an account</Text>
-              </Pressable>
-            </>
+              <AuthFooter
+                isId={isId}
+                already={ui.already}
+                login={ui.login}
+                onLogin={() => router.push("/login" as any)}
+              />
+            </View>
           ) : (
-            <>
-              <View style={styles.selectedPanel}>
+            <View style={styles.card}>
+              <View style={styles.selectedRoleBox}>
                 <View>
-                  <Text style={styles.panelKicker}>SELECTED ROLE</Text>
-                  <Text style={styles.selectedRoleText}>{selectedRoleLabel}</Text>
+                  <Text style={styles.smallLabel}>{ui.selectedRole}</Text>
+                  <Text style={styles.selectedRoleText}>{roleLabel}</Text>
                 </View>
 
-                <Pressable style={styles.changeButton} onPress={goBackToRoleSelect}>
-                  <ArrowLeft color="#ffffff" size={14} />
-                  <Text style={styles.changeButtonText}>Change</Text>
+                <Pressable
+                  style={styles.changeButton}
+                  onPress={() => {
+                    setSelectedRole(null);
+                    setAgreedToPolicies(false);
+                  }}
+                >
+                  <ArrowLeft color="#111111" size={13} />
+                  <Text style={styles.changeButtonText}>{ui.change}</Text>
                 </Pressable>
               </View>
 
-              {isDeveloper ? (
-                <DeveloperRedirectPanel onContinue={continueDeveloper} />
-              ) : isBuyer ? (
-                <BuyerRedirectPanel onContinue={continueBuyer} />
-              ) : (
-                <>
-                  <View style={styles.formPanel}>
-                    <PolicyAgreement checked={agreed} onPress={() => setAgreed(!agreed)} />
+              <FormInput
+                label={ui.phone}
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                placeholder={ui.phonePlaceholder}
+                keyboardType="phone-pad"
+                icon={<Phone color="#e6c15c" size={17} />}
+              />
 
-                    <OAuthButton
-                      provider="google"
-                      label="Sign up with Google"
-                      loadingLabel="Connecting to Google..."
-                      loading={socialLoading === "google"}
-                      disabled={isBusy || !agreed}
-                      onPress={() => void handleOAuthSignup("google")}
-                    />
+              <FormInput
+                label={ui.fullName}
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder={ui.fullNamePlaceholder}
+                autoCapitalize="words"
+                icon={<UserRound color="#e6c15c" size={17} />}
+              />
 
-                    <OAuthButton
-                      provider="apple"
-                      label="Sign up with Apple"
-                      loadingLabel="Connecting to Apple..."
-                      loading={socialLoading === "apple"}
-                      disabled={isBusy || !agreed}
-                      onPress={() => void handleOAuthSignup("apple")}
-                    />
+              <FormInput
+                label={ui.email}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                icon={<Mail color="#e6c15c" size={17} />}
+              />
 
-                    <View style={styles.dividerRow}>
-                      <View style={styles.dividerLine} />
-                      <Text style={styles.dividerText}>OR</Text>
-                      <View style={styles.dividerLine} />
-                    </View>
+              <FormInput
+                label={ui.password}
+                value={password}
+                onChangeText={setPassword}
+                placeholder={ui.password}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                icon={<LockKeyhole color="#e6c15c" size={17} />}
+                rightSlot={
+                  <Pressable
+                    style={styles.eyeButton}
+                    onPress={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? (
+                      <EyeOff color="#a9a9a9" size={17} />
+                    ) : (
+                      <Eye color="#a9a9a9" size={17} />
+                    )}
+                  </Pressable>
+                }
+              />
 
-                    <FormInput
-                      label="Full Name"
-                      placeholder="Enter your full name"
-                      value={fullName}
-                      onChangeText={setFullName}
-                      autoCapitalize="words"
-                    />
+              <Pressable
+                style={styles.policyBox}
+                onPress={() => setAgreedToPolicies((prev) => !prev)}
+              >
+                <View
+                  style={[
+                    styles.checkbox,
+                    agreedToPolicies && styles.checkboxActive,
+                  ]}
+                >
+                  {agreedToPolicies ? <Check color="#111111" size={13} /> : null}
+                </View>
 
-                    <FormInput
-                      label="Email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChangeText={setEmail}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                    />
+                <Text style={styles.policyText}>{ui.policyPrefix}</Text>
+              </Pressable>
 
-                    <View>
-                      <Text style={styles.inputLabel}>Password</Text>
+              <Pressable
+                style={[styles.primaryButton, isBusy && styles.disabled]}
+                disabled={isBusy}
+                onPress={handleEmailSignup}
+              >
+                {loadingEmail ? <ActivityIndicator color="#ffffff" /> : null}
+                <Text style={styles.primaryButtonText}>
+                  {loadingEmail ? ui.creating : ui.createAccount}
+                </Text>
+              </Pressable>
 
-                      <View style={styles.passwordWrap}>
-                        <TextInput
-                          value={password}
-                          onChangeText={setPassword}
-                          placeholder="Create a password"
-                          placeholderTextColor="#777777"
-                          secureTextEntry={!showPassword}
-                          style={styles.passwordInput}
-                          autoCapitalize="none"
-                        />
+              <View style={styles.dividerRow}>
+                <View style={styles.divider} />
+                <Text style={styles.dividerText}>{ui.or}</Text>
+                <View style={styles.divider} />
+              </View>
 
-                        <Pressable
-                          style={styles.eyeButton}
-                          onPress={() => setShowPassword((prev) => !prev)}
-                        >
-                          {showPassword ? (
-                            <EyeOff color="#ffffff" size={18} />
-                          ) : (
-                            <Eye color="#ffffff" size={18} />
-                          )}
-                        </Pressable>
-                      </View>
-                    </View>
+              <Pressable
+                style={[styles.googleButton, isBusy && styles.disabled]}
+                disabled={isBusy}
+                onPress={handleGoogleSignup}
+              >
+                {loadingGoogle ? (
+                  <ActivityIndicator color="#111111" />
+                ) : (
+                  <Text style={styles.googleIcon}>G</Text>
+                )}
+                <Text style={styles.googleButtonText}>
+                  {loadingGoogle ? ui.connecting : ui.continueGoogle}
+                </Text>
+              </Pressable>
 
-                    <Pressable
-                      style={[
-                        styles.primaryButton,
-                        (!agreed || loading) && styles.primaryButtonDisabled,
-                      ]}
-                      disabled={!agreed || loading}
-                      onPress={handleEmailSignup}
-                    >
-                      {loading && !socialLoading ? (
-                        <ActivityIndicator color="#111111" />
-                      ) : (
-                        <>
-                          <Text style={styles.primaryButtonText}>Sign Up</Text>
-                          <ChevronRight color="#111111" size={17} />
-                        </>
-                      )}
-                    </Pressable>
+              <View style={styles.secureBox}>
+                <ShieldCheck color="#60a5fa" size={17} />
+                <View style={styles.secureTextBox}>
+                  <Text style={styles.secureTitle}>{ui.secureTitle}</Text>
+                  <Text style={styles.secureText}>{ui.secureText}</Text>
+                </View>
+              </View>
 
-                    <Pressable
-                      style={styles.loginButton}
-                      onPress={() => router.push(loginRoute as any)}
-                    >
-                      <Text style={styles.loginButtonText}>I already have an account</Text>
-                    </Pressable>
-                  </View>
-
-                  <View style={styles.nextPanel}>
-                    <View style={styles.nextIcon}>
-                      <ShieldCheck color="#e6c15c" size={21} />
-                    </View>
-
-                    <View style={styles.nextTextBox}>
-                      <Text style={styles.nextTitle}>After signup</Text>
-                      <Text style={styles.nextText}>
-                        {currentRole === "owner"
-                          ? "Owner accounts continue to owner packages before creating a listing."
-                          : "Agent accounts continue to agent packages and dashboard access."}
-                      </Text>
-                    </View>
-                  </View>
-                </>
-              )}
-            </>
+              <AuthFooter
+                isId={isId}
+                already={ui.already}
+                login={ui.login}
+                onLogin={() =>
+                  router.push(
+                    `/login?role=${selectedRole}&next=${encodeURIComponent(
+                      getRoleRedirect(selectedRole)
+                    )}` as any
+                  )
+                }
+              />
+            </View>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -561,79 +657,46 @@ export default function SignupScreen() {
   );
 }
 
-function OAuthButton({
-  provider,
-  label,
-  loadingLabel,
-  loading,
-  disabled,
-  onPress,
-}: {
-  provider: OAuthProvider;
-  label: string;
-  loadingLabel: string;
-  loading: boolean;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      style={[styles.oauthButton, disabled && styles.oauthButtonDisabled]}
-      disabled={disabled}
-      onPress={onPress}
-    >
-      {loading ? (
-        <ActivityIndicator color="#ffffff" />
-      ) : (
-        <FontAwesome5
-          name={provider === "google" ? "google" : "apple"}
-          color="#ffffff"
-          size={16}
-        />
-      )}
-
-      <Text style={styles.oauthButtonText}>{loading ? loadingLabel : label}</Text>
-    </Pressable>
-  );
-}
-
 function RoleCard({
-  role,
   active,
+  tone,
+  icon,
+  title,
+  description,
+  badge,
   onPress,
 }: {
-  role: RoleCardData;
   active: boolean;
+  tone: "amber" | "emerald" | "slate";
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  badge?: string;
   onPress: () => void;
 }) {
+  const toneStyle =
+    tone === "amber"
+      ? styles.roleAmber
+      : tone === "emerald"
+        ? styles.roleEmerald
+        : styles.roleSlate;
+
   return (
     <Pressable
-      style={[
-        styles.roleCard,
-        active && styles.roleCardActive,
-        role.tone === "green" && styles.roleCardGreen,
-        role.tone === "purple" && styles.roleCardPurple,
-        role.tone === "blue" && styles.roleCardBlue,
-      ]}
+      style={[styles.roleCard, toneStyle, active && styles.roleCardActive]}
       onPress={onPress}
     >
-      {role.badge ? (
+      {badge ? (
         <View style={styles.roleBadge}>
-          <Text style={styles.roleBadgeText}>{role.badge}</Text>
+          <Text style={styles.roleBadgeText}>{badge}</Text>
         </View>
       ) : null}
 
-      <View style={[styles.roleIcon, active && styles.roleIconActive]}>
-        {role.icon}
-      </View>
+      <View style={styles.roleIcon}>{icon}</View>
 
       <View style={styles.roleTextBox}>
-        <Text style={styles.roleTitle}>{role.title}</Text>
-        <Text style={styles.roleSubtitle}>{role.subtitle}</Text>
-      </View>
-
-      <View style={[styles.roleDot, active && styles.roleDotActive]}>
-        {active ? <Check color="#111111" size={11} /> : null}
+        <Text style={styles.roleTitle}>{title}</Text>
+        <Text style={styles.roleDesc}>{description}</Text>
       </View>
     </Pressable>
   );
@@ -641,253 +704,67 @@ function RoleCard({
 
 function FormInput({
   label,
-  placeholder,
   value,
   onChangeText,
+  placeholder,
   keyboardType,
   autoCapitalize,
+  secureTextEntry,
+  icon,
+  rightSlot,
 }: {
   label: string;
-  placeholder: string;
   value: string;
   onChangeText: (value: string) => void;
-  keyboardType?: "default" | "email-address";
+  placeholder: string;
+  keyboardType?: "default" | "email-address" | "phone-pad";
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  secureTextEntry?: boolean;
+  icon?: React.ReactNode;
+  rightSlot?: React.ReactNode;
 }) {
   return (
-    <View>
+    <View style={styles.inputGroup}>
       <Text style={styles.inputLabel}>{label}</Text>
 
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor="#777777"
-        keyboardType={keyboardType || "default"}
-        autoCapitalize={autoCapitalize || "sentences"}
-        style={styles.input}
-      />
+      <View style={styles.inputWrap}>
+        {icon ? <View style={styles.inputIcon}>{icon}</View> : null}
+
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="#777777"
+          style={styles.input}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          secureTextEntry={secureTextEntry}
+        />
+
+        {rightSlot}
+      </View>
     </View>
   );
 }
 
-function PolicyAgreement({
-  checked,
-  onPress,
+function AuthFooter({
+  already,
+  login,
+  onLogin,
 }: {
-  checked: boolean;
-  onPress: () => void;
+  isId: boolean;
+  already: string;
+  login: string;
+  onLogin: () => void;
 }) {
   return (
-    <Pressable style={styles.policyBox} onPress={onPress}>
-      <View style={[styles.checkbox, checked && styles.checkboxActive]}>
-        {checked ? <Check color="#111111" size={13} /> : null}
-      </View>
-
-      <Text style={styles.policyText}>
-        I agree to TETAMO’s Terms & Conditions, Privacy Policy, and Subscription
-        Policy.
-      </Text>
-    </Pressable>
-  );
-}
-
-function DeveloperRedirectPanel({ onContinue }: { onContinue: () => void }) {
-  return (
-    <View style={styles.redirectPanel}>
-      <View style={styles.redirectIcon}>
-        <Building2 color="#a78bfa" size={28} />
-      </View>
-
-      <Text style={styles.redirectTitle}>Developer Package / License</Text>
-      <Text style={styles.redirectText}>
-        Developer accounts use a separate package or license flow. Continue to
-        developer onboarding to request the right option for your project.
-      </Text>
-
-      <Pressable style={styles.primaryButton} onPress={onContinue}>
-        <Text style={styles.primaryButtonText}>Continue to Developer Package</Text>
-        <ChevronRight color="#111111" size={17} />
+    <View style={styles.authFooter}>
+      <Text style={styles.authFooterText}>{already} </Text>
+      <Pressable onPress={onLogin}>
+        <Text style={styles.authFooterLink}>{login}</Text>
       </Pressable>
     </View>
   );
-}
-
-function BuyerRedirectPanel({ onContinue }: { onContinue: () => void }) {
-  return (
-    <View style={styles.redirectPanel}>
-      <View style={styles.redirectIcon}>
-        <Search color="#22c55e" size={28} />
-      </View>
-
-      <Text style={styles.redirectTitle}>Search Properties</Text>
-      <Text style={styles.redirectText}>
-        Buyer and renter accounts can search, save, and contact owners or agents.
-        Listing is available for owners, agents, and developers.
-      </Text>
-
-      <Pressable style={styles.primaryButton} onPress={onContinue}>
-        <Text style={styles.primaryButtonText}>Search Properties</Text>
-        <ChevronRight color="#111111" size={17} />
-      </Pressable>
-    </View>
-  );
-}
-
-function readParam(value: unknown) {
-  if (Array.isArray(value)) return String(value[0] || "");
-  return String(value || "");
-}
-
-function safeString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function normalizeRole(value: unknown): SignupRole {
-  const role = String(value || "").toLowerCase().trim();
-
-  if (
-    role === "owner" ||
-    role === "pemilik" ||
-    role === "landlord" ||
-    role === "property_owner"
-  ) {
-    return "owner";
-  }
-
-  if (role === "agent" || role === "agen" || role === "broker") {
-    return "agent";
-  }
-
-  if (role === "developer" || role === "pengembang") {
-    return "developer";
-  }
-
-  if (
-    role === "buyer" ||
-    role === "renter" ||
-    role === "tenant" ||
-    role === "pembeli" ||
-    role === "penyewa"
-  ) {
-    return "buyer";
-  }
-
-  if (role === "admin") {
-    return "admin";
-  }
-
-  return "unknown";
-}
-
-function formatRole(role: SignupRole) {
-  if (role === "owner") return "Property Owner";
-  if (role === "agent") return "Property Agent";
-  if (role === "developer") return "Developer";
-  if (role === "buyer") return "Buyer / Renter";
-  if (role === "admin") return "Admin";
-  return "Choose Role";
-}
-
-function normalizeNextPath(value: string) {
-  const raw = String(value || "").trim();
-
-  if (!raw) return "";
-  if (raw.startsWith("http://") || raw.startsWith("https://")) return "";
-  if (raw.startsWith("//")) return "";
-  if (raw.startsWith("/")) return raw;
-
-  return `/${raw}`;
-}
-
-function getNextPath(role: SignupRole, nextFromUrl: string) {
-  if (nextFromUrl) return nextFromUrl;
-
-  if (role === "owner") return ROUTES.ownerPackages;
-  if (role === "agent") return ROUTES.agentPackages;
-  if (role === "developer") return ROUTES.developerPackages;
-  if (role === "buyer") return ROUTES.search;
-  if (role === "admin") return ROUTES.adminDashboard;
-
-  return ROUTES.search;
-}
-
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function extractAuthTokensFromUrl(url: string) {
-  const queryString = url.includes("?") ? url.split("?")[1]?.split("#")[0] : "";
-  const hashString = url.includes("#") ? url.split("#")[1] : "";
-
-  const queryParams = new URLSearchParams(queryString || "");
-  const hashParams = new URLSearchParams(hashString || "");
-
-  const accessToken =
-    queryParams.get("access_token") || hashParams.get("access_token") || "";
-  const refreshToken =
-    queryParams.get("refresh_token") || hashParams.get("refresh_token") || "";
-  const error =
-    queryParams.get("error_description") ||
-    hashParams.get("error_description") ||
-    queryParams.get("error") ||
-    hashParams.get("error") ||
-    "";
-
-  return {
-    accessToken,
-    refreshToken,
-    error,
-  };
-}
-
-async function createSessionFromUrl(url: string) {
-  const { accessToken, refreshToken, error } = extractAuthTokensFromUrl(url);
-
-  if (error) {
-    throw new Error(error);
-  }
-
-  if (!accessToken || !refreshToken) {
-    throw new Error("Missing OAuth session tokens.");
-  }
-
-  const { data, error: sessionError } = await supabase.auth.setSession({
-    access_token: accessToken,
-    refresh_token: refreshToken,
-  });
-
-  if (sessionError) {
-    throw sessionError;
-  }
-
-  return data.session;
-}
-
-async function upsertProfile({
-  userId,
-  email,
-  fullName,
-  role,
-}: {
-  userId: string;
-  email: string;
-  fullName: string;
-  role: SignupRole;
-}) {
-  const { error } = await supabase.from("profiles").upsert(
-    {
-      id: userId,
-      email,
-      full_name: fullName,
-      role,
-    },
-    {
-      onConflict: "id",
-    }
-  );
-
-  return error?.message || "";
 }
 
 const styles = StyleSheet.create({
@@ -898,89 +775,156 @@ const styles = StyleSheet.create({
   keyboard: {
     flex: 1,
   },
+  topBar: {
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 10,
+    backgroundColor: "#050505",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  backButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#333333",
+    backgroundColor: "#101010",
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  backText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  langToggle: {
+    flexDirection: "row",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#5b4a24",
+    overflow: "hidden",
+  },
+  langButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  langButtonActive: {
+    backgroundColor: "#e6c15c",
+  },
+  langText: {
+    color: "#e6c15c",
+    fontSize: 9.5,
+    fontWeight: "900",
+  },
+  langTextActive: {
+    color: "#111111",
+  },
   scroll: {
     flex: 1,
     backgroundColor: "#050505",
   },
   content: {
     paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 34,
+    paddingTop: 10,
+    paddingBottom: 38,
   },
-  header: {
-    marginBottom: 18,
+  heroCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "#303030",
+    backgroundColor: "#101010",
+    padding: 18,
+    marginBottom: 13,
   },
-  kicker: {
+  badge: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#705d2c",
+    backgroundColor: "#211a0b",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  badgeText: {
     color: "#e6c15c",
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: "900",
     letterSpacing: 1,
   },
   title: {
     color: "#ffffff",
-    fontSize: 30,
-    lineHeight: 36,
+    fontSize: 25,
+    lineHeight: 30,
     fontWeight: "900",
-    letterSpacing: -0.6,
-    marginTop: 5,
+    letterSpacing: -0.5,
+    marginTop: 13,
   },
   subtitle: {
     color: "#b8b8b8",
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: "700",
     marginTop: 7,
   },
-  roleHeader: {
-    marginBottom: 11,
+  card: {
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "#303030",
+    backgroundColor: "#101010",
+    padding: 15,
   },
-  sectionTitle: {
+  cardTitle: {
     color: "#ffffff",
-    fontSize: 19,
+    fontSize: 17,
     fontWeight: "900",
   },
-  sectionSub: {
-    color: "#a7a7a7",
+  cardSub: {
+    color: "#a9a9a9",
     fontSize: 11.5,
+    lineHeight: 16,
     fontWeight: "700",
-    marginTop: 3,
+    marginTop: 5,
+    marginBottom: 13,
   },
-  roleGrid: {
+  roleList: {
     gap: 10,
-    marginBottom: 16,
   },
   roleCard: {
-    position: "relative",
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#2d2d2d",
-    backgroundColor: "#101010",
     padding: 13,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 11,
+    position: "relative",
+  },
+  roleAmber: {
+    borderColor: "#705d2c",
+    backgroundColor: "#211a0b",
+  },
+  roleEmerald: {
+    borderColor: "#166534",
+    backgroundColor: "#052e16",
+  },
+  roleSlate: {
+    borderColor: "#343434",
+    backgroundColor: "#151515",
   },
   roleCardActive: {
     borderColor: "#e6c15c",
-    backgroundColor: "#161309",
-  },
-  roleCardGreen: {
-    borderColor: "#1d3b2b",
-  },
-  roleCardPurple: {
-    borderColor: "#34234a",
-  },
-  roleCardBlue: {
-    borderColor: "#20334f",
   },
   roleBadge: {
     position: "absolute",
     right: 11,
-    top: 9,
+    top: 11,
     borderRadius: 999,
-    backgroundColor: "#e6c15c",
-    paddingHorizontal: 7,
-    paddingVertical: 3,
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   roleBadgeText: {
     color: "#111111",
@@ -988,77 +932,55 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   roleIcon: {
-    width: 45,
-    height: 45,
-    borderRadius: 17,
-    backgroundColor: "#1a1a1a",
-    borderWidth: 1,
-    borderColor: "#303030",
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: "#e6c15c",
     alignItems: "center",
     justifyContent: "center",
   },
-  roleIconActive: {
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-  },
   roleTextBox: {
     flex: 1,
-    paddingRight: 12,
+    paddingRight: 82,
   },
   roleTitle: {
     color: "#ffffff",
     fontSize: 13.5,
     fontWeight: "900",
   },
-  roleSubtitle: {
-    color: "#a9a9a9",
-    fontSize: 11,
-    lineHeight: 15,
+  roleDesc: {
+    color: "#d6d6d6",
+    fontSize: 11.2,
+    lineHeight: 16,
     fontWeight: "700",
-    marginTop: 3,
+    marginTop: 4,
   },
-  roleDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#4a4a4a",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  roleDotActive: {
-    borderColor: "#e6c15c",
-    backgroundColor: "#e6c15c",
-  },
-  selectedPanel: {
-    borderRadius: 22,
+  selectedRoleBox: {
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 14,
+    backgroundColor: "#050505",
+    padding: 12,
+    marginBottom: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    marginBottom: 14,
   },
-  panelKicker: {
-    color: "#e6c15c",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 0.8,
+  smallLabel: {
+    color: "#a9a9a9",
+    fontSize: 10.5,
+    fontWeight: "800",
   },
   selectedRoleText: {
     color: "#ffffff",
-    fontSize: 17,
+    fontSize: 13,
     fontWeight: "900",
     marginTop: 3,
   },
   changeButton: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#3a3a3a",
-    backgroundColor: "#050505",
+    borderRadius: 14,
+    backgroundColor: "#e6c15c",
     paddingHorizontal: 10,
     paddingVertical: 8,
     flexDirection: "row",
@@ -1066,37 +988,21 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   changeButtonText: {
-    color: "#ffffff",
-    fontSize: 11,
+    color: "#111111",
+    fontSize: 10.5,
     fontWeight: "900",
   },
-  formPanel: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 15,
-    gap: 13,
+  inputGroup: {
+    marginBottom: 12,
   },
   inputLabel: {
     color: "#ffffff",
-    fontSize: 12,
+    fontSize: 11.7,
     fontWeight: "900",
     marginBottom: 7,
   },
-  input: {
-    minHeight: 50,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#050505",
-    color: "#ffffff",
-    paddingHorizontal: 13,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  passwordWrap: {
-    minHeight: 50,
+  inputWrap: {
+    minHeight: 49,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#303030",
@@ -1104,16 +1010,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  passwordInput: {
+  inputIcon: {
+    width: 43,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  input: {
     flex: 1,
     color: "#ffffff",
-    paddingHorizontal: 13,
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: "700",
+    paddingVertical: 0,
+    paddingRight: 12,
   },
   eyeButton: {
-    width: 46,
-    height: 50,
+    width: 42,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1126,13 +1038,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
+    marginBottom: 13,
   },
   checkbox: {
-    width: 20,
-    height: 20,
+    width: 19,
+    height: 19,
     borderRadius: 7,
     borderWidth: 1,
-    borderColor: "#5a5a5a",
+    borderColor: "#777777",
     alignItems: "center",
     justifyContent: "center",
     marginTop: 1,
@@ -1142,150 +1055,110 @@ const styles = StyleSheet.create({
     backgroundColor: "#e6c15c",
   },
   policyText: {
-    color: "#b8b8b8",
-    fontSize: 11,
-    lineHeight: 17,
-    fontWeight: "700",
     flex: 1,
+    color: "#d6d6d6",
+    fontSize: 10.8,
+    lineHeight: 16,
+    fontWeight: "700",
   },
-  oauthButton: {
+  primaryButton: {
     minHeight: 49,
     borderRadius: 17,
+    backgroundColor: "#111827",
     borderWidth: 1,
-    borderColor: "#343434",
-    backgroundColor: "#050505",
+    borderColor: "#303030",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 9,
-    paddingHorizontal: 14,
+    gap: 8,
   },
-  oauthButtonDisabled: {
-    opacity: 0.5,
-  },
-  oauthButtonText: {
+  primaryButtonText: {
     color: "#ffffff",
     fontSize: 12.5,
     fontWeight: "900",
   },
+  disabled: {
+    opacity: 0.55,
+  },
   dividerRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 9,
-    marginVertical: 2,
+    gap: 10,
+    marginVertical: 15,
   },
-  dividerLine: {
+  divider: {
     flex: 1,
     height: 1,
-    backgroundColor: "#303030",
+    backgroundColor: "#252525",
   },
   dividerText: {
     color: "#777777",
     fontSize: 10,
     fontWeight: "900",
-    letterSpacing: 1,
+    textTransform: "uppercase",
   },
-  primaryButton: {
+  googleButton: {
     minHeight: 49,
     borderRadius: 17,
-    backgroundColor: "#e6c15c",
+    borderWidth: 1,
+    borderColor: "#303030",
+    backgroundColor: "#ffffff",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
-    paddingHorizontal: 14,
+    gap: 9,
   },
-  primaryButtonDisabled: {
-    opacity: 0.5,
-  },
-  primaryButtonText: {
+  googleIcon: {
     color: "#111111",
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "900",
   },
-  loginButton: {
-    minHeight: 45,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: "#343434",
-    backgroundColor: "#050505",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 10,
-  },
-  loginButtonText: {
-    color: "#ffffff",
-    fontSize: 12,
+  googleButtonText: {
+    color: "#111111",
+    fontSize: 12.5,
     fontWeight: "900",
   },
-  nextPanel: {
-    borderRadius: 22,
+  secureBox: {
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    padding: 14,
+    borderColor: "#1d4ed8",
+    backgroundColor: "#0b1624",
+    padding: 12,
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 11,
-    marginTop: 14,
+    gap: 9,
+    marginTop: 13,
   },
-  nextIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
-    backgroundColor: "#151106",
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  nextTextBox: {
+  secureTextBox: {
     flex: 1,
   },
-  nextTitle: {
+  secureTitle: {
     color: "#ffffff",
-    fontSize: 13.5,
+    fontSize: 11.8,
     fontWeight: "900",
   },
-  nextText: {
-    color: "#d6d6d6",
-    fontSize: 11,
-    lineHeight: 16,
+  secureText: {
+    color: "#bfdbfe",
+    fontSize: 10.8,
+    lineHeight: 15,
     fontWeight: "700",
-    marginTop: 4,
+    marginTop: 3,
   },
-  redirectPanel: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 17,
-    alignItems: "center",
-  },
-  redirectIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 22,
-    backgroundColor: "#171717",
-    borderWidth: 1,
-    borderColor: "#303030",
-    alignItems: "center",
+  authFooter: {
+    flexDirection: "row",
     justifyContent: "center",
-    marginBottom: 12,
+    flexWrap: "wrap",
+    marginTop: 15,
   },
-  redirectTitle: {
-    color: "#ffffff",
-    fontSize: 21,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  redirectText: {
-    color: "#b8b8b8",
+  authFooterText: {
+    color: "#a9a9a9",
     fontSize: 12,
-    lineHeight: 18,
     fontWeight: "700",
-    textAlign: "center",
-    marginTop: 7,
-    marginBottom: 15,
+  },
+  authFooterLink: {
+    color: "#e6c15c",
+    fontSize: 12,
+    fontWeight: "900",
+    textDecorationLine: "underline",
   },
 });

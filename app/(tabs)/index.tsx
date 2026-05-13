@@ -79,7 +79,7 @@ const HERO_FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=1400&auto=format&fit=crop";
 
 const PROJECT_FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1600607687644-c7171b42498b?q=80&w=1000&auto=format&fit=crop";
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1000&auto=format&fit=crop";
 
 const ARTICLE_IMAGE_ONE =
   "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1000&auto=format&fit=crop";
@@ -1130,12 +1130,7 @@ function EngagementMetrics({
   const isLight = variant === "light";
 
   return (
-    <View
-      style={[
-        styles.engagementRow,
-        isLight && styles.engagementRowLight,
-      ]}
-    >
+    <View style={[styles.engagementRow, isLight && styles.engagementRowLight]}>
       <EngagementMetric
         icon={<Heart color={isLight ? "#111111" : "#ffffff"} size={11} />}
         value={formatCompactNumber(listing.likeCount)}
@@ -1188,10 +1183,7 @@ function EngagementMetric({
 
   return (
     <View
-      style={[
-        styles.engagementMetric,
-        isLight && styles.engagementMetricLight,
-      ]}
+      style={[styles.engagementMetric, isLight && styles.engagementMetricLight]}
     >
       {icon}
       <Text
@@ -1227,7 +1219,7 @@ function SectionHeader({
       {action ? (
         <Pressable style={styles.seeAllRow} onPress={onPress}>
           <Text style={styles.seeAllText}>{action}</Text>
-          <ChevronRight color="#ffffff" size={13} />
+          <ChevronRight color="#e6c15c" size={13} />
         </Pressable>
       ) : null}
     </View>
@@ -1514,7 +1506,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   activeToggle: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#e6c15c",
   },
   activeToggleText: {
     color: "#111111",
@@ -1695,7 +1687,7 @@ const styles = StyleSheet.create({
   },
   activeDot: {
     width: 18,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#e6c15c",
   },
   sectionHeader: {
     flexDirection: "row",
@@ -1721,9 +1713,9 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   seeAllText: {
-    color: "#ffffff",
+    color: "#e6c15c",
     fontSize: 11,
-    fontWeight: "800",
+    fontWeight: "900",
   },
   categoryRow: {
     gap: 10,
@@ -2130,7 +2122,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   ctaButton: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#e6c15c",
     borderRadius: 17,
     paddingHorizontal: 14,
     paddingVertical: 12,
