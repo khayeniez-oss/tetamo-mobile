@@ -6,10 +6,20 @@ import {
     Home,
     MapPin,
     RotateCcw,
+    Search,
     ShieldCheck,
 } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
 import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type Dispatch,
+    type ReactNode,
+    type SetStateAction,
+} from "react";
+import {
+    ActivityIndicator,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -23,13 +33,28 @@ type ListingType = "dijual" | "disewa" | "lelang" | "";
 
 type Props = {
   draft: ListingDraft;
-  setDraft: React.Dispatch<React.SetStateAction<ListingDraft>>;
+  setDraft: Dispatch<SetStateAction<ListingDraft>>;
   onNext: () => void;
   onReset?: () => void;
   language?: "en" | "id";
   provinces?: string[];
   citiesByProvince?: Record<string, string[]>;
   housingSuggestions?: string[];
+};
+
+type GooglePlacePrediction = {
+  description: string;
+  place_id: string;
+  structured_formatting?: {
+    main_text?: string;
+    secondary_text?: string;
+  };
+};
+
+type GoogleAddressComponent = {
+  long_name: string;
+  short_name: string;
+  types: string[];
 };
 
 const DEFAULT_PROVINCES = [
@@ -156,6 +181,10 @@ export default function ListingIklan({
   const isId = language === "id";
   const mode = draft.mode === "edit" ? "edit" : "create";
 
+  const googleMapsKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+  const placesSessionToken = useRef(createLocalId()).current;
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [listingType, setListingType] = useState<ListingType>(
     draft.listingType || ""
   );
@@ -174,6 +203,13 @@ export default function ListingIklan({
 
   const [provinceOpen, setProvinceOpen] = useState(false);
   const [housingOpen, setHousingOpen] = useState(false);
+
+  const [addressFocused, setAddressFocused] = useState(false);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressSuggestions, setAddressSuggestions] = useState<
+    GooglePlacePrediction[]
+  >([]);
+  const [addressError, setAddressError] = useState("");
 
   useEffect(() => {
     setListingType(draft.listingType || "");
@@ -196,6 +232,36 @@ export default function ListingIklan({
     draft.customHousing,
     draft.note,
   ]);
+
+  useEffect(() => {
+    if (!googleMapsKey) {
+      setAddressSuggestions([]);
+      setAddressError("");
+      return;
+    }
+
+    const query = address.trim();
+
+    if (!addressFocused || query.length < 3) {
+      setAddressSuggestions([]);
+      setAddressError("");
+      return;
+    }
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    debounceRef.current = setTimeout(() => {
+      void fetchAddressSuggestions(query);
+    }, 350);
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [address, addressFocused, googleMapsKey]);
 
   const sortedProvinces = useMemo(() => {
     return uniqueStrings(provinces);
@@ -220,6 +286,109 @@ export default function ListingIklan({
     province.trim().length > 0 &&
     city.trim().length > 0 &&
     (housingName === "__OTHER__" ? customHousing.trim().length > 0 : true);
+
+  async function fetchAddressSuggestions(query: string) {
+    try {
+      setAddressLoading(true);
+      setAddressError("");
+
+      const url =
+        "https://maps.googleapis.com/maps/api/place/autocomplete/json" +
+        `?input=${encodeURIComponent(query)}` +
+        `&key=${encodeURIComponent(googleMapsKey)}` +
+        "&components=country:id" +
+        "&language=id" +
+        `&sessiontoken=${encodeURIComponent(placesSessionToken)}`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data?.status === "OK") {
+        setAddressSuggestions(data.predictions || []);
+        return;
+      }
+
+      if (data?.status === "ZERO_RESULTS") {
+        setAddressSuggestions([]);
+        return;
+      }
+
+      setAddressSuggestions([]);
+      setAddressError(data?.error_message || data?.status || "");
+    } catch (error) {
+      console.log("Tetamo address suggestion error:", error);
+      setAddressSuggestions([]);
+      setAddressError(
+        isId
+          ? "Gagal memuat saran alamat."
+          : "Failed to load address suggestions."
+      );
+    } finally {
+      setAddressLoading(false);
+    }
+  }
+
+  async function selectAddressSuggestion(item: GooglePlacePrediction) {
+    try {
+      setAddressLoading(true);
+      setAddressSuggestions([]);
+      setAddressError("");
+
+      const url =
+        "https://maps.googleapis.com/maps/api/place/details/json" +
+        `?place_id=${encodeURIComponent(item.place_id)}` +
+        `&key=${encodeURIComponent(googleMapsKey)}` +
+        "&fields=formatted_address,address_component,geometry" +
+        "&language=id" +
+        `&sessiontoken=${encodeURIComponent(placesSessionToken)}`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      const result = data?.result;
+      const formattedAddress =
+        String(result?.formatted_address || "").trim() || item.description;
+
+      const components: GoogleAddressComponent[] =
+        result?.address_components || [];
+
+      const nextProvince = extractAddressComponent(components, [
+        "administrative_area_level_1",
+      ]);
+
+      const nextCity =
+        extractAddressComponent(components, ["locality"]) ||
+        extractAddressComponent(components, [
+          "administrative_area_level_2",
+        ]) ||
+        extractAddressComponent(components, [
+          "administrative_area_level_3",
+        ]);
+
+      setAddress(formattedAddress);
+
+      if (nextProvince) {
+        setProvince(nextProvince);
+      }
+
+      if (nextCity) {
+        setCity(nextCity);
+      }
+
+      setDraft((prev) => ({
+        ...prev,
+        address: formattedAddress,
+        province: nextProvince || prev.province,
+        city: nextCity || prev.city,
+      }));
+    } catch (error) {
+      console.log("Tetamo address details error:", error);
+      setAddress(item.description);
+    } finally {
+      setAddressFocused(false);
+      setAddressLoading(false);
+    }
+  }
 
   function handleNext() {
     if (!canNext) return;
@@ -395,23 +564,36 @@ export default function ListingIklan({
             </Text>
             <Text style={styles.sectionSub}>
               {isId
-                ? "Masukkan alamat properti dengan jelas."
-                : "Enter the property address clearly."}
+                ? "Mulai ketik alamat. Saran Google Maps akan muncul otomatis."
+                : "Start typing the address. Google Maps suggestions will appear automatically."}
             </Text>
           </View>
         </View>
 
-        <FormInput
+        <AddressInput
           label={isId ? "Alamat" : "Address"}
           required
           value={address}
-          onChangeText={setAddress}
+          onChangeText={(value) => {
+            setAddress(value);
+            setAddressFocused(true);
+          }}
+          onFocus={() => setAddressFocused(true)}
           placeholder={
             isId
               ? "Contoh: 27A, Jalan Pantai Batu Bolong, Canggu"
               : "Example: 27A, Jalan Pantai Batu Bolong, Canggu"
           }
-          multiline
+          loading={addressLoading}
+          suggestions={addressSuggestions}
+          error={addressError}
+          googleEnabled={Boolean(googleMapsKey)}
+          emptyApiText={
+            isId
+              ? "Google Maps key belum terbaca di mobile .env."
+              : "Google Maps key is not detected in mobile .env."
+          }
+          onSelect={(item) => void selectAddressSuggestion(item)}
         />
 
         <View style={styles.fieldGap} />
@@ -488,10 +670,7 @@ export default function ListingIklan({
           optional
           placeholder={isId ? "Pilih atau kosongkan" : "Select or leave empty"}
           open={housingOpen}
-          options={[
-            ...finalHousingSuggestions,
-            "__OTHER__",
-          ]}
+          options={[...finalHousingSuggestions, "__OTHER__"]}
           getLabel={(value) =>
             value === "__OTHER__"
               ? isId
@@ -584,6 +763,94 @@ export default function ListingIklan({
   );
 }
 
+function AddressInput({
+  label,
+  value,
+  onChangeText,
+  onFocus,
+  placeholder,
+  required,
+  loading,
+  suggestions,
+  error,
+  googleEnabled,
+  emptyApiText,
+  onSelect,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  onFocus: () => void;
+  placeholder: string;
+  required?: boolean;
+  loading: boolean;
+  suggestions: GooglePlacePrediction[];
+  error: string;
+  googleEnabled: boolean;
+  emptyApiText: string;
+  onSelect: (item: GooglePlacePrediction) => void;
+}) {
+  return (
+    <View>
+      <Text style={styles.inputLabel}>
+        {label}
+        {required ? <Text style={styles.required}> *</Text> : null}
+      </Text>
+
+      <View style={[styles.inputWrap, styles.textareaWrap]}>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          onFocus={onFocus}
+          placeholder={placeholder}
+          placeholderTextColor="#777777"
+          style={[styles.input, styles.textarea]}
+          multiline
+          textAlignVertical="top"
+        />
+
+        <View style={styles.inputIcon}>
+          {loading ? (
+            <ActivityIndicator color="#e6c15c" />
+          ) : (
+            <Search color="#e6c15c" size={17} />
+          )}
+        </View>
+      </View>
+
+      {!googleEnabled ? (
+        <Text style={styles.addressHelperText}>{emptyApiText}</Text>
+      ) : null}
+
+      {error ? <Text style={styles.addressErrorText}>{error}</Text> : null}
+
+      {suggestions.length > 0 ? (
+        <View style={styles.addressSuggestionBox}>
+          {suggestions.slice(0, 6).map((item) => (
+            <Pressable
+              key={item.place_id}
+              style={styles.addressSuggestionItem}
+              onPress={() => onSelect(item)}
+            >
+              <MapPin color="#e6c15c" size={15} />
+              <View style={styles.addressSuggestionTextBox}>
+                <Text style={styles.addressSuggestionMain}>
+                  {item.structured_formatting?.main_text || item.description}
+                </Text>
+                {item.structured_formatting?.secondary_text ? (
+                  <Text style={styles.addressSuggestionSecondary}>
+                    {item.structured_formatting.secondary_text}
+                  </Text>
+                ) : null}
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function FormInput({
   label,
   value,
@@ -601,7 +868,7 @@ function FormInput({
   required?: boolean;
   optional?: boolean;
   multiline?: boolean;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
 }) {
   return (
     <View>
@@ -710,6 +977,17 @@ function DropdownField({
   );
 }
 
+function extractAddressComponent(
+  components: GoogleAddressComponent[],
+  types: string[]
+) {
+  const found = components.find((component) =>
+    types.some((type) => component.types.includes(type))
+  );
+
+  return found?.long_name || "";
+}
+
 function getTodayDate() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -726,6 +1004,10 @@ function getPlanBadgeLabel(plan: string | undefined, language: "en" | "id") {
   if (plan === "basic") return "BASIC";
 
   return language === "id" ? "MEMUAT..." : "LOADING...";
+}
+
+function createLocalId() {
+  return `listing-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 const styles = StyleSheet.create({
@@ -935,6 +1217,54 @@ const styles = StyleSheet.create({
     height: 50,
     alignItems: "center",
     justifyContent: "center",
+  },
+  addressHelperText: {
+    color: "#a9a9a9",
+    fontSize: 10.8,
+    lineHeight: 15,
+    fontWeight: "700",
+    marginTop: 7,
+  },
+  addressErrorText: {
+    color: "#fecaca",
+    fontSize: 10.8,
+    lineHeight: 15,
+    fontWeight: "700",
+    marginTop: 7,
+  },
+  addressSuggestionBox: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#303030",
+    backgroundColor: "#050505",
+    marginTop: 8,
+    overflow: "hidden",
+  },
+  addressSuggestionItem: {
+    minHeight: 52,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#151515",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+  },
+  addressSuggestionTextBox: {
+    flex: 1,
+  },
+  addressSuggestionMain: {
+    color: "#ffffff",
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "900",
+  },
+  addressSuggestionSecondary: {
+    color: "#a9a9a9",
+    fontSize: 10.8,
+    lineHeight: 15,
+    fontWeight: "700",
+    marginTop: 2,
   },
   fieldGap: {
     height: 13,

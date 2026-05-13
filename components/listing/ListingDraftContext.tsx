@@ -14,6 +14,23 @@ export type OwnerPlanType = "basic" | "priority" | "featured";
 export type AgentPackageType = "silver" | "gold" | "agent-pro";
 export type PaymentGateway = "stripe" | "xendit" | "hitpay";
 
+export type ListingVerificationDraft = {
+  relationship?: "pemilik" | "keluarga" | "kuasa" | "lainnya" | "";
+  otherRelationship?: string;
+
+  sellMode?: "jual_sendiri" | "pakai_agen" | "";
+  needAgentRecommendation?: "ya" | "tidak" | "";
+  needTransactionSupport?: "ya" | "tidak" | "";
+
+  note?: string;
+
+  ownershipPdfName?: string;
+  authorizationPdfName?: string;
+
+  representation?: string;
+  status?: "pending_verification" | "verified" | "approved" | "rejected";
+};
+
 export type ListingDraft = {
   listingType?: "dijual" | "disewa" | "lelang" | "";
   rentalType?: "bulanan" | "tahunan" | "harian" | "";
@@ -36,6 +53,7 @@ export type ListingDraft = {
 
   propertyType?: string;
   marketType?: string;
+  saleType?: string;
 
   price?: string;
   lt?: string;
@@ -55,6 +73,18 @@ export type ListingDraft = {
   jenisZoning?: string;
   jenisKepemilikan?: string;
 
+  landUnit?: string;
+  leaseYears?: string;
+  leaseUntilYear?: string;
+  leaseExtendable?: string;
+  frontage?: string;
+  depth?: string;
+  dimensionText?: string;
+  unitFloor?: string;
+  towerBlock?: string;
+  ceilingHeight?: string;
+  roadAccess?: string;
+
   title?: string;
   title_id?: string;
   titleId?: string;
@@ -63,11 +93,8 @@ export type ListingDraft = {
   description_id?: string;
   descriptionId?: string;
 
-  verification?: {
-    relationship?: string;
-    representation?: string;
-    status?: "pending_verification" | "approved" | "rejected";
-  };
+  verification?: ListingVerificationDraft;
+  verifiedOk?: boolean;
 
   payment?: {
     planId?: string;
@@ -87,6 +114,12 @@ export type ListingDraft = {
   video?: string;
 
   mediaFolder?: string;
+
+  aiGeneratedOnce?: boolean;
+  ai_seo_title?: string;
+  ai_seo_meta_description?: string;
+  ai_social_caption?: string;
+  ai_whatsapp_inquiry_message?: string;
 };
 
 type ListingDraftContextValue = {
@@ -124,6 +157,7 @@ export function getEmptyListingDraft(): ListingDraft {
 
     propertyType: undefined,
     marketType: undefined,
+    saleType: undefined,
 
     price: undefined,
     lt: undefined,
@@ -143,6 +177,18 @@ export function getEmptyListingDraft(): ListingDraft {
     jenisZoning: undefined,
     jenisKepemilikan: undefined,
 
+    landUnit: undefined,
+    leaseYears: undefined,
+    leaseUntilYear: undefined,
+    leaseExtendable: undefined,
+    frontage: undefined,
+    depth: undefined,
+    dimensionText: undefined,
+    unitFloor: undefined,
+    towerBlock: undefined,
+    ceilingHeight: undefined,
+    roadAccess: undefined,
+
     title: undefined,
     title_id: undefined,
     titleId: undefined,
@@ -152,6 +198,8 @@ export function getEmptyListingDraft(): ListingDraft {
     descriptionId: undefined,
 
     verification: undefined,
+    verifiedOk: undefined,
+
     payment: undefined,
 
     fasilitas: undefined,
@@ -162,6 +210,12 @@ export function getEmptyListingDraft(): ListingDraft {
     video: undefined,
 
     mediaFolder: undefined,
+
+    aiGeneratedOnce: undefined,
+    ai_seo_title: undefined,
+    ai_seo_meta_description: undefined,
+    ai_social_caption: undefined,
+    ai_whatsapp_inquiry_message: undefined,
   };
 }
 

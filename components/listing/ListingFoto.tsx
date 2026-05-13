@@ -7,12 +7,20 @@ import {
     Check,
     Copy,
     ImagePlus,
+    Play,
     Sparkles,
     Trash2,
     Upload,
     Video,
 } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type Dispatch,
+    type SetStateAction,
+} from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -33,7 +41,7 @@ type SourceType = "owner" | "agent";
 
 type Props = {
   draft: ListingDraft;
-  setDraft: React.Dispatch<React.SetStateAction<ListingDraft>>;
+  setDraft: Dispatch<SetStateAction<ListingDraft>>;
   onNext: () => void;
   onBack: () => void;
   language?: Language;
@@ -240,7 +248,7 @@ export default function ListingFoto({
         indonesianDescription: "Deskripsi Bahasa Indonesia",
         submitForApproval: "Submit untuk Persetujuan",
         saveAndContinue: "Simpan & Lanjutkan",
-        videoOptional: "Video (Opsional)",
+        videoOptional: "Video Reels / Portrait 9:16 (Opsional)",
         noVideoYet: "Belum ada video.",
         uploadVideo: "Upload Video",
         removeVideo: "Hapus Video",
@@ -290,6 +298,8 @@ export default function ListingFoto({
         copyCaption: "Salin Caption",
         copiedCaption: "Caption tersalin",
         openVideo: "Buka Video",
+        reelsHint:
+          "Area video dibuat portrait 9:16 agar sesuai dengan format Reels, TikTok, dan Shorts.",
       };
     }
 
@@ -308,7 +318,7 @@ export default function ListingFoto({
       indonesianDescription: "Indonesian Description",
       submitForApproval: "Submit for Approval",
       saveAndContinue: "Save & Continue",
-      videoOptional: "Video (Optional)",
+      videoOptional: "Reels / Portrait 9:16 Video (Optional)",
       noVideoYet: "No video yet.",
       uploadVideo: "Upload Video",
       removeVideo: "Remove Video",
@@ -356,6 +366,8 @@ export default function ListingFoto({
       copyCaption: "Copy Caption",
       copiedCaption: "Caption copied",
       openVideo: "Open Video",
+      reelsHint:
+        "The video area is portrait 9:16 to match Reels, TikTok, and Shorts format.",
     };
   }, [isId]);
 
@@ -385,24 +397,27 @@ export default function ListingFoto({
   useEffect(() => {
     if (!hydratedRef.current) return;
 
-    setDraft((prev) => ({
-      ...prev,
-      source,
-      photos,
-      coverIndex,
-      video,
-      title,
-      title_id: titleId,
-      titleId,
-      description,
-      description_id: descriptionId,
-      descriptionId,
-      aiGeneratedOnce,
-      ai_seo_title: aiSeoTitle,
-      ai_seo_meta_description: aiSeoMetaDescription,
-      ai_social_caption: socialCaption,
-      ai_whatsapp_inquiry_message: aiWhatsappInquiryMessage,
-    }) as ListingDraft);
+    setDraft(
+      (prev) =>
+        ({
+          ...prev,
+          source,
+          photos,
+          coverIndex,
+          video,
+          title,
+          title_id: titleId,
+          titleId,
+          description,
+          description_id: descriptionId,
+          descriptionId,
+          aiGeneratedOnce,
+          ai_seo_title: aiSeoTitle,
+          ai_seo_meta_description: aiSeoMetaDescription,
+          ai_social_caption: socialCaption,
+          ai_whatsapp_inquiry_message: aiWhatsappInquiryMessage,
+        }) as ListingDraft
+    );
   }, [
     source,
     photos,
@@ -876,21 +891,24 @@ export default function ListingFoto({
       setAiWhatsappInquiryMessage(nextWhatsappInquiryMessage);
       setAiGeneratedOnce(true);
 
-      setDraft((prev) => ({
-        ...prev,
-        source,
-        title: nextTitle,
-        title_id: nextTitleId,
-        titleId: nextTitleId,
-        description: nextDescription,
-        description_id: nextDescriptionId,
-        descriptionId: nextDescriptionId,
-        aiGeneratedOnce: true,
-        ai_seo_title: nextSeoTitle,
-        ai_seo_meta_description: nextSeoMetaDescription,
-        ai_social_caption: nextSocialCaption,
-        ai_whatsapp_inquiry_message: nextWhatsappInquiryMessage,
-      }) as ListingDraft);
+      setDraft(
+        (prev) =>
+          ({
+            ...prev,
+            source,
+            title: nextTitle,
+            title_id: nextTitleId,
+            titleId: nextTitleId,
+            description: nextDescription,
+            description_id: nextDescriptionId,
+            descriptionId: nextDescriptionId,
+            aiGeneratedOnce: true,
+            ai_seo_title: nextSeoTitle,
+            ai_seo_meta_description: nextSeoMetaDescription,
+            ai_social_caption: nextSocialCaption,
+            ai_whatsapp_inquiry_message: nextWhatsappInquiryMessage,
+          }) as ListingDraft
+      );
     } catch (error: any) {
       console.log("Tetamo AI listing content error:", error);
       const message = error?.message || t.aiFailed;
@@ -955,7 +973,10 @@ export default function ListingFoto({
           </Pressable>
 
           <Pressable
-            style={[styles.secondaryAction, photos.length === 0 && styles.disabled]}
+            style={[
+              styles.secondaryAction,
+              photos.length === 0 && styles.disabled,
+            ]}
             disabled={photos.length === 0 || uploadingPhotos}
             onPress={clearAllPhotos}
           >
@@ -1017,23 +1038,34 @@ export default function ListingFoto({
           <Text style={styles.sectionTitle}>{t.videoOptional}</Text>
         </View>
 
-        <View style={styles.videoBox}>
-          {video ? (
-            <>
-              <Text style={styles.videoUploadedText}>
-                {isId ? "Video sudah diupload." : "Video uploaded."}
-              </Text>
+        <Text style={styles.hintText}>{t.reelsHint}</Text>
 
-              <Pressable
-                style={styles.videoOpenButton}
-                onPress={() => void Linking.openURL(video)}
-              >
-                <Text style={styles.videoOpenText}>{t.openVideo}</Text>
-              </Pressable>
-            </>
-          ) : (
-            <Text style={styles.emptyText}>{t.noVideoYet}</Text>
-          )}
+        <View style={styles.videoOuter}>
+          <View style={styles.videoReelFrame}>
+            {video ? (
+              <>
+                <View style={styles.videoPlayIcon}>
+                  <Play color="#111111" size={26} />
+                </View>
+
+                <Text style={styles.videoUploadedText}>
+                  {isId ? "Video sudah diupload." : "Video uploaded."}
+                </Text>
+
+                <Pressable
+                  style={styles.videoOpenButton}
+                  onPress={() => void Linking.openURL(video)}
+                >
+                  <Text style={styles.videoOpenText}>{t.openVideo}</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Video color="#777777" size={38} />
+                <Text style={styles.emptyText}>{t.noVideoYet}</Text>
+              </>
+            )}
+          </View>
         </View>
 
         <View style={styles.actionRow}>
@@ -1588,6 +1620,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center",
     paddingHorizontal: 18,
+    marginTop: 8,
   },
   tetamoBadge: {
     position: "absolute",
@@ -1657,29 +1690,48 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   sectionTitle: {
     color: "#ffffff",
     fontSize: 15,
     fontWeight: "900",
   },
-  videoBox: {
-    minHeight: 220,
-    borderRadius: 22,
+  videoOuter: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 13,
+    marginBottom: 12,
+  },
+  videoReelFrame: {
+    width: "72%",
+    maxWidth: 260,
+    aspectRatio: 9 / 16,
+    borderRadius: 28,
     borderWidth: 1,
     borderColor: "#303030",
     backgroundColor: "#050505",
     alignItems: "center",
     justifyContent: "center",
-    padding: 18,
-    marginBottom: 12,
+    padding: 16,
+    overflow: "hidden",
+  },
+  videoPlayIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 999,
+    backgroundColor: "#e6c15c",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 13,
   },
   videoUploadedText: {
     color: "#ffffff",
     fontSize: 13,
+    lineHeight: 18,
     fontWeight: "900",
     marginBottom: 10,
+    textAlign: "center",
   },
   videoOpenButton: {
     borderRadius: 999,
