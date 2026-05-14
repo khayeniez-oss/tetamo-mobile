@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
   BarChart3,
-  BellRing,
   Bookmark,
   Bot,
   CalendarDays,
@@ -1012,12 +1011,7 @@ export default function ProfileScreen() {
                  onPress={() => router.push("/dashboard/commission" as any)}
               />
 
-              <ToolCard
-                icon={<BellRing color="#ffffff" size={20} />}
-                title="Performance"
-                subtitle={isId ? "Sukses & insight" : "Success and insights"}
-                onPress={() => comingSoon("Performance")}
-              />
+
             </View>
 
             <ListingPreview

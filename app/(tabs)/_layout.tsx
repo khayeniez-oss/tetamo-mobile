@@ -4,7 +4,7 @@ import {
   Home,
   Plus,
   UserRound,
-  UserRoundCheck,
+  UserSearch,
 } from "lucide-react-native";
 
 export default function TabLayout() {
@@ -12,22 +12,18 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#e6c15c",
+        tabBarActiveTintColor: "#ffffff",
         tabBarInactiveTintColor: "#8f8f8f",
         tabBarStyle: {
           backgroundColor: "#050505",
           borderTopColor: "#1f1f1f",
-          height: 78,
-          paddingTop: 7,
-          paddingBottom: 14,
+          height: 86,
+          paddingTop: 8,
+          paddingBottom: 18,
         },
         tabBarLabelStyle: {
-          fontSize: 9.5,
+          fontSize: 11,
           fontWeight: "700",
-          letterSpacing: 0.1,
-        },
-        tabBarIconStyle: {
-          marginBottom: 1,
         },
       }}
     >
@@ -35,9 +31,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, focused }) => (
-            <Home color={color} size={focused ? 22 : 21} strokeWidth={2.2} />
-          ),
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
 
@@ -45,12 +39,8 @@ export default function TabLayout() {
         name="property"
         options={{
           title: "Property",
-          tabBarIcon: ({ color, focused }) => (
-            <Building2
-              color={color}
-              size={focused ? 22 : 21}
-              strokeWidth={2.2}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <Building2 color={color} size={size} />
           ),
         }}
       />
@@ -58,27 +48,19 @@ export default function TabLayout() {
       <Tabs.Screen
         name="add-listing"
         options={{
-          title: "Pasang Iklan",
-          tabBarIcon: ({ color, focused }) => (
-            <Plus
-              color={color}
-              size={focused ? 29 : 27}
-              strokeWidth={2.5}
-            />
+          title: "Add Listing",
+          tabBarIcon: ({ color }) => (
+            <Plus color={color} size={34} strokeWidth={2.6} />
           ),
         }}
       />
 
       <Tabs.Screen
-        name="saved"
+        name="buyer"
         options={{
           title: "Buyer",
-          tabBarIcon: ({ color, focused }) => (
-            <UserRoundCheck
-              color={color}
-              size={focused ? 22 : 21}
-              strokeWidth={2.2}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <UserSearch color={color} size={size} />
           ),
         }}
       />
@@ -87,12 +69,8 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, focused }) => (
-            <UserRound
-              color={color}
-              size={focused ? 22 : 21}
-              strokeWidth={2.2}
-            />
+          tabBarIcon: ({ color, size }) => (
+            <UserRound color={color} size={size} />
           ),
         }}
       />
