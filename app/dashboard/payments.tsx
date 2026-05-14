@@ -1,79 +1,44 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    ArrowLeft,
-    CalendarDays,
-    CheckCircle2,
-    Clock3,
-    CreditCard,
-    FileText,
-    Languages,
-    ReceiptText,
-    Search,
-    ShieldCheck,
-    UserRound,
+  ArrowLeft,
+  CheckCircle2,
+  Clock3,
+  CreditCard,
+  ExternalLink,
+  FileText,
+  QrCode,
+  Receipt,
+  RefreshCcw,
+  Wallet,
+  XCircle,
 } from "lucide-react-native";
-import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Linking,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
 
 type Language = "en" | "id";
-type Role = "owner" | "agent" | "guest" | "unsupported";
 
-type PaymentStatus =
-  | "initiated"
-  | "pending"
-  | "checkout_created"
+type NormalizedStatus =
   | "paid"
+  | "pending"
+  | "unpaid"
   | "failed"
   | "expired"
-  | "canceled"
   | "cancelled"
-  | "refunded"
-  | "partially_refunded"
-  | "completed"
-  | "succeeded"
-  | "settled"
-  | "active"
-  | null;
+  | "refunded";
 
-type ProfileRow = {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  role: string | null;
-};
-
-type AgentMembershipRow = {
-  id: string;
-  user_id: string | null;
-  payment_id: string | null;
-  package_id: string | null;
-  package_name: string | null;
-  billing_cycle: string | null;
-  listing_limit: number | null;
-  status: string | null;
-  auto_renew: boolean | null;
-  starts_at: string | null;
-  expires_at: string | null;
-  metadata: Record<string, any> | null;
-  created_at: string | null;
-  updated_at: string | null;
-};
-
-type PaymentTransactionRow = {
+type PaymentRow = {
   id: string;
   user_id: string | null;
   property_id: string | null;
@@ -82,7 +47,7 @@ type PaymentTransactionRow = {
   product_id: string | null;
   product_name_snapshot: string | null;
   product_type: string | null;
-  status: PaymentStatus;
+  status: string | null;
   currency: string | null;
   amount_subtotal: number | null;
   amount_total: number | null;
@@ -98,6 +63,10 @@ type PaymentTransactionRow = {
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
   stripe_charge_id: string | null;
+  stripe_invoice_id: string | null;
+  receipt_url: string | null;
+  hosted_invoice_url: string | null;
+  invoice_pdf_url: string | null;
   paid_at: string | null;
   expired_at: string | null;
   failed_at: string | null;
@@ -106,131 +75,44 @@ type PaymentTransactionRow = {
   updated_at: string | null;
 };
 
-type PaymentCategory = "membership" | "listing" | "addon" | "education" | "other";
-
-type PaymentItem = {
-  id: string;
-  role: "owner" | "agent";
-  category: PaymentCategory;
-  title: string;
-  paymentType: string;
-  packageName: string;
-  productId: string;
-  listingCode: string;
-  amount: number;
-  amountLabel: string;
-  method: string;
-  reference: string;
-  isPaid: boolean;
-  createdLabel: string;
-  paidLabel: string;
-  expiryLabel: string;
-  checkoutUrl: string;
-};
-
-function normalizeRole(value: unknown): Role {
-  const role = String(value || "").toLowerCase();
-
-  if (role === "owner" || role === "pemilik") return "owner";
-  if (role === "agent" || role === "agen") return "agent";
-  if (!role) return "guest";
-
-  return "unsupported";
-}
-
 function asObject(value: unknown): Record<string, any> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, any>)
     : {};
 }
 
-function cleanText(value: unknown) {
+function cleanText(value: unknown, fallback = "-") {
   const text = String(value || "").trim();
-  return text || "-";
+  return text || fallback;
 }
 
-function blankText(value: unknown) {
-  const text = String(value || "").trim();
-  return text && text !== "-" ? text : "";
-}
+function normalizeStatus(value: unknown): NormalizedStatus {
+  const status = String(value || "").toLowerCase();
 
-function sanitizePublicPaymentText(value: unknown) {
-  return String(value || "")
-    .replace(/stripe/gi, "secure payment")
-    .replace(/hitpay/gi, "secure payment")
-    .replace(/xendit/gi, "payment provider")
-    .trim();
-}
-
-function getMetaString(
-  metadata: Record<string, any> | null | undefined,
-  key: string
-) {
-  const value = metadata?.[key];
-  return typeof value === "string" && value.trim() ? value.trim() : "";
-}
-
-function getNestedMetaString(
-  metadata: Record<string, any> | null | undefined,
-  objectKey: string,
-  key: string
-) {
-  const objectValue = metadata?.[objectKey];
-
-  if (!objectValue || typeof objectValue !== "object" || Array.isArray(objectValue)) {
-    return "";
+  if (
+    status === "paid" ||
+    status === "completed" ||
+    status === "succeeded" ||
+    status === "settled" ||
+    status === "active"
+  ) {
+    return "paid";
   }
 
-  const value = (objectValue as Record<string, any>)[key];
-  return typeof value === "string" && value.trim() ? value.trim() : "";
+  if (status === "checkout_created" || status === "pending" || status === "initiated") {
+    return "pending";
+  }
+
+  if (status === "unpaid") return "unpaid";
+  if (status === "failed") return "failed";
+  if (status === "expired") return "expired";
+  if (status === "canceled" || status === "cancelled") return "cancelled";
+  if (status === "refunded" || status === "partially_refunded") return "refunded";
+
+  return "pending";
 }
 
-function getPaymentMetaInfo(metadata: Record<string, any> | null | undefined) {
-  const meta = asObject(metadata);
-  const hitpay = asObject(meta.hitpay);
-
-  const gateway = String(
-    meta.gateway || meta.payment_gateway || hitpay.gateway || ""
-  ).toLowerCase();
-
-  const method = String(
-    meta.paymentMethod ||
-      meta.payment_method ||
-      hitpay.paymentMethod ||
-      hitpay.payment_method ||
-      ""
-  ).toLowerCase();
-
-  const qrisReference =
-    String(
-      meta.hitpay_reference_number ||
-        meta.hitpay_payment_request_id ||
-        hitpay.reference_number ||
-        hitpay.payment_request_id ||
-        hitpay.payment_id ||
-        ""
-    ).trim() || "";
-
-  const isQris = Boolean(
-    method === "qris" ||
-      gateway === "hitpay" ||
-      meta.hitpay_payment_request_id ||
-      meta.hitpay_reference_number ||
-      hitpay.payment_request_id ||
-      hitpay.reference_number ||
-      hitpay.payment_id
-  );
-
-  return {
-    isQris,
-    qrisReference,
-  };
-}
-
-function formatAmount(
-  amount: number | null | undefined,
-  currency: string | null | undefined
-) {
+function formatAmount(amount: number | null, currency: string | null) {
   const code = String(currency || "IDR").toUpperCase();
   const value = Number(amount || 0);
 
@@ -249,7 +131,7 @@ function formatAmount(
   }
 }
 
-function formatDateTime(value: string | null | undefined, language: Language) {
+function formatDateTime(value: string | null, language: Language) {
   if (!value) return "-";
 
   const date = new Date(value);
@@ -264,510 +146,418 @@ function formatDateTime(value: string | null | undefined, language: Language) {
   }).format(date);
 }
 
-function isPaidStatus(status: PaymentStatus, paidAt?: string | null) {
-  const value = String(status || "").toLowerCase();
+function getPaymentMetaInfo(payment: PaymentRow) {
+  const metadata = asObject(payment.metadata);
+  const hitpay = asObject(metadata.hitpay);
 
-  if (
-    value === "paid" ||
-    value === "completed" ||
-    value === "succeeded" ||
-    value === "settled" ||
-    value === "active"
-  ) {
-    return true;
-  }
+  const gateway = String(
+    metadata.gateway ||
+      metadata.payment_gateway ||
+      hitpay.gateway ||
+      ""
+  ).toLowerCase();
 
-  return Boolean(paidAt);
-}
+  const method = String(
+    metadata.paymentMethod ||
+      metadata.payment_method ||
+      hitpay.paymentMethod ||
+      hitpay.payment_method ||
+      ""
+  ).toLowerCase();
 
-function inferCategory(row: PaymentTransactionRow, role: "owner" | "agent"): PaymentCategory {
-  const paymentType = String(row.payment_type || "").toLowerCase();
-  const productType = String(row.product_type || "").toLowerCase();
+  const qrisReference = String(
+    metadata.hitpay_reference_number ||
+      metadata.hitpay_payment_request_id ||
+      hitpay.reference_number ||
+      hitpay.payment_request_id ||
+      hitpay.payment_id ||
+      ""
+  ).trim();
 
-  if (paymentType === "education" || productType === "education") return "education";
-
-  if (
-    paymentType === "boost" ||
-    paymentType === "spotlight" ||
-    productType === "addon"
-  ) {
-    return "addon";
-  }
-
-  if (role === "agent" && (paymentType === "package" || productType === "membership")) {
-    return "membership";
-  }
-
-  if (
-    role === "owner" &&
-    (paymentType === "package" ||
-      paymentType === "listing_fee" ||
-      productType === "listing")
-  ) {
-    return "listing";
-  }
-
-  return "other";
-}
-
-function getPaymentTypeLabel(
-  row: PaymentTransactionRow,
-  role: "owner" | "agent",
-  language: Language
-) {
-  const isId = language === "id";
-  const paymentType = String(row.payment_type || "").toLowerCase();
-
-  if (paymentType === "package") {
-    if (role === "agent") return isId ? "Membership Agent" : "Agent Membership";
-    return isId ? "Paket Listing" : "Listing Package";
-  }
-
-  if (paymentType === "listing_fee") return isId ? "Biaya Listing" : "Listing Fee";
-  if (paymentType === "boost") return "Boost Listing";
-  if (paymentType === "spotlight") return "Homepage Spotlight";
-  if (paymentType === "education") return "Education Pass";
-  if (paymentType === "featured") return "Featured Listing";
-
-  return cleanText(row.payment_type || row.product_type || "Payment");
-}
-
-function getExpiryDate(row: PaymentTransactionRow, membership: AgentMembershipRow | null) {
-  return (
-    membership?.expires_at ||
-    getNestedMetaString(row.metadata, "activation", "expiresAt") ||
-    getNestedMetaString(row.metadata, "activation", "endsAt") ||
-    getMetaString(row.metadata, "expires_at") ||
-    row.checkout_expires_at ||
-    row.expired_at ||
-    null
+  const isQris = Boolean(
+    method === "qris" ||
+      gateway === "hitpay" ||
+      metadata.hitpay_payment_request_id ||
+      metadata.hitpay_reference_number ||
+      hitpay.payment_request_id ||
+      hitpay.reference_number ||
+      hitpay.payment_id
   );
+
+  return {
+    isQris,
+    qrisReference,
+  };
 }
 
-function getPaymentMethod(row: PaymentTransactionRow) {
-  const info = getPaymentMetaInfo(row.metadata);
+function getPaymentMethod(payment: PaymentRow, language: Language) {
+  const info = getPaymentMetaInfo(payment);
 
-  if (info.isQris) return "QRIS";
+  if (info.isQris) {
+    return language === "id" ? "Dibayar dengan QRIS" : "Paid by QRIS";
+  }
 
   return "Debit / Credit Card";
 }
 
-function getReference(row: PaymentTransactionRow) {
-  const info = getPaymentMetaInfo(row.metadata);
+function getPaymentIcon(payment: PaymentRow) {
+  return getPaymentMetaInfo(payment).isQris ? (
+    <QrCode color="#e6c15c" size={16} />
+  ) : (
+    <CreditCard color="#e6c15c" size={16} />
+  );
+}
+
+function getReference(payment: PaymentRow) {
+  const info = getPaymentMetaInfo(payment);
 
   if (info.qrisReference) return info.qrisReference;
-  if (row.stripe_checkout_session_id) return row.stripe_checkout_session_id;
-  if (row.stripe_payment_intent_id) return row.stripe_payment_intent_id;
-  if (row.stripe_charge_id) return row.stripe_charge_id;
+  if (payment.stripe_checkout_session_id) return payment.stripe_checkout_session_id;
+  if (payment.stripe_payment_intent_id) return payment.stripe_payment_intent_id;
+  if (payment.stripe_charge_id) return payment.stripe_charge_id;
 
-  return `PAY-${row.id.slice(0, 8).toUpperCase()}`;
+  return payment.id;
 }
 
-function getTitle(
-  row: PaymentTransactionRow,
-  membership: AgentMembershipRow | null,
-  role: "owner" | "agent",
-  language: Language
-) {
-  const isId = language === "id";
-  const paymentType = String(row.payment_type || "").toLowerCase();
+function getInvoiceUrl(payment: PaymentRow) {
+  return payment.hosted_invoice_url || payment.invoice_pdf_url || "";
+}
 
-  const direct =
-    row.description ||
-    getMetaString(row.metadata, "paymentTitle") ||
-    getMetaString(row.metadata, "payment_title") ||
-    row.property_title_snapshot ||
-    row.product_name_snapshot ||
-    membership?.package_name ||
-    row.plan_name ||
-    row.product_id;
+function getExternalReceiptUrl(payment: PaymentRow) {
+  return payment.receipt_url || getInvoiceUrl(payment);
+}
 
-  if (direct) return cleanText(sanitizePublicPaymentText(direct));
+function getTitle(payment: PaymentRow, language: Language) {
+  const paymentType = String(payment.payment_type || "").toLowerCase();
 
-  if (paymentType === "education") return "Education Pass";
-  if (paymentType === "boost") return "Boost Listing";
-  if (paymentType === "spotlight") return "Homepage Spotlight";
+  if (payment.property_title_snapshot) return payment.property_title_snapshot;
+  if (payment.product_name_snapshot) return payment.product_name_snapshot;
+  if (payment.description) return payment.description;
+  if (payment.plan_name) return payment.plan_name;
 
   if (paymentType === "package") {
-    if (role === "agent") return isId ? "Membership Agent" : "Agent Membership";
-    return isId ? "Paket Listing Pemilik" : "Owner Listing Package";
+    return language === "id" ? "Membership Agen" : "Agent Membership";
   }
 
-  return isId ? "Pembayaran Tetamo" : "Tetamo Payment";
+  if (paymentType === "listing_fee") {
+    return language === "id" ? "Biaya Listing" : "Listing Fee";
+  }
+
+  if (paymentType === "boost") return "Boost Listing";
+  if (paymentType === "spotlight") return "Homepage Spotlight";
+  if (paymentType === "education") return "Education Pass";
+
+  return language === "id" ? "Pembayaran Tetamo" : "Tetamo Payment";
 }
 
-function isMembershipActive(membership: AgentMembershipRow | null) {
-  if (!membership) return false;
-  if (membership.status !== "active") return false;
+function getTypeLabel(payment: PaymentRow, language: Language) {
+  const paymentType = String(payment.payment_type || "").toLowerCase();
+  const productType = String(payment.product_type || "").toLowerCase();
 
-  if (!membership.expires_at) return true;
+  if (paymentType === "package" || productType === "membership") {
+    return language === "id" ? "Membership" : "Membership";
+  }
 
-  const expiry = new Date(membership.expires_at);
-  if (Number.isNaN(expiry.getTime())) return true;
+  if (paymentType === "listing_fee") {
+    return language === "id" ? "Listing" : "Listing";
+  }
 
-  return expiry.getTime() >= Date.now();
+  if (paymentType === "boost") return "Boost";
+  if (paymentType === "spotlight") return "Spotlight";
+  if (paymentType === "education") return "Education";
+
+  return cleanText(payment.payment_type || payment.product_type || "Payment");
 }
 
-function membershipStatusLabel(membership: AgentMembershipRow | null, language: Language) {
-  const isId = language === "id";
+function getStatusUI(status: NormalizedStatus, language: Language) {
+  if (status === "paid") {
+    return {
+      label: "PAID",
+      description:
+        language === "id"
+          ? "Pembayaran sudah berhasil dikonfirmasi."
+          : "Payment has been confirmed successfully.",
+      icon: <CheckCircle2 color="#22c55e" size={16} />,
+      color: "#22c55e",
+      bg: "#052e16",
+      border: "#166534",
+    };
+  }
 
-  if (!membership) return isId ? "Belum Aktif" : "Not Active";
-  if (isMembershipActive(membership)) return isId ? "Aktif" : "Active";
-  if (membership.status === "pending") return "Pending";
-  if (membership.status === "cancelled") return isId ? "Dibatalkan" : "Cancelled";
+  if (status === "pending") {
+    return {
+      label: language === "id" ? "PENDING" : "PENDING",
+      description:
+        language === "id"
+          ? "Menunggu pembayaran atau konfirmasi dari gateway."
+          : "Waiting for payment or gateway confirmation.",
+      icon: <Clock3 color="#e6c15c" size={16} />,
+      color: "#e6c15c",
+      bg: "#211a0b",
+      border: "#705d2c",
+    };
+  }
 
-  return isId ? "Kedaluwarsa" : "Expired";
-}
+  if (status === "unpaid") {
+    return {
+      label: language === "id" ? "UNPAID" : "UNPAID",
+      description:
+        language === "id"
+          ? "Tagihan belum dibayar."
+          : "This billing record has not been paid.",
+      icon: <Clock3 color="#e6c15c" size={16} />,
+      color: "#e6c15c",
+      bg: "#211a0b",
+      border: "#705d2c",
+    };
+  }
 
-function mapPaymentRow(
-  row: PaymentTransactionRow,
-  role: "owner" | "agent",
-  memberships: AgentMembershipRow[],
-  language: Language
-): PaymentItem {
-  const membership = memberships.find((item) => item.payment_id === row.id) || null;
-  const category = inferCategory(row, role);
-  const amount = Number(row.amount_total ?? row.amount_subtotal ?? 0);
-  const currency = row.currency || "IDR";
-  const expiryAt = getExpiryDate(row, membership);
+  if (status === "expired") {
+    return {
+      label: language === "id" ? "EXPIRED" : "EXPIRED",
+      description:
+        language === "id"
+          ? "Checkout sudah kedaluwarsa."
+          : "The checkout link has expired.",
+      icon: <Clock3 color="#fb923c" size={16} />,
+      color: "#fb923c",
+      bg: "#2a1608",
+      border: "#9a3412",
+    };
+  }
+
+  if (status === "cancelled") {
+    return {
+      label: language === "id" ? "CANCELLED" : "CANCELLED",
+      description:
+        language === "id"
+          ? "Pembayaran dibatalkan atau tidak diselesaikan."
+          : "Payment was cancelled or not completed.",
+      icon: <XCircle color="#a9a9a9" size={16} />,
+      color: "#a9a9a9",
+      bg: "#171717",
+      border: "#333333",
+    };
+  }
+
+  if (status === "refunded") {
+    return {
+      label: "REFUNDED",
+      description:
+        language === "id"
+          ? "Pembayaran sudah dikembalikan."
+          : "Payment has been refunded.",
+      icon: <RefreshCcw color="#38bdf8" size={16} />,
+      color: "#38bdf8",
+      bg: "#082f49",
+      border: "#0369a1",
+    };
+  }
 
   return {
-    id: row.id,
-    role,
-    category,
-    title: getTitle(row, membership, role, language),
-    paymentType: getPaymentTypeLabel(row, role, language),
-    packageName: cleanText(
-      sanitizePublicPaymentText(
-        membership?.package_name ||
-          getMetaString(row.metadata, "packageName") ||
-          getMetaString(row.metadata, "package_name") ||
-          row.product_name_snapshot ||
-          row.plan_name ||
-          row.product_id
-      )
-    ),
-    productId: cleanText(row.product_id),
-    listingCode: cleanText(
-      row.property_code_snapshot ||
-        getMetaString(row.metadata, "existingPropertyCode") ||
-        getMetaString(row.metadata, "listing_code")
-    ),
-    amount,
-    amountLabel: formatAmount(amount, currency),
-    method: getPaymentMethod(row),
-    reference: getReference(row),
-    isPaid: isPaidStatus(row.status, row.paid_at),
-    createdLabel: formatDateTime(row.created_at, language),
-    paidLabel: formatDateTime(row.paid_at, language),
-    expiryLabel: formatDateTime(expiryAt, language),
-    checkoutUrl: blankText(row.checkout_url),
+    label: language === "id" ? "FAILED" : "FAILED",
+    description:
+      language === "id"
+        ? "Pembayaran gagal atau tidak berhasil diproses."
+        : "Payment failed or was not processed successfully.",
+    icon: <XCircle color="#f87171" size={16} />,
+    color: "#f87171",
+    bg: "#2a0d0d",
+    border: "#7f1d1d",
   };
 }
 
-export default function PaymentsScreen() {
+function shouldShowReceipt(status: NormalizedStatus) {
+  return status === "paid" || status === "refunded";
+}
+
+function shouldShowPayNow(status: NormalizedStatus, payment: PaymentRow) {
+  if (status === "paid") return false;
+  if (status === "refunded") return false;
+
+  if (
+    status === "pending" ||
+    status === "unpaid" ||
+    status === "failed" ||
+    status === "expired" ||
+    status === "cancelled"
+  ) {
+    return Boolean(payment.checkout_url);
+  }
+
+  return false;
+}
+
+export default function DashboardPaymentsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
 
   const [language, setLanguage] = useState<Language>("en");
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<ProfileRow | null>(null);
-  const [role, setRole] = useState<Role>("guest");
-  const [memberships, setMemberships] = useState<AgentMembershipRow[]>([]);
-  const [payments, setPayments] = useState<PaymentItem[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
 
   const isId = language === "id";
-  const paymentResult = String(params.payment || "");
 
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadPayments() {
-      setLoading(true);
-      setErrorMessage("");
-
-      try {
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser();
-
-        if (ignore) return;
-
-        if (authError || !user) {
-          setProfile(null);
-          setRole("guest");
-          setPayments([]);
-          setMemberships([]);
-          setLoading(false);
-          return;
-        }
-
-        const { data: profileRow, error: profileError } = await supabase
-          .from("profiles")
-          .select("id, full_name, email, role")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (ignore) return;
-        if (profileError) throw profileError;
-
-        const safeProfile: ProfileRow = {
-          id: user.id,
-          full_name:
-            profileRow?.full_name ||
-            String(user.user_metadata?.full_name || "") ||
-            String(user.user_metadata?.name || ""),
-          email: profileRow?.email || user.email || "",
-          role: profileRow?.role || String(user.user_metadata?.role || ""),
-        };
-
-        const detectedRole = normalizeRole(safeProfile.role);
-
-        setProfile(safeProfile);
-        setRole(detectedRole);
-
-        if (detectedRole !== "owner" && detectedRole !== "agent") {
-          setPayments([]);
-          setMemberships([]);
-          setLoading(false);
-          return;
-        }
-
-        if (detectedRole === "agent") {
-          const [membershipRes, transactionRes] = await Promise.all([
-            supabase
-              .from("agent_memberships")
-              .select(
-                "id, user_id, payment_id, package_id, package_name, billing_cycle, listing_limit, status, auto_renew, starts_at, expires_at, metadata, created_at, updated_at"
-              )
-              .eq("user_id", user.id)
-              .order("created_at", { ascending: false }),
-
-            supabase
-              .from("payment_transactions")
-              .select(
-                "id, user_id, property_id, source_role, payment_type, product_id, product_name_snapshot, product_type, status, currency, amount_subtotal, amount_total, description, plan_name, duration_days, property_title_snapshot, property_code_snapshot, customer_name, customer_email, checkout_url, checkout_expires_at, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, paid_at, expired_at, failed_at, metadata, created_at, updated_at"
-              )
-              .eq("user_id", user.id)
-              .eq("source_role", "agent")
-              .order("created_at", { ascending: false }),
-          ]);
-
-          if (ignore) return;
-
-          if (transactionRes.error) throw transactionRes.error;
-
-          if (membershipRes.error) {
-            console.log("Mobile payments membership error:", membershipRes.error);
-          }
-
-          const membershipRows = (membershipRes.data || []) as AgentMembershipRow[];
-          const transactionRows = (transactionRes.data || []) as PaymentTransactionRow[];
-
-          setMemberships(membershipRows);
-          setPayments(
-            transactionRows.map((row) =>
-              mapPaymentRow(row, "agent", membershipRows, language)
-            )
-          );
-          setLoading(false);
-          return;
-        }
-
-        const { data: transactionRows, error: transactionError } = await supabase
-          .from("payment_transactions")
-          .select(
-            "id, user_id, property_id, source_role, payment_type, product_id, product_name_snapshot, product_type, status, currency, amount_subtotal, amount_total, description, plan_name, duration_days, property_title_snapshot, property_code_snapshot, customer_name, customer_email, checkout_url, checkout_expires_at, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, paid_at, expired_at, failed_at, metadata, created_at, updated_at"
-          )
-          .eq("user_id", user.id)
-          .eq("source_role", "owner")
-          .order("created_at", { ascending: false });
-
-        if (ignore) return;
-        if (transactionError) throw transactionError;
-
-        setMemberships([]);
-        setPayments(
-          ((transactionRows || []) as PaymentTransactionRow[]).map((row) =>
-            mapPaymentRow(row, "owner", [], language)
-          )
-        );
-        setLoading(false);
-      } catch (error: any) {
-        if (!ignore) {
-          console.log("Tetamo mobile payments error:", error);
-          setErrorMessage(
-            error?.message ||
-              (isId ? "Gagal memuat pembayaran." : "Failed to load payments.")
-          );
-          setLoading(false);
-        }
-      }
+  const ui = useMemo(() => {
+    if (isId) {
+      return {
+        title: "Payment & Receipt",
+        subtitle:
+          "Lihat status pembayaran, metode pembayaran, receipt, dan invoice Tetamo.",
+        loading: "Memuat pembayaran...",
+        empty: "Belum ada riwayat pembayaran.",
+        failedLoad: "Gagal memuat pembayaran.",
+        back: "Kembali",
+        refresh: "Refresh",
+        total: "Total",
+        paid: "Paid",
+        pending: "Pending",
+        amount: "Jumlah",
+        method: "Metode",
+        source: "Role",
+        type: "Jenis",
+        listingCode: "Kode Listing",
+        reference: "Reference",
+        created: "Dibuat",
+        paidAt: "Dibayar",
+        receipt: "Receipt",
+        invoice: "Invoice",
+        payNow: "Pay Now",
+        noCheckout: "Link checkout tidak tersedia",
+      };
     }
 
-    void loadPayments();
+    return {
+      title: "Payment & Receipt",
+      subtitle:
+        "View Tetamo payment status, payment method, receipts, and invoices.",
+      loading: "Loading payments...",
+      empty: "No payment history yet.",
+      failedLoad: "Failed to load payments.",
+      back: "Back",
+      refresh: "Refresh",
+      total: "Total",
+      paid: "Paid",
+      pending: "Pending",
+      amount: "Amount",
+      method: "Method",
+      source: "Role",
+      type: "Type",
+      listingCode: "Listing Code",
+      reference: "Reference",
+      created: "Created",
+      paidAt: "Paid At",
+      receipt: "Receipt",
+      invoice: "Invoice",
+      payNow: "Pay Now",
+      noCheckout: "Checkout link unavailable",
+    };
+  }, [isId]);
+
+  const stats = useMemo(() => {
+    const paid = payments.filter((item) => normalizeStatus(item.status) === "paid");
+    const pending = payments.filter((item) => {
+      const status = normalizeStatus(item.status);
+      return status === "pending" || status === "unpaid";
+    });
+
+    return {
+      total: payments.length,
+      paid: paid.length,
+      pending: pending.length,
+    };
+  }, [payments]);
+
+  const loadPayments = useCallback(async () => {
+    setErrorMessage("");
 
     const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      void loadPayments();
-    });
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    return () => {
-      ignore = true;
-      subscription.unsubscribe();
-    };
-  }, [language, isId]);
-
-  const activeMembership = useMemo(() => {
-    return memberships.find((item) => isMembershipActive(item)) || memberships[0] || null;
-  }, [memberships]);
-
-  const filteredPayments = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-
-    if (!query) return payments;
-
-    const words = query.split(" ").filter(Boolean);
-
-    return payments.filter((item) => {
-      const searchable = `
-        ${item.title}
-        ${item.paymentType}
-        ${item.packageName}
-        ${item.productId}
-        ${item.listingCode}
-        ${item.method}
-        ${item.reference}
-        ${item.isPaid ? "paid receipt" : "pay now"}
-        ${item.amountLabel}
-      `.toLowerCase();
-
-      return words.every((word) => searchable.includes(word));
-    });
-  }, [payments, searchQuery]);
-
-  const paidPayments = useMemo(() => {
-    return payments.filter((item) => item.isPaid);
-  }, [payments]);
-
-  const payNowPayments = useMemo(() => {
-    return payments.filter((item) => !item.isPaid);
-  }, [payments]);
-
-  const totalPaid = useMemo(() => {
-    return paidPayments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  }, [paidPayments]);
-
-  const totalPayNow = useMemo(() => {
-    return payNowPayments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  }, [payNowPayments]);
-
-  async function openCheckout(url: string) {
-    if (!url) {
-      Alert.alert(
-        isId ? "Link pembayaran belum tersedia" : "Payment link not available",
-        isId
-          ? "Belum ada link pembayaran untuk catatan ini."
-          : "There is no payment link available for this record."
-      );
+    if (userError || !user) {
+      setPayments([]);
+      setLoading(false);
+      setRefreshing(false);
+      router.replace("/login" as any);
       return;
     }
 
-    try {
-      await Linking.openURL(url);
-    } catch {
-      Alert.alert(
-        isId ? "Tidak bisa membuka link" : "Cannot open link",
-        isId ? "Silakan coba lagi nanti." : "Please try again later."
-      );
+    const { data, error } = await supabase
+      .from("payment_transactions")
+      .select(
+        `
+          id,
+          user_id,
+          property_id,
+          source_role,
+          payment_type,
+          product_id,
+          product_name_snapshot,
+          product_type,
+          status,
+          currency,
+          amount_subtotal,
+          amount_total,
+          description,
+          plan_name,
+          duration_days,
+          property_title_snapshot,
+          property_code_snapshot,
+          customer_name,
+          customer_email,
+          checkout_url,
+          checkout_expires_at,
+          stripe_checkout_session_id,
+          stripe_payment_intent_id,
+          stripe_charge_id,
+          stripe_invoice_id,
+          receipt_url,
+          hosted_invoice_url,
+          invoice_pdf_url,
+          paid_at,
+          expired_at,
+          failed_at,
+          metadata,
+          created_at,
+          updated_at
+        `
+      )
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      setPayments([]);
+      setErrorMessage(error.message || ui.failedLoad);
+      setLoading(false);
+      setRefreshing(false);
+      return;
     }
+
+    setPayments((data || []) as PaymentRow[]);
+    setLoading(false);
+    setRefreshing(false);
+  }, [router, ui.failedLoad]);
+
+  useEffect(() => {
+    void loadPayments();
+  }, [loadPayments]);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await loadPayments();
   }
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar style="light" />
-
-        <View style={styles.loadingBox}>
-          <ActivityIndicator color="#e6c15c" />
-          <Text style={styles.loadingText}>
-            {isId ? "Memuat pembayaran..." : "Loading payments..."}
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
+  async function openUrl(url?: string | null) {
+    if (!url) return;
+    await Linking.openURL(url);
   }
 
-  if (!profile || role === "guest") {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar style="light" />
-
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.guestContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.guestCard}>
-            <View style={styles.logoCircle}>
-              <UserRound color="#e6c15c" size={34} />
-            </View>
-
-            <Text style={styles.guestTitle}>
-              {isId ? "Masuk untuk melihat pembayaran" : "Log in to view payments"}
-            </Text>
-
-            <Text style={styles.guestText}>
-              {isId
-                ? "Anda perlu login untuk melihat tagihan, pembayaran, dan receipt Tetamo."
-                : "You need to log in to view your Tetamo billing, payments, and receipts."}
-            </Text>
-
-            <Pressable style={styles.primaryButton} onPress={() => router.push("/login" as any)}>
-              <Text style={styles.primaryButtonText}>{isId ? "Login" : "Log In"}</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
+  function openReceipt(payment: PaymentRow) {
+    router.push(`/dashboard/receipt/${payment.id}` as any);
   }
-
-  if (role === "unsupported") {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar style="light" />
-
-        <View style={styles.topBar}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft color="#ffffff" size={18} />
-          </Pressable>
-
-          <View style={styles.topTitleBox}>
-            <Text style={styles.topTitle}>{isId ? "Pembayaran" : "Payments"}</Text>
-            <Text style={styles.topSub}>Tetamo</Text>
-          </View>
-        </View>
-
-        <View style={styles.unsupportedCard}>
-          <Text style={styles.unsupportedTitle}>
-            {isId ? "Role belum tersedia" : "Role not supported"}
-          </Text>
-          <Text style={styles.unsupportedText}>
-            {isId
-              ? "Halaman pembayaran mobile ini hanya untuk Owner dan Agent."
-              : "This mobile payments page is only for Owners and Agents."}
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const roleLabel =
-    role === "owner" ? (isId ? "PEMILIK" : "OWNER") : isId ? "AGENT" : "AGENT";
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -775,32 +565,26 @@ export default function PaymentsScreen() {
 
       <View style={styles.topBar}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft color="#ffffff" size={18} />
+          <ArrowLeft color="#ffffff" size={15} />
+          <Text style={styles.backText}>{ui.back}</Text>
         </Pressable>
 
-        <View style={styles.topTitleBox}>
-          <Text style={styles.topTitle}>{isId ? "Pembayaran" : "Payments"}</Text>
-          <Text style={styles.topSub}>
-            {role === "owner"
-              ? isId
-                ? "Tagihan & receipt pemilik"
-                : "Owner billing and receipts"
-              : isId
-                ? "Tagihan & receipt agent"
-                : "Agent billing and receipts"}
-          </Text>
-        </View>
-
         <View style={styles.langToggle}>
-          <Languages color="#e6c15c" size={14} />
-
           {(["en", "id"] as Language[]).map((item) => (
             <Pressable
               key={item}
-              style={[styles.langButton, language === item && styles.langButtonActive]}
+              style={[
+                styles.langButton,
+                language === item && styles.langButtonActive,
+              ]}
               onPress={() => setLanguage(item)}
             >
-              <Text style={[styles.langText, language === item && styles.langTextActive]}>
+              <Text
+                style={[
+                  styles.langText,
+                  language === item && styles.langTextActive,
+                ]}
+              >
                 {item.toUpperCase()}
               </Text>
             </Pressable>
@@ -812,343 +596,215 @@ export default function PaymentsScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-      >
-        {errorMessage ? (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorBannerText}>{errorMessage}</Text>
-          </View>
-        ) : null}
-
-        {paymentResult === "success" ? (
-          <View style={styles.successBanner}>
-            <CheckCircle2 color="#86efac" size={18} />
-            <View style={styles.bannerTextBox}>
-              <Text style={styles.successTitle}>
-                {isId ? "Pembayaran berhasil." : "Payment successful."}
-              </Text>
-              <Text style={styles.successText}>
-                {isId
-                  ? "Status pembayaran akan tampil sebagai Paid setelah sistem selesai memproses."
-                  : "Payment status will show as Paid once the system finishes processing."}
-              </Text>
-            </View>
-          </View>
-        ) : null}
-
-        {paymentResult === "cancelled" ? (
-          <View style={styles.warningBanner}>
-            <Clock3 color="#facc15" size={18} />
-            <View style={styles.bannerTextBox}>
-              <Text style={styles.warningTitle}>
-                {isId ? "Pembayaran belum selesai." : "Payment not completed."}
-              </Text>
-              <Text style={styles.warningText}>
-                {isId
-                  ? "Gunakan tombol Pay Now jika Anda ingin menyelesaikan pembayaran."
-                  : "Use the Pay Now button if you want to complete the payment."}
-              </Text>
-            </View>
-          </View>
-        ) : null}
-
-        <View style={styles.heroCard}>
-          <View style={styles.heroTop}>
-            <View style={styles.heroIcon}>
-              <ReceiptText color="#e6c15c" size={24} />
-            </View>
-
-            <View style={styles.heroTextBox}>
-              <View style={styles.rolePill}>
-                <Text style={styles.rolePillText}>{roleLabel}</Text>
-              </View>
-
-              <Text style={styles.heroTitle}>
-                {role === "owner"
-                  ? isId
-                    ? "Riwayat Pembayaran Pemilik"
-                    : "Owner Payment History"
-                  : isId
-                    ? "Riwayat Pembayaran Agent"
-                    : "Agent Payment History"}
-              </Text>
-
-              <Text style={styles.heroSub}>
-                {profile.full_name || profile.email || "Tetamo User"}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.summaryGrid}>
-            <SummaryCard
-              icon={<FileText color="#e6c15c" size={17} />}
-              label={isId ? "Total" : "Records"}
-              value={String(payments.length)}
-            />
-            <SummaryCard
-              icon={<CheckCircle2 color="#22c55e" size={17} />}
-              label="Paid"
-              value={formatAmount(totalPaid, "IDR")}
-            />
-            <SummaryCard
-              icon={<CreditCard color="#f59e0b" size={17} />}
-              label="Pay Now"
-              value={formatAmount(totalPayNow, "IDR")}
-            />
-          </View>
-        </View>
-
-        {role === "agent" ? (
-          <View style={styles.membershipCard}>
-            <View style={styles.membershipTop}>
-              <View style={styles.membershipIcon}>
-                <ShieldCheck color="#60a5fa" size={21} />
-              </View>
-
-              <View style={styles.membershipTextBox}>
-                <Text style={styles.membershipTitle}>
-                  {isId ? "Membership Agent" : "Agent Membership"}
-                </Text>
-                <Text style={styles.membershipSub}>
-                  {sanitizePublicPaymentText(
-                    activeMembership?.package_name ||
-                      activeMembership?.package_id ||
-                      (isId ? "Belum ada paket aktif" : "No active package")
-                  )}
-                </Text>
-              </View>
-
-              <View style={styles.membershipBadge}>
-                <Text style={styles.membershipBadgeText}>
-                  {membershipStatusLabel(activeMembership, language)}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.membershipStats}>
-              <MiniStat
-                label="Billing"
-                value={
-                  activeMembership?.billing_cycle === "monthly"
-                    ? isId
-                      ? "Bulanan"
-                      : "Monthly"
-                    : activeMembership?.billing_cycle === "yearly"
-                      ? isId
-                        ? "Tahunan"
-                        : "Yearly"
-                      : "-"
-                }
-              />
-              <MiniStat
-                label="Limit"
-                value={String(activeMembership?.listing_limit || 0)}
-              />
-              <MiniStat
-                label={isId ? "Expired" : "Expires"}
-                value={formatDateTime(activeMembership?.expires_at, language)}
-              />
-              <MiniStat
-                label="Auto Renew"
-                value={
-                  activeMembership?.auto_renew
-                    ? isId
-                      ? "Aktif"
-                      : "Active"
-                    : isId
-                      ? "Nonaktif"
-                      : "Inactive"
-                }
-              />
-            </View>
-          </View>
-        ) : null}
-
-        <View style={styles.searchBox}>
-          <Search color="#777777" size={17} />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder={
-              isId
-                ? "Cari pembayaran, kode listing, metode..."
-                : "Search payments, listing code, method..."
-            }
-            placeholderTextColor="#777777"
-            style={styles.searchInput}
+        refreshControl={
+          <RefreshControl
+            tintColor="#e6c15c"
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
           />
+        }
+      >
+        <View style={styles.heroCard}>
+          <View style={styles.heroIcon}>
+            <Wallet color="#111111" size={25} />
+          </View>
+
+          <Text style={styles.heroTitle}>{ui.title}</Text>
+          <Text style={styles.heroSubtitle}>{ui.subtitle}</Text>
+
+          <Pressable
+            style={styles.refreshButton}
+            onPress={() => void handleRefresh()}
+          >
+            <RefreshCcw color="#111111" size={14} />
+            <Text style={styles.refreshText}>{ui.refresh}</Text>
+          </Pressable>
         </View>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {isId ? "Riwayat Pembayaran" : "Payment History"}
-          </Text>
+        <View style={styles.statsGrid}>
+          <StatBox label={ui.total} value={String(stats.total)} />
+          <StatBox label={ui.paid} value={String(stats.paid)} />
+          <StatBox label={ui.pending} value={String(stats.pending)} />
         </View>
 
-        {filteredPayments.length === 0 ? (
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator color="#e6c15c" />
+            <Text style={styles.loadingText}>{ui.loading}</Text>
+          </View>
+        ) : null}
+
+        {!loading && errorMessage ? (
+          <View style={styles.errorBox}>
+            <XCircle color="#fecaca" size={18} />
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          </View>
+        ) : null}
+
+        {!loading && !errorMessage && payments.length === 0 ? (
           <View style={styles.emptyBox}>
-            <ReceiptText color="#777777" size={24} />
-            <Text style={styles.emptyTitle}>
-              {isId ? "Belum ada pembayaran" : "No payments yet"}
-            </Text>
-            <Text style={styles.emptyText}>
-              {isId
-                ? "Tidak ada riwayat pembayaran untuk akun ini."
-                : "There are no payment records for this account yet."}
-            </Text>
+            <Receipt color="#a9a9a9" size={28} />
+            <Text style={styles.emptyText}>{ui.empty}</Text>
           </View>
-        ) : (
-          <View style={styles.paymentList}>
-            {filteredPayments.map((item) => (
-              <PaymentCard
-                key={item.id}
-                item={item}
-                language={language}
-                onPayNow={() => openCheckout(item.checkoutUrl)}
-                onReceipt={() => router.push(`/dashboard/receipt/${item.id}` as any)}
-              />
-            ))}
-          </View>
-        )}
+        ) : null}
 
-        <View style={styles.noteCard}>
-          <Text style={styles.noteTitle}>{isId ? "Catatan" : "Note"}</Text>
-          <Text style={styles.noteText}>
-            {isId
-              ? "Pembayaran yang sudah berhasil akan tampil sebagai Paid dan memiliki Receipt. Pembayaran yang belum berhasil akan tampil sebagai Pay Now."
-              : "Successful payments show as Paid and have a Receipt. Payments not completed yet show as Pay Now."}
-          </Text>
+        <View style={styles.paymentList}>
+          {payments.map((payment) => {
+            const status = normalizeStatus(payment.status);
+            const statusUI = getStatusUI(status, language);
+            const invoiceUrl = getInvoiceUrl(payment);
+            const externalReceiptUrl = getExternalReceiptUrl(payment);
+
+            const showReceipt = shouldShowReceipt(status);
+            const showPayNow = shouldShowPayNow(status, payment);
+
+            return (
+              <View key={payment.id} style={styles.paymentCard}>
+                <View style={styles.cardTop}>
+                  <View style={styles.cardTitleBox}>
+                    <Text style={styles.cardTitle} numberOfLines={2}>
+                      {getTitle(payment, language)}
+                    </Text>
+
+                    <Text style={styles.cardSubtitle} numberOfLines={1}>
+                      {getTypeLabel(payment, language)} •{" "}
+                      {cleanText(payment.source_role, "-").toUpperCase()}
+                    </Text>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.statusPill,
+                      {
+                        backgroundColor: statusUI.bg,
+                        borderColor: statusUI.border,
+                      },
+                    ]}
+                  >
+                    {statusUI.icon}
+                    <Text style={[styles.statusText, { color: statusUI.color }]}>
+                      {statusUI.label}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.statusDescription}>
+                  {statusUI.description}
+                </Text>
+
+                <View style={styles.methodBox}>
+                  {getPaymentIcon(payment)}
+                  <View style={styles.methodTextBox}>
+                    <Text style={styles.methodLabel}>{ui.method}</Text>
+                    <Text style={styles.methodValue}>
+                      {getPaymentMethod(payment, language)}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.detailGrid}>
+                  <DetailItem
+                    label={ui.amount}
+                    value={formatAmount(
+                      payment.amount_total ?? payment.amount_subtotal ?? 0,
+                      payment.currency
+                    )}
+                  />
+
+                  <DetailItem
+                    label={ui.listingCode}
+                    value={cleanText(payment.property_code_snapshot)}
+                  />
+
+                  <DetailItem
+                    label={ui.reference}
+                    value={getReference(payment)}
+                  />
+
+                  <DetailItem
+                    label={ui.created}
+                    value={formatDateTime(payment.created_at, language)}
+                  />
+
+                  <DetailItem
+                    label={ui.paidAt}
+                    value={formatDateTime(payment.paid_at, language)}
+                  />
+                </View>
+
+                <View style={styles.actionRow}>
+                  {showReceipt ? (
+                    <Pressable
+                      style={styles.goldButton}
+                      onPress={() => openReceipt(payment)}
+                    >
+                      <Receipt color="#111111" size={15} />
+                      <Text style={styles.goldButtonText}>{ui.receipt}</Text>
+                    </Pressable>
+                  ) : null}
+
+                  {showReceipt && invoiceUrl ? (
+                    <Pressable
+                      style={styles.darkButton}
+                      onPress={() => void openUrl(invoiceUrl)}
+                    >
+                      <FileText color="#ffffff" size={15} />
+                      <Text style={styles.darkButtonText}>{ui.invoice}</Text>
+                      <ExternalLink color="#ffffff" size={13} />
+                    </Pressable>
+                  ) : null}
+
+                  {showReceipt && !invoiceUrl && externalReceiptUrl ? (
+                    <Pressable
+                      style={styles.darkButton}
+                      onPress={() => void openUrl(externalReceiptUrl)}
+                    >
+                      <ExternalLink color="#ffffff" size={15} />
+                      <Text style={styles.darkButtonText}>
+                        {isId ? "Gateway" : "Gateway"}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
+                  {showPayNow ? (
+                    <Pressable
+                      style={styles.goldButton}
+                      onPress={() => void openUrl(payment.checkout_url)}
+                    >
+                      {getPaymentMetaInfo(payment).isQris ? (
+                        <QrCode color="#111111" size={15} />
+                      ) : (
+                        <CreditCard color="#111111" size={15} />
+                      )}
+                      <Text style={styles.goldButtonText}>{ui.payNow}</Text>
+                      <ExternalLink color="#111111" size={13} />
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function SummaryCard({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-}) {
+function StatBox({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.summaryCard}>
-      <View style={styles.summaryIcon}>{icon}</View>
-      <Text style={styles.summaryValue} numberOfLines={1}>
+    <View style={styles.statBox}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.detailItem}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue} numberOfLines={2}>
         {value}
-      </Text>
-      <Text style={styles.summaryLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.miniStat}>
-      <Text style={styles.miniStatLabel}>{label}</Text>
-      <Text style={styles.miniStatValue} numberOfLines={1}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function PaymentCard({
-  item,
-  language,
-  onPayNow,
-  onReceipt,
-}: {
-  item: PaymentItem;
-  language: Language;
-  onPayNow: () => void;
-  onReceipt: () => void;
-}) {
-  const isId = language === "id";
-
-  return (
-    <View style={styles.paymentCard}>
-      <View style={styles.paymentTop}>
-        <View style={styles.paymentIcon}>
-          {item.isPaid ? (
-            <CheckCircle2 color="#22c55e" size={20} />
-          ) : (
-            <CreditCard color="#e6c15c" size={20} />
-          )}
-        </View>
-
-        <View style={styles.paymentTitleBox}>
-          <Text style={styles.paymentTitle} numberOfLines={2}>
-            {item.title}
-          </Text>
-          <Text style={styles.paymentSub} numberOfLines={1}>
-            {item.paymentType}
-          </Text>
-        </View>
-
-        <View style={[styles.statusPill, item.isPaid ? styles.statusPaid : styles.statusPayNow]}>
-          <Text style={[styles.statusText, item.isPaid ? styles.statusPaidText : styles.statusPayNowText]}>
-            {item.isPaid ? "Paid" : "Pay Now"}
-          </Text>
-        </View>
-      </View>
-
-      <Text style={styles.paymentAmount}>{item.amountLabel}</Text>
-
-      <View style={styles.infoGrid}>
-        <InfoPill label={isId ? "Kode" : "Code"} value={item.listingCode} />
-        <InfoPill label="Product" value={item.productId} />
-        <InfoPill label={isId ? "Metode" : "Method"} value={item.method} />
-        <InfoPill label="Reference" value={item.reference} />
-      </View>
-
-      <View style={styles.dateGrid}>
-        <View style={styles.dateRow}>
-          <CalendarDays color="#777777" size={14} />
-          <Text style={styles.dateText}>
-            {isId ? "Dibuat:" : "Created:"} {item.createdLabel}
-          </Text>
-        </View>
-
-        <View style={styles.dateRow}>
-          <CheckCircle2 color="#777777" size={14} />
-          <Text style={styles.dateText}>
-            {isId ? "Dibayar:" : "Paid:"} {item.paidLabel}
-          </Text>
-        </View>
-
-        <View style={styles.dateRow}>
-          <Clock3 color="#777777" size={14} />
-          <Text style={styles.dateText}>
-            {isId ? "Expired:" : "Expiry:"} {item.expiryLabel}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.actionRow}>
-        {item.isPaid ? (
-          <Pressable style={styles.goldActionButton} onPress={onReceipt}>
-            <ReceiptText color="#111111" size={15} />
-            <Text style={styles.goldActionText}>Receipt</Text>
-          </Pressable>
-        ) : (
-          <Pressable style={styles.goldActionButton} onPress={onPayNow}>
-            <CreditCard color="#111111" size={15} />
-            <Text style={styles.goldActionText}>Pay Now</Text>
-          </Pressable>
-        )}
-      </View>
-    </View>
-  );
-}
-
-function InfoPill({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.infoPill}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue} numberOfLines={1}>
-        {value || "-"}
       </Text>
     </View>
   );
@@ -1159,10 +815,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#050505",
   },
-  scroll: {
-    flex: 1,
-    backgroundColor: "#050505",
-  },
   topBar: {
     paddingHorizontal: 18,
     paddingTop: 14,
@@ -1170,44 +822,34 @@ const styles = StyleSheet.create({
     backgroundColor: "#050505",
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: 10,
   },
   backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 15,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#303030",
+    borderColor: "#333333",
     backgroundColor: "#101010",
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 6,
   },
-  topTitleBox: {
-    flex: 1,
-  },
-  topTitle: {
+  backText: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: 11,
     fontWeight: "900",
-    letterSpacing: -0.2,
-  },
-  topSub: {
-    color: "#9b9b9b",
-    fontSize: 10.5,
-    fontWeight: "700",
-    marginTop: 2,
   },
   langToggle: {
     flexDirection: "row",
-    alignItems: "center",
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "#5b4a24",
     overflow: "hidden",
-    paddingLeft: 8,
   },
   langButton: {
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
     paddingVertical: 7,
   },
   langButtonActive: {
@@ -1221,521 +863,267 @@ const styles = StyleSheet.create({
   langTextActive: {
     color: "#111111",
   },
+  scroll: {
+    flex: 1,
+    backgroundColor: "#050505",
+  },
   content: {
     paddingHorizontal: 18,
-    paddingBottom: 36,
-  },
-  loadingBox: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    padding: 24,
-  },
-  loadingText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  guestContent: {
-    flexGrow: 1,
-    paddingHorizontal: 18,
-    paddingBottom: 36,
-    justifyContent: "center",
-  },
-  guestCard: {
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 22,
-    alignItems: "center",
-  },
-  logoCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  guestTitle: {
-    color: "#ffffff",
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: "900",
-    textAlign: "center",
-    marginTop: 16,
-  },
-  guestText: {
-    color: "#b8b8b8",
-    fontSize: 12.5,
-    lineHeight: 19,
-    fontWeight: "700",
-    textAlign: "center",
-    marginTop: 8,
-  },
-  primaryButton: {
-    width: "100%",
-    minHeight: 50,
-    borderRadius: 17,
-    backgroundColor: "#e6c15c",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 20,
-  },
-  primaryButtonText: {
-    color: "#111111",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  errorBanner: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#7f1d1d",
-    backgroundColor: "#2a0d0d",
-    padding: 12,
-    marginBottom: 12,
-  },
-  errorBannerText: {
-    color: "#fecaca",
-    fontSize: 11.5,
-    lineHeight: 16,
-    fontWeight: "700",
-  },
-  successBanner: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#166534",
-    backgroundColor: "#052e16",
-    padding: 13,
-    marginBottom: 12,
-    flexDirection: "row",
-    gap: 10,
-  },
-  warningBanner: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#854d0e",
-    backgroundColor: "#2b1d07",
-    padding: 13,
-    marginBottom: 12,
-    flexDirection: "row",
-    gap: 10,
-  },
-  bannerTextBox: {
-    flex: 1,
-  },
-  successTitle: {
-    color: "#bbf7d0",
-    fontSize: 12.5,
-    fontWeight: "900",
-  },
-  successText: {
-    color: "#86efac",
-    fontSize: 11.2,
-    lineHeight: 16,
-    fontWeight: "700",
-    marginTop: 3,
-  },
-  warningTitle: {
-    color: "#fef08a",
-    fontSize: 12.5,
-    fontWeight: "900",
-  },
-  warningText: {
-    color: "#fde68a",
-    fontSize: 11.2,
-    lineHeight: 16,
-    fontWeight: "700",
-    marginTop: 3,
+    paddingTop: 10,
+    paddingBottom: 38,
   },
   heroCard: {
     borderRadius: 28,
     borderWidth: 1,
     borderColor: "#303030",
     backgroundColor: "#101010",
-    padding: 15,
-    marginBottom: 14,
-  },
-  heroTop: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "center",
+    padding: 18,
+    marginBottom: 12,
   },
   heroIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
+    width: 52,
+    height: 52,
+    borderRadius: 19,
+    backgroundColor: "#e6c15c",
     alignItems: "center",
     justifyContent: "center",
-  },
-  heroTextBox: {
-    flex: 1,
-  },
-  rolePill: {
-    alignSelf: "flex-start",
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-  },
-  rolePillText: {
-    color: "#e6c15c",
-    fontSize: 8.8,
-    fontWeight: "900",
-    letterSpacing: 0.8,
+    marginBottom: 12,
   },
   heroTitle: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: 25,
+    lineHeight: 30,
     fontWeight: "900",
+    letterSpacing: -0.5,
+  },
+  heroSubtitle: {
+    color: "#b8b8b8",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
     marginTop: 7,
   },
-  heroSub: {
-    color: "#a9a9a9",
-    fontSize: 11.5,
-    fontWeight: "700",
-    marginTop: 3,
+  refreshButton: {
+    alignSelf: "flex-start",
+    marginTop: 13,
+    borderRadius: 999,
+    backgroundColor: "#e6c15c",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  summaryGrid: {
+  refreshText: {
+    color: "#111111",
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  statsGrid: {
     flexDirection: "row",
     gap: 9,
-    marginTop: 14,
+    marginBottom: 13,
   },
-  summaryCard: {
+  statBox: {
     flex: 1,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#252525",
-    backgroundColor: "#050505",
-    padding: 10,
-  },
-  summaryIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 13,
-    borderWidth: 1,
-    borderColor: "#252525",
-    backgroundColor: "#101010",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  summaryValue: {
-    color: "#ffffff",
-    fontSize: 13.5,
-    fontWeight: "900",
-    marginTop: 8,
-  },
-  summaryLabel: {
-    color: "#9b9b9b",
-    fontSize: 9.5,
-    fontWeight: "800",
-    marginTop: 2,
-  },
-  membershipCard: {
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: "#1d4ed8",
-    backgroundColor: "#0b1624",
-    padding: 14,
-    marginBottom: 14,
-  },
-  membershipTop: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "flex-start",
-  },
-  membershipIcon: {
-    width: 43,
-    height: 43,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#1d4ed8",
-    backgroundColor: "#06101d",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  membershipTextBox: {
-    flex: 1,
-  },
-  membershipTitle: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "900",
-  },
-  membershipSub: {
-    color: "#bfdbfe",
-    fontSize: 11.5,
-    lineHeight: 16,
-    fontWeight: "800",
-    marginTop: 3,
-  },
-  membershipBadge: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#1d4ed8",
-    backgroundColor: "#06101d",
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-  },
-  membershipBadgeText: {
-    color: "#bfdbfe",
-    fontSize: 9.5,
-    fontWeight: "900",
-  },
-  membershipStats: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 13,
-  },
-  miniStat: {
-    width: "48.5%",
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "#1d4ed8",
-    backgroundColor: "#06101d",
-    padding: 10,
-  },
-  miniStatLabel: {
-    color: "#93c5fd",
-    fontSize: 10.3,
-    fontWeight: "800",
-  },
-  miniStatValue: {
-    color: "#ffffff",
-    fontSize: 11.7,
-    fontWeight: "900",
-    marginTop: 4,
-  },
-  searchBox: {
-    minHeight: 48,
-    borderRadius: 17,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "#303030",
     backgroundColor: "#101010",
-    paddingHorizontal: 13,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    marginBottom: 14,
+    padding: 12,
   },
-  searchInput: {
-    flex: 1,
+  statValue: {
     color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "800",
-    paddingVertical: 10,
-  },
-  sectionHeader: {
-    marginTop: 4,
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    color: "#ffffff",
-    fontSize: 15.5,
+    fontSize: 20,
     fontWeight: "900",
-    letterSpacing: -0.2,
   },
-  emptyBox: {
-    borderRadius: 22,
+  statLabel: {
+    color: "#a9a9a9",
+    fontSize: 10.5,
+    fontWeight: "800",
+    marginTop: 3,
+  },
+  loadingBox: {
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: "#303030",
     backgroundColor: "#101010",
     padding: 18,
     alignItems: "center",
-    gap: 8,
-    marginBottom: 16,
+    gap: 10,
   },
-  emptyTitle: {
+  loadingText: {
     color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "900",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  errorBox: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#7f1d1d",
+    backgroundColor: "#2a0d0d",
+    padding: 13,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+  },
+  errorText: {
+    color: "#fecaca",
+    fontSize: 11.8,
+    lineHeight: 17,
+    fontWeight: "700",
+    flex: 1,
+  },
+  emptyBox: {
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#303030",
+    backgroundColor: "#101010",
+    padding: 22,
+    alignItems: "center",
+    gap: 10,
   },
   emptyText: {
-    color: "#9b9b9b",
-    fontSize: 11.5,
-    lineHeight: 16,
-    fontWeight: "700",
+    color: "#a9a9a9",
+    fontSize: 12,
+    fontWeight: "800",
     textAlign: "center",
   },
   paymentList: {
-    gap: 11,
-    marginBottom: 16,
+    gap: 13,
   },
   paymentCard: {
     borderRadius: 24,
     borderWidth: 1,
     borderColor: "#303030",
     backgroundColor: "#101010",
-    padding: 13,
+    padding: 15,
   },
-  paymentTop: {
+  cardTop: {
     flexDirection: "row",
-    gap: 10,
     alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
   },
-  paymentIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#050505",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  paymentTitleBox: {
+  cardTitleBox: {
     flex: 1,
   },
-  paymentTitle: {
+  cardTitle: {
     color: "#ffffff",
-    fontSize: 13.2,
-    lineHeight: 18,
+    fontSize: 14.5,
+    lineHeight: 19,
     fontWeight: "900",
   },
-  paymentSub: {
-    color: "#9b9b9b",
-    fontSize: 10.5,
+  cardSubtitle: {
+    color: "#a9a9a9",
+    fontSize: 11,
     fontWeight: "800",
     marginTop: 3,
-  },
-  paymentAmount: {
-    color: "#e6c15c",
-    fontSize: 20,
-    fontWeight: "900",
-    marginTop: 11,
   },
   statusPill: {
     borderRadius: 999,
     borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
   },
   statusText: {
-    fontSize: 8.8,
+    fontSize: 9.8,
     fontWeight: "900",
   },
-  statusPaid: {
-    borderColor: "#166534",
-    backgroundColor: "#052e16",
+  statusDescription: {
+    color: "#b8b8b8",
+    fontSize: 11.3,
+    lineHeight: 16,
+    fontWeight: "700",
+    marginTop: 10,
   },
-  statusPaidText: {
-    color: "#86efac",
-  },
-  statusPayNow: {
-    borderColor: "#854d0e",
-    backgroundColor: "#2b1d07",
-  },
-  statusPayNowText: {
-    color: "#fde68a",
-  },
-  infoGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+  methodBox: {
     marginTop: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#5b4a24",
+    backgroundColor: "#211a0b",
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
-  infoPill: {
-    width: "48.5%",
-    borderRadius: 15,
+  methodTextBox: {
+    flex: 1,
+  },
+  methodLabel: {
+    color: "#c9b56b",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  methodValue: {
+    color: "#ffffff",
+    fontSize: 12.5,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  detailGrid: {
+    marginTop: 12,
+    gap: 8,
+  },
+  detailItem: {
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: "#252525",
     backgroundColor: "#050505",
     padding: 10,
   },
-  infoLabel: {
+  detailLabel: {
     color: "#777777",
-    fontSize: 9.3,
+    fontSize: 10,
     fontWeight: "800",
   },
-  infoValue: {
+  detailValue: {
     color: "#ffffff",
-    fontSize: 10.5,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: "900",
-    marginTop: 4,
-  },
-  dateGrid: {
-    gap: 6,
-    marginTop: 12,
-  },
-  dateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-  },
-  dateText: {
-    color: "#a9a9a9",
-    fontSize: 10.7,
-    fontWeight: "700",
-    flex: 1,
+    marginTop: 3,
   },
   actionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 13,
+    gap: 9,
+    marginTop: 14,
   },
-  goldActionButton: {
-    minHeight: 40,
-    borderRadius: 14,
+  goldButton: {
+    minHeight: 43,
+    borderRadius: 15,
     backgroundColor: "#e6c15c",
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    paddingHorizontal: 12,
+    gap: 7,
   },
-  goldActionText: {
+  goldButtonText: {
     color: "#111111",
-    fontSize: 11.2,
+    fontSize: 12,
     fontWeight: "900",
   },
-  noteCard: {
-    borderRadius: 22,
+  darkButton: {
+    minHeight: 43,
+    borderRadius: 15,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 14,
+    borderColor: "#343434",
+    backgroundColor: "#050505",
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
   },
-  noteTitle: {
+  darkButtonText: {
     color: "#ffffff",
-    fontSize: 13.5,
+    fontSize: 12,
     fontWeight: "900",
-  },
-  noteText: {
-    color: "#a9a9a9",
-    fontSize: 11.3,
-    lineHeight: 17,
-    fontWeight: "700",
-    marginTop: 5,
-  },
-  unsupportedCard: {
-    margin: 18,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 16,
-  },
-  unsupportedTitle: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  unsupportedText: {
-    color: "#a9a9a9",
-    fontSize: 11.5,
-    lineHeight: 16,
-    fontWeight: "700",
-    marginTop: 5,
   },
 });

@@ -1,43 +1,43 @@
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    BarChart3,
-    BellRing,
-    Bookmark,
-    Bot,
-    CalendarDays,
-    CheckCircle2,
-    ChevronRight,
-    Clock3,
-    FileText,
-    Heart,
-    Home,
-    Languages,
-    LogIn,
-    LogOut,
-    MapPin,
-    MessageCircle,
-    PackageCheck,
-    Pencil,
-    Plus,
-    ReceiptText,
-    Settings,
-    ShieldCheck,
-    UserRound,
-    Wallet,
+  BarChart3,
+  BellRing,
+  Bookmark,
+  Bot,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  FileText,
+  Heart,
+  Home,
+  Languages,
+  LogIn,
+  LogOut,
+  MapPin,
+  MessageCircle,
+  PackageCheck,
+  Pencil,
+  Plus,
+  ReceiptText,
+  Settings,
+  ShieldCheck,
+  UserRound,
+  Wallet,
 } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
 
@@ -386,10 +386,6 @@ export default function ProfileScreen() {
           linkedin_url: profileRow?.linkedin_url || "",
         };
 
-        console.log("MOBILE PROFILE USER ID:", user.id);
-        console.log("MOBILE PROFILE ROLE:", profileRow?.role);
-        console.log("MOBILE PROFILE PHOTO URL:", profileRow?.photo_url);
-
         const [
           { data: propertyRows, error: propertyError },
           { data: membershipRows, error: membershipError },
@@ -638,12 +634,8 @@ export default function ProfileScreen() {
                   source={{ uri: avatarUrl }}
                   style={styles.avatarImage}
                   resizeMode="cover"
-                  onLoad={() => {
-                    console.log("PROFILE IMAGE LOADED:", avatarUrl);
-                  }}
                   onError={(error) => {
                     console.log("PROFILE IMAGE LOAD ERROR:", error.nativeEvent);
-                    console.log("FAILED PROFILE IMAGE URL:", avatarUrl);
                     setAvatarLoadFailed(true);
                   }}
                 />
@@ -660,8 +652,8 @@ export default function ProfileScreen() {
                       ? "PEMILIK"
                       : "OWNER"
                     : role === "agent"
-                    ? "AGENT"
-                    : String(role || "USER").toUpperCase()}
+                      ? "AGENT"
+                      : String(role || "USER").toUpperCase()}
                 </Text>
               </View>
 
@@ -722,22 +714,29 @@ export default function ProfileScreen() {
                 featured
                 onPress={routeOwnerAddListing}
               />
+
               <ToolCard
                 icon={<Home color="#ffffff" size={20} />}
                 title={isId ? "Iklan Saya" : "My Listings"}
                 subtitle={
                   isId ? "Edit & kelola iklan" : "Edit & manage listings"
                 }
-                onPress={() => router.push("/dashboard/listings?role=owner" as any)}
+                onPress={() =>
+                  router.push("/dashboard/listings?role=owner" as any)
+                }
               />
+
               <ToolCard
                 icon={<MessageCircle color="#ffffff" size={20} />}
                 title="Leads"
                 subtitle={
                   isId ? "Inquiry buyer/renter" : "Buyer/renter inquiries"
                 }
-                onPress={() => comingSoon("Leads")}
+                onPress={() =>
+                  router.push("/dashboard/leads?role=owner" as any)
+                }
               />
+
               <ToolCard
                 icon={<ReceiptText color="#ffffff" size={20} />}
                 title="Payment / Receipt"
@@ -746,17 +745,19 @@ export default function ProfileScreen() {
                 }
                 onPress={() => router.push("/dashboard/payments" as any)}
               />
+
               <ToolCard
                 icon={<Bookmark color="#ffffff" size={20} />}
                 title={isId ? "Tersimpan" : "Saved"}
                 subtitle={isId ? "Properti tersimpan" : "Saved properties"}
-                onPress={() => comingSoon(isId ? "Tersimpan" : "Saved")}
+                onPress={() => router.push("/dashboard/saved" as any)}
               />
+
               <ToolCard
                 icon={<Heart color="#ffffff" size={20} />}
                 title={isId ? "Disukai" : "Liked"}
                 subtitle={isId ? "Properti disukai" : "Liked properties"}
-                onPress={() => comingSoon(isId ? "Disukai" : "Liked")}
+                onPress={() => router.push("/dashboard/liked" as any)}
               />
             </View>
 
@@ -795,8 +796,8 @@ export default function ProfileScreen() {
                         ? "Membership Aktif"
                         : "Active Membership"
                       : isId
-                      ? "Membership Belum Aktif"
-                      : "Membership Not Active"}
+                        ? "Membership Belum Aktif"
+                        : "Membership Not Active"}
                   </Text>
                   <Text style={styles.membershipSub}>
                     {latestMembership?.package_name ||
@@ -839,8 +840,8 @@ export default function ProfileScreen() {
                       ? "Lihat / Upgrade Paket"
                       : "View / Upgrade Package"
                     : isId
-                    ? "Pilih Paket Agent"
-                    : "Choose Agent Package"}
+                      ? "Pilih Paket Agent"
+                      : "Choose Agent Package"}
                 </Text>
                 <ChevronRight color="#111111" size={15} />
               </Pressable>
@@ -872,6 +873,7 @@ export default function ProfileScreen() {
                 featured
                 onPress={routeAgentCreateListing}
               />
+
               <ToolCard
                 icon={<Bot color="#ffffff" size={20} />}
                 title="AI Social Media"
@@ -880,40 +882,64 @@ export default function ProfileScreen() {
                 }
                 onPress={() => router.push("/agent/ai-social" as any)}
               />
+
               <ToolCard
                 icon={<Home color="#ffffff" size={20} />}
                 title={isId ? "Listing Saya" : "My Listings"}
                 subtitle={
                   isId ? "Kelola listing agent" : "Manage agent listings"
                 }
-                onPress={() => router.push("/dashboard/listings?role=agent" as any)}
+                onPress={() =>
+                  router.push("/dashboard/listings?role=agent" as any)
+                }
               />
+
               <ToolCard
                 icon={<MessageCircle color="#ffffff" size={20} />}
                 title="Leads"
                 subtitle={isId ? "Kelola inquiry" : "Manage inquiries"}
-                onPress={() => comingSoon("Leads")}
+                onPress={() =>
+                  router.push("/dashboard/leads?role=agent" as any)
+                }
               />
+
               <ToolCard
                 icon={<CalendarDays color="#ffffff" size={20} />}
                 title={isId ? "Jadwal Viewing" : "Viewing Schedule"}
                 subtitle={isId ? "Atur jadwal viewing" : "Manage viewings"}
                 onPress={() =>
-                  comingSoon(isId ? "Jadwal Viewing" : "Viewing Schedule")
+                  router.push("/dashboard/viewing-schedule" as any)
                 }
               />
+
               <ToolCard
                 icon={<ReceiptText color="#ffffff" size={20} />}
                 title={isId ? "Tagihan" : "Billing"}
                 subtitle={isId ? "Payment & receipt" : "Payment and receipts"}
                 onPress={() => router.push("/dashboard/payments" as any)}
               />
+
+              <ToolCard
+                icon={<Bookmark color="#ffffff" size={20} />}
+                title={isId ? "Tersimpan" : "Saved"}
+                subtitle={isId ? "Properti tersimpan" : "Saved properties"}
+                onPress={() => router.push("/dashboard/saved" as any)}
+              />
+
+              <ToolCard
+                icon={<Heart color="#ffffff" size={20} />}
+                title={isId ? "Disukai" : "Liked"}
+                subtitle={isId ? "Properti disukai" : "Liked properties"}
+                onPress={() => router.push("/dashboard/liked" as any)}
+              />
+
               <ToolCard
                 icon={<BarChart3 color="#ffffff" size={20} />}
                 title={isId ? "Komisi" : "Commission"}
                 subtitle={isId ? "Tracking komisi" : "Commission tracking"}
                 onPress={() => comingSoon(isId ? "Komisi" : "Commission")}
               />
+
               <ToolCard
                 icon={<BellRing color="#ffffff" size={20} />}
                 title="Performance"
