@@ -1009,7 +1009,7 @@ export default function ProfileScreen() {
                 icon={<BarChart3 color="#ffffff" size={20} />}
                 title={isId ? "Komisi" : "Commission"}
                 subtitle={isId ? "Tracking komisi" : "Commission tracking"}
-                onPress={() => comingSoon(isId ? "Komisi" : "Commission")}
+                 onPress={() => router.push("/dashboard/commission" as any)}
               />
 
               <ToolCard
