@@ -3,8 +3,8 @@ import {
   Building2,
   Home,
   Plus,
-  Search,
   UserRound,
+  UserRoundCheck,
 } from "lucide-react-native";
 
 export default function TabLayout() {
@@ -12,7 +12,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#ffffff",
+        tabBarActiveTintColor: "#e6c15c",
         tabBarInactiveTintColor: "#8f8f8f",
         tabBarStyle: {
           backgroundColor: "#050505",
@@ -60,7 +60,7 @@ export default function TabLayout() {
         options={{
           title: "Buyer",
           tabBarIcon: ({ color, size }) => (
-            <Search color={color} size={size} />
+            <UserRoundCheck color={color} size={size} />
           ),
         }}
       />
