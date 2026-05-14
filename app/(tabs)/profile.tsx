@@ -744,7 +744,7 @@ export default function ProfileScreen() {
                 subtitle={
                   isId ? "Tagihan & bukti bayar" : "Billing and receipts"
                 }
-                onPress={() => comingSoon(isId ? "Tagihan" : "Billing")}
+                onPress={() => router.push("/dashboard/payments" as any)}
               />
               <ToolCard
                 icon={<Bookmark color="#ffffff" size={20} />}
@@ -906,7 +906,7 @@ export default function ProfileScreen() {
                 icon={<ReceiptText color="#ffffff" size={20} />}
                 title={isId ? "Tagihan" : "Billing"}
                 subtitle={isId ? "Payment & receipt" : "Payment and receipts"}
-                onPress={() => comingSoon(isId ? "Tagihan" : "Billing")}
+                onPress={() => router.push("/dashboard/payments" as any)}
               />
               <ToolCard
                 icon={<BarChart3 color="#ffffff" size={20} />}
