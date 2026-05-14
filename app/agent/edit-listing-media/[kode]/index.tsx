@@ -6,7 +6,7 @@ import {
     ImagePlus,
     Languages,
 } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -72,6 +72,8 @@ export default function AgentEditListingMediaScreen() {
   const params = useLocalSearchParams();
   const { draft, setDraft, clearDraft } = useListingDraft();
 
+  const initialDraftRef = useRef<any>(draft);
+
   const [language, setLanguage] = useState<Language>("en");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -92,20 +94,11 @@ export default function AgentEditListingMediaScreen() {
         return;
       }
 
-      const existingKode = String((draft as any)?.kode || "");
-      const existingSource = String((draft as any)?.source || "");
-      const hasDraftAlready =
-        existingKode === kode && existingSource === "agent";
+      const initialDraft = initialDraftRef.current || {};
+      const existingKode = String(initialDraft?.kode || "");
+      const existingSource = String(initialDraft?.source || "");
 
-      if (hasDraftAlready) {
-        setDraft((prev) => ({
-          ...(prev || {}),
-          mode: "edit",
-          source: "agent",
-          kode,
-          payment: undefined,
-        }) as ListingDraft);
-
+      if (existingKode === kode && existingSource === "agent") {
         setLoading(false);
         return;
       }
@@ -324,7 +317,7 @@ export default function AgentEditListingMediaScreen() {
     return () => {
       ignore = true;
     };
-  }, [kode, draft, router, setDraft, isId]);
+  }, [kode, router, setDraft, isId]);
 
   const listingDraft = useMemo(() => {
     return {
@@ -471,9 +464,7 @@ export default function AgentEditListingMediaScreen() {
 
         ai_generated_once: Boolean(draftAny?.aiGeneratedOnce),
         ai_seo_title: cleanText(draftAny?.ai_seo_title),
-        ai_seo_meta_description: cleanText(
-          draftAny?.ai_seo_meta_description
-        ),
+        ai_seo_meta_description: cleanText(draftAny?.ai_seo_meta_description),
         ai_social_caption: cleanText(draftAny?.ai_social_caption),
         ai_whatsapp_inquiry_message: cleanText(
           draftAny?.ai_whatsapp_inquiry_message

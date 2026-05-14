@@ -1,7 +1,11 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ArrowLeft, FileText, Languages } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import {
+    ArrowLeft,
+    FileText,
+    Languages
+} from "lucide-react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Pressable,
@@ -59,6 +63,9 @@ export default function AgentEditListingDetailsScreen() {
   const params = useLocalSearchParams();
   const { draft, setDraft } = useListingDraft();
 
+  const initialDraftRef = useRef<any>(draft);
+  const hasLoadedRef = useRef(false);
+
   const [language, setLanguage] = useState<Language>("en");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -72,6 +79,11 @@ export default function AgentEditListingDetailsScreen() {
     let ignore = false;
 
     async function ensureDraftLoaded() {
+      if (hasLoadedRef.current) {
+        setLoading(false);
+        return;
+      }
+
       if (!kode) {
         setErrorMessage(
           isId ? "Kode listing tidak ditemukan." : "Listing code not found."
@@ -80,19 +92,12 @@ export default function AgentEditListingDetailsScreen() {
         return;
       }
 
-      const existingKode = String((draft as any)?.kode || "");
-      const existingSource = String((draft as any)?.source || "");
-      const hasDraftAlready =
-        existingKode === kode && existingSource === "agent";
+      const initialDraft = initialDraftRef.current || {};
+      const existingKode = String(initialDraft?.kode || "");
+      const existingSource = String(initialDraft?.source || "");
 
-      if (hasDraftAlready) {
-        setDraft((prev) => ({
-          ...(prev || {}),
-          mode: "edit",
-          source: "agent",
-          kode,
-        }) as ListingDraft);
-
+      if (existingKode === kode && existingSource === "agent") {
+        hasLoadedRef.current = true;
         setLoading(false);
         return;
       }
@@ -292,6 +297,7 @@ export default function AgentEditListingDetailsScreen() {
           ),
         } as ListingDraft;
 
+        hasLoadedRef.current = true;
         setDraft(loadedDraft);
         setLoading(false);
       } catch (error: any) {
@@ -311,7 +317,7 @@ export default function AgentEditListingDetailsScreen() {
     return () => {
       ignore = true;
     };
-  }, [kode, draft, router, setDraft, isId]);
+  }, [kode, router, setDraft, isId]);
 
   const listingDraft = useMemo(() => {
     return {

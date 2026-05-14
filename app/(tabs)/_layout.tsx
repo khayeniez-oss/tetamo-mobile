@@ -17,13 +17,17 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: "#050505",
           borderTopColor: "#1f1f1f",
-          height: 86,
-          paddingTop: 8,
-          paddingBottom: 18,
+          height: 78,
+          paddingTop: 7,
+          paddingBottom: 14,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 9.5,
           fontWeight: "700",
+          letterSpacing: 0.1,
+        },
+        tabBarIconStyle: {
+          marginBottom: 1,
         },
       }}
     >
@@ -31,7 +35,9 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Home color={color} size={focused ? 22 : 21} strokeWidth={2.2} />
+          ),
         }}
       />
 
@@ -39,8 +45,12 @@ export default function TabLayout() {
         name="property"
         options={{
           title: "Property",
-          tabBarIcon: ({ color, size }) => (
-            <Building2 color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <Building2
+              color={color}
+              size={focused ? 22 : 21}
+              strokeWidth={2.2}
+            />
           ),
         }}
       />
@@ -48,9 +58,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="add-listing"
         options={{
-          title: "Add Listing",
-          tabBarIcon: ({ color }) => (
-            <Plus color={color} size={34} strokeWidth={2.6} />
+          title: "Pasang Iklan",
+          tabBarIcon: ({ color, focused }) => (
+            <Plus
+              color={color}
+              size={focused ? 29 : 27}
+              strokeWidth={2.5}
+            />
           ),
         }}
       />
@@ -59,8 +73,12 @@ export default function TabLayout() {
         name="saved"
         options={{
           title: "Buyer",
-          tabBarIcon: ({ color, size }) => (
-            <UserRoundCheck color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <UserRoundCheck
+              color={color}
+              size={focused ? 22 : 21}
+              strokeWidth={2.2}
+            />
           ),
         }}
       />
@@ -69,8 +87,12 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, size }) => (
-            <UserRound color={color} size={size} />
+          tabBarIcon: ({ color, focused }) => (
+            <UserRound
+              color={color}
+              size={focused ? 22 : 21}
+              strokeWidth={2.2}
+            />
           ),
         }}
       />
