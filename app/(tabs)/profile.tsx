@@ -32,6 +32,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -109,6 +110,11 @@ type ListingCardRow = PropertyRow & {
   photo?: string;
 };
 
+type SocialLink = {
+  label: string;
+  url: string;
+};
+
 const FALLBACK_PHOTO =
   "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80";
 
@@ -130,6 +136,15 @@ function normalizePhotoUrl(value: unknown) {
   if (!/^https?:\/\//i.test(url)) return "";
 
   return encodeURI(url);
+}
+
+function normalizeExternalUrl(value: unknown) {
+  const url = String(value || "").trim();
+
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+
+  return `https://${url}`;
 }
 
 function formatIdr(value: number | null | undefined) {
@@ -269,6 +284,18 @@ export default function ProfileScreen() {
   useEffect(() => {
     setAvatarLoadFailed(false);
   }, [avatarUrl]);
+
+  const socialLinks = useMemo<SocialLink[]>(() => {
+    if (!profile) return [];
+
+    return [
+      { label: "Instagram", url: normalizeExternalUrl(profile.instagram_url) },
+      { label: "Facebook", url: normalizeExternalUrl(profile.facebook_url) },
+      { label: "TikTok", url: normalizeExternalUrl(profile.tiktok_url) },
+      { label: "YouTube", url: normalizeExternalUrl(profile.youtube_url) },
+      { label: "LinkedIn", url: normalizeExternalUrl(profile.linkedin_url) },
+    ].filter((item) => item.url);
+  }, [profile]);
 
   const ownerListings = useMemo(() => {
     return properties.filter((item) => String(item.source || "") !== "agent");
@@ -504,6 +531,24 @@ export default function ProfileScreen() {
     router.push(`/owner/edit-listing/${encodeURIComponent(kode)}` as any);
   }
 
+  async function openSocial(url: string) {
+    const finalUrl = normalizeExternalUrl(url);
+
+    if (!finalUrl) return;
+
+    const canOpen = await Linking.canOpenURL(finalUrl);
+
+    if (!canOpen) {
+      Alert.alert(
+        isId ? "Link tidak valid." : "Invalid link.",
+        finalUrl
+      );
+      return;
+    }
+
+    await Linking.openURL(finalUrl);
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -575,6 +620,7 @@ export default function ProfileScreen() {
   const displayLocation = profile.address || "-";
   const displayEmail = profile.email || "-";
   const displayPhone = profile.phone || "-";
+  const displayAgency = profile.agency || "-";
   const showAvatarImage = Boolean(avatarUrl) && !avatarLoadFailed;
 
   return (
@@ -652,13 +698,21 @@ export default function ProfileScreen() {
                       ? "PEMILIK"
                       : "OWNER"
                     : role === "agent"
-                      ? "AGENT"
-                      : String(role || "USER").toUpperCase()}
+                    ? "AGENT"
+                    : String(role || "USER").toUpperCase()}
                 </Text>
               </View>
 
               <Text style={styles.nameText} numberOfLines={1}>
                 {displayName}
+              </Text>
+
+              <Text style={styles.agencyText} numberOfLines={1}>
+                {role === "agent"
+                  ? displayAgency
+                  : isId
+                  ? "Platform Tetamo"
+                  : "Tetamo Platform"}
               </Text>
 
               <View style={styles.locationRow}>
@@ -672,12 +726,30 @@ export default function ProfileScreen() {
 
           <View style={styles.profileInfoGrid}>
             <MiniInfo label="Email" value={displayEmail} />
-            <MiniInfo label={isId ? "Telepon" : "Phone"} value={displayPhone} />
+            <MiniInfo label={isId ? "WhatsApp" : "WhatsApp"} value={displayPhone} />
 
             {role === "agent" ? (
-              <MiniInfo label="Agency" value={profile.agency || "-"} />
+              <MiniInfo label="Agency" value={displayAgency} />
             ) : null}
           </View>
+
+          {socialLinks.length > 0 ? (
+            <View style={styles.socialSection}>
+              <Text style={styles.socialTitle}>Social Media</Text>
+
+              <View style={styles.socialRow}>
+                {socialLinks.map((item) => (
+                  <Pressable
+                    key={item.label}
+                    style={styles.socialPill}
+                    onPress={() => void openSocial(item.url)}
+                  >
+                    <Text style={styles.socialPillText}>{item.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
         </View>
 
         {role === "owner" ? (
@@ -796,8 +868,8 @@ export default function ProfileScreen() {
                         ? "Membership Aktif"
                         : "Active Membership"
                       : isId
-                        ? "Membership Belum Aktif"
-                        : "Membership Not Active"}
+                      ? "Membership Belum Aktif"
+                      : "Membership Not Active"}
                   </Text>
                   <Text style={styles.membershipSub}>
                     {latestMembership?.package_name ||
@@ -840,8 +912,8 @@ export default function ProfileScreen() {
                       ? "Lihat / Upgrade Paket"
                       : "View / Upgrade Package"
                     : isId
-                      ? "Pilih Paket Agent"
-                      : "Choose Agent Package"}
+                    ? "Pilih Paket Agent"
+                    : "Choose Agent Package"}
                 </Text>
                 <ChevronRight color="#111111" size={15} />
               </Pressable>
@@ -981,8 +1053,8 @@ export default function ProfileScreen() {
           <ToolRow
             icon={<Settings color="#ffffff" size={18} />}
             title={isId ? "Pengaturan" : "Settings"}
-            subtitle={isId ? "Update profile nanti" : "Update profile later"}
-            onPress={() => comingSoon(isId ? "Pengaturan" : "Settings")}
+            subtitle={isId ? "Update profile" : "Update profile"}
+            onPress={() => router.push("/dashboard/settings" as any)}
           />
 
           <ToolRow
@@ -1389,6 +1461,12 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 7,
   },
+  agencyText: {
+    color: "#d6d6d6",
+    fontSize: 11.5,
+    fontWeight: "800",
+    marginTop: 3,
+  },
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1425,6 +1503,36 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
     marginTop: 4,
+  },
+  socialSection: {
+    marginTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#202020",
+    paddingTop: 13,
+  },
+  socialTitle: {
+    color: "#ffffff",
+    fontSize: 11.5,
+    fontWeight: "900",
+    marginBottom: 9,
+  },
+  socialRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  socialPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#5b4a24",
+    backgroundColor: "#211a0b",
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  socialPillText: {
+    color: "#e6c15c",
+    fontSize: 10.5,
+    fontWeight: "900",
   },
   sectionHeader: {
     marginTop: 5,
