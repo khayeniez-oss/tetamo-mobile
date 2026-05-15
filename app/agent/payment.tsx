@@ -1,33 +1,33 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    ArrowLeft,
-    Banknote,
-    Check,
-    ChevronRight,
-    CreditCard,
-    Languages,
-    PackageCheck,
-    QrCode,
-    ShieldCheck,
-    Sparkles,
+  ArrowLeft,
+  Banknote,
+  Check,
+  ChevronRight,
+  CreditCard,
+  Languages,
+  PackageCheck,
+  QrCode,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Linking,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
 import {
-    getAgentPackageById,
-    type AgentPackage,
+  getAgentPackageById,
+  type AgentPackage,
 } from "../../services/pricelist";
 
 type Language = "en" | "id";
@@ -44,6 +44,31 @@ function readParam(value: unknown) {
 
 function formatIdr(value: number) {
   return `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
+}
+
+function createPaymentId() {
+  const fallback = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+    /[xy]/g,
+    (character) => {
+      const random = Math.floor(Math.random() * 16);
+      const value = character === "x" ? random : (random & 0x3) | 0x8;
+      return value.toString(16);
+    }
+  );
+
+  try {
+    const maybeCrypto = globalThis.crypto as
+      | { randomUUID?: () => string }
+      | undefined;
+
+    if (maybeCrypto?.randomUUID) {
+      return maybeCrypto.randomUUID();
+    }
+
+    return fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function getAvailableBillingCycles(product: AgentPackage): BillingCycle[] {
@@ -137,7 +162,9 @@ function getPaymentDescription(
   return cycle === "monthly"
     ? product.monthlyBillingNoteEn ||
         product.monthlyBillingNote ||
-        `Review the ${product.nameEn || product.name} package with monthly billing.`
+        `Review the ${
+          product.nameEn || product.name
+        } package with monthly billing.`
     : product.paymentDescriptionEn || product.paymentDescription;
 }
 
@@ -158,6 +185,94 @@ function getBillingNote(
         product.billingNoteEn ||
         product.billingNote
     : product.billingNoteEn || product.billingNote;
+}
+
+function buildAgentMobileSuccessDeepLink({
+  paymentId,
+  packageId,
+  billingCycle,
+}: {
+  paymentId: string;
+  packageId: string;
+  billingCycle: BillingCycle;
+}) {
+  const url = new URL("tetamomobile://agent/payment-success");
+  url.searchParams.set("payment", "success");
+  url.searchParams.set("payment_id", paymentId);
+  url.searchParams.set("flow", "agent-membership");
+  url.searchParams.set("role", "agent");
+  url.searchParams.set("product", packageId);
+  url.searchParams.set("package", packageId);
+  url.searchParams.set("billing", billingCycle);
+  url.searchParams.set("source", "mobile");
+
+  return url.toString();
+}
+
+function buildAgentMobileCancelDeepLink({
+  paymentId,
+  packageId,
+  billingCycle,
+}: {
+  paymentId: string;
+  packageId: string;
+  billingCycle: BillingCycle;
+}) {
+  const url = new URL("tetamomobile://agent/payment");
+  url.searchParams.set("payment", "cancelled");
+  url.searchParams.set("payment_id", paymentId);
+  url.searchParams.set("flow", "agent-membership");
+  url.searchParams.set("role", "agent");
+  url.searchParams.set("product", packageId);
+  url.searchParams.set("package", packageId);
+  url.searchParams.set("billing", billingCycle);
+  url.searchParams.set("source", "mobile");
+
+  return url.toString();
+}
+
+function buildAgentMobileWebsiteSuccessUrl({
+  paymentId,
+  packageId,
+  billingCycle,
+}: {
+  paymentId: string;
+  packageId: string;
+  billingCycle: BillingCycle;
+}) {
+  const url = new URL("/payment/mobile/success", TETAMO_SITE_URL);
+  url.searchParams.set("payment", "success");
+  url.searchParams.set("payment_id", paymentId);
+  url.searchParams.set("flow", "agent-membership");
+  url.searchParams.set("role", "agent");
+  url.searchParams.set("product", packageId);
+  url.searchParams.set("package", packageId);
+  url.searchParams.set("billing", billingCycle);
+  url.searchParams.set("source", "mobile");
+
+  return url.toString();
+}
+
+function buildAgentMobileWebsiteCancelUrl({
+  paymentId,
+  packageId,
+  billingCycle,
+}: {
+  paymentId: string;
+  packageId: string;
+  billingCycle: BillingCycle;
+}) {
+  const url = new URL("/payment/mobile/cancel", TETAMO_SITE_URL);
+  url.searchParams.set("payment", "cancelled");
+  url.searchParams.set("payment_id", paymentId);
+  url.searchParams.set("flow", "agent-membership");
+  url.searchParams.set("role", "agent");
+  url.searchParams.set("product", packageId);
+  url.searchParams.set("package", packageId);
+  url.searchParams.set("billing", billingCycle);
+  url.searchParams.set("source", "mobile");
+
+  return url.toString();
 }
 
 export default function AgentPaymentScreen() {
@@ -290,7 +405,34 @@ export default function AgentPaymentScreen() {
         language
       );
 
+      const paymentId = createPaymentId();
+
+      const successUrl = buildAgentMobileWebsiteSuccessUrl({
+        paymentId,
+        packageId: selectedPackage.id,
+        billingCycle: selectedBillingCycle,
+      });
+
+      const cancelUrl = buildAgentMobileWebsiteCancelUrl({
+        paymentId,
+        packageId: selectedPackage.id,
+        billingCycle: selectedBillingCycle,
+      });
+
+      const mobileSuccessDeepLink = buildAgentMobileSuccessDeepLink({
+        paymentId,
+        packageId: selectedPackage.id,
+        billingCycle: selectedBillingCycle,
+      });
+
+      const mobileCancelDeepLink = buildAgentMobileCancelDeepLink({
+        paymentId,
+        packageId: selectedPackage.id,
+        billingCycle: selectedBillingCycle,
+      });
+
       const paymentPayload = {
+        id: paymentId,
         userId: session.user.id,
         userType: "agent",
         flow: flow || "agent-membership",
@@ -305,10 +447,8 @@ export default function AgentPaymentScreen() {
         productName,
         packageName: selectedPackage.name,
         listingLimit,
-        successUrl: `${TETAMO_SITE_URL}/payment/success?flow=agent-membership&package=${encodeURIComponent(
-          selectedPackage.id
-        )}`,
-        cancelUrl: `${TETAMO_SITE_URL}/agentdashboard/paket`,
+        successUrl,
+        cancelUrl,
         metadata: {
           source: "tetamo-mobile",
           user_type: "agent",
@@ -334,6 +474,10 @@ export default function AgentPaymentScreen() {
             String(session.user.user_metadata?.full_name || "") ||
             "",
           customer_phone: profile?.phone || "",
+          mobile_success_deep_link: mobileSuccessDeepLink,
+          mobile_cancel_deep_link: mobileCancelDeepLink,
+          mobile_success_return_url: successUrl,
+          mobile_cancel_return_url: cancelUrl,
         },
       };
 
@@ -348,7 +492,7 @@ export default function AgentPaymentScreen() {
 
       const result = await response.json().catch(() => null);
 
-      if (!response.ok) {
+      if (!response.ok || !result?.success) {
         throw new Error(
           result?.error ||
             result?.message ||
@@ -517,8 +661,8 @@ export default function AgentPaymentScreen() {
               </Text>
               <Text style={styles.summarySub}>
                 {isId
-                  ? "Aktivasi dilakukan setelah pembayaran terkonfirmasi."
-                  : "Activation happens after payment is confirmed."}
+                  ? "Paket agen aktif setelah pembayaran berhasil dikonfirmasi."
+                  : "Your agent package becomes active after payment is successfully confirmed."}
               </Text>
             </View>
           </View>
@@ -602,9 +746,7 @@ export default function AgentPaymentScreen() {
           </View>
 
           <View style={styles.paymentMethodTextBox}>
-            <Text style={styles.paymentMethodTitle}>
-              {isId ? "Debit / Credit Card" : "Debit / Credit Card"}
-            </Text>
+            <Text style={styles.paymentMethodTitle}>Debit / Credit Card</Text>
             <Text style={styles.paymentMethodSubtitle}>
               {isId
                 ? "Visa, Mastercard, American Express, dan kartu lain yang didukung."
@@ -666,8 +808,8 @@ export default function AgentPaymentScreen() {
             <Banknote color="#e6c15c" size={15} />
             <Text style={styles.checkoutNoteText}>
               {isId
-                ? "Checkout aman akan dibuat otomatis saat tombol ditekan."
-                : "A secure checkout will be created automatically when you press the button."}
+                ? "Checkout aman akan terbuka setelah Anda menekan tombol pembayaran."
+                : "Secure checkout will open after you tap the payment button."}
             </Text>
           </View>
         </View>
