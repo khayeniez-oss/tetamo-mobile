@@ -1,29 +1,29 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    ArrowLeft,
-    Check,
-    CreditCard,
-    FileText,
-    PackageCheck,
-    QrCode,
-    ShieldCheck,
+  ArrowLeft,
+  Check,
+  CreditCard,
+  FileText,
+  PackageCheck,
+  QrCode,
+  ShieldCheck,
 } from "lucide-react-native";
 import { useMemo, useState, type ReactNode } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Linking,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import {
-    useListingDraft,
-    type OwnerPlanType,
+  useListingDraft,
+  type OwnerPlanType,
 } from "../../components/listing/ListingDraftContext";
 import { supabase } from "../../lib/supabase";
 import { getOwnerPackageById } from "../../services/pricelist";
@@ -141,6 +141,32 @@ export default function OwnerPaymentScreen() {
 
       const paymentId = createPaymentId();
 
+      const mobileSuccessDeepLink = buildOwnerMobileSuccessDeepLink({
+        paymentId,
+        currentPlan,
+        kode: String(draft.kode || ""),
+      });
+
+      const mobileCancelDeepLink = buildOwnerMobileCancelDeepLink({
+        paymentId,
+        currentPlan,
+        kode: String(draft.kode || ""),
+      });
+
+      const successUrl = buildOwnerMobileWebsiteSuccessUrl({
+        siteUrl,
+        paymentId,
+        currentPlan,
+        kode: String(draft.kode || ""),
+      });
+
+      const cancelUrl = buildOwnerMobileWebsiteCancelUrl({
+        siteUrl,
+        paymentId,
+        currentPlan,
+        kode: String(draft.kode || ""),
+      });
+
       const paymentRecord = {
         id: paymentId,
         userId: session.user.id,
@@ -158,8 +184,8 @@ export default function OwnerPaymentScreen() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
 
-        successUrl: `tetamomobile://owner/payment-success?payment=success&payment_id=${paymentId}&flow=new-listing&product=${currentPlan}&plan=${currentPlan}`,
-        cancelUrl: `tetamomobile://owner/payment?payment=cancelled&payment_id=${paymentId}&flow=new-listing&product=${currentPlan}&plan=${currentPlan}`,
+        successUrl,
+        cancelUrl,
 
         metadata: {
           action: "create",
@@ -189,6 +215,11 @@ export default function OwnerPaymentScreen() {
             null,
           gateway: selectedGateway,
           paymentMethod: selectedPaymentMethod,
+          clientSource: "tetamo-mobile-owner-payment",
+          mobile_success_deep_link: mobileSuccessDeepLink,
+          mobile_cancel_deep_link: mobileCancelDeepLink,
+          mobile_success_return_url: successUrl,
+          mobile_cancel_return_url: cancelUrl,
         },
       };
 
@@ -241,11 +272,13 @@ export default function OwnerPaymentScreen() {
         ...prev,
         payment: {
           ...(prev.payment || {}),
+          id: data?.paymentId || paymentId,
           planId: currentPlan,
           amount: total,
           currency: "IDR",
           status: "pending",
           method: selectedGateway,
+          checkoutUrl,
         },
       }));
 
@@ -372,13 +405,13 @@ export default function OwnerPaymentScreen() {
             <View style={styles.infoTextBox}>
               <Text style={styles.infoTitle}>
                 {isId
-                  ? "Aktivasi setelah pembayaran terkonfirmasi"
-                  : "Activation happens after payment is confirmed"}
+                  ? "Aktivasi setelah pembayaran dikonfirmasi"
+                  : "Activation after payment confirmation"}
               </Text>
               <Text style={styles.infoText}>
                 {isId
-                  ? "Webhook Stripe/HitPay dari website akan mengaktifkan listing dan membuat status pending verification."
-                  : "The website Stripe/HitPay webhook will activate the listing and set it as pending verification."}
+                  ? "Setelah pembayaran dikonfirmasi, listing Anda akan dikirim untuk verifikasi admin."
+                  : "After payment is confirmed, your listing will be submitted for admin verification."}
               </Text>
             </View>
           </View>
@@ -475,15 +508,6 @@ export default function OwnerPaymentScreen() {
             onPress={() => setSelectedGateway("hitpay")}
           />
 
-          <View style={styles.qrisNoteBox}>
-            <QrCode color="#e6c15c" size={17} />
-            <Text style={styles.qrisNoteText}>
-              {isId
-                ? "QRIS cocok untuk pembayaran lokal Indonesia seperti BRI, BNI, Mandiri, BCA, e-wallet, dan aplikasi bank yang support QRIS."
-                : "QRIS is suitable for local Indonesian payments such as BRI, BNI, Mandiri, BCA, e-wallets, and banking apps that support QRIS."}
-            </Text>
-          </View>
-
           <View style={styles.totalBox}>
             <Text style={styles.totalLabel}>{isId ? "Total" : "Total"}</Text>
             <Text style={styles.totalValue}>{formatIdr(total)}</Text>
@@ -512,8 +536,8 @@ export default function OwnerPaymentScreen() {
 
           <Text style={styles.checkoutNote}>
             {isId
-              ? "Checkout aman dibuat melalui backend Tetamo website."
-              : "Secure checkout is created through the Tetamo website backend."}
+              ? "Checkout aman akan terbuka setelah Anda menekan Bayar Sekarang."
+              : "Secure checkout will open after you tap Pay Now."}
           </Text>
         </View>
       </ScrollView>
@@ -597,7 +621,130 @@ function readParam(value: unknown) {
 }
 
 function createPaymentId() {
-  return `pay_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+  const fallback = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+    /[xy]/g,
+    (character) => {
+      const random = Math.floor(Math.random() * 16);
+      const value = character === "x" ? random : (random & 0x3) | 0x8;
+      return value.toString(16);
+    }
+  );
+
+  try {
+    const maybeCrypto = globalThis.crypto as
+      | { randomUUID?: () => string }
+      | undefined;
+
+    if (maybeCrypto?.randomUUID) {
+      return maybeCrypto.randomUUID();
+    }
+
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function buildOwnerMobileSuccessDeepLink({
+  paymentId,
+  currentPlan,
+  kode,
+}: {
+  paymentId: string;
+  currentPlan: string;
+  kode: string;
+}) {
+  const url = new URL("tetamomobile://owner/payment-success");
+  url.searchParams.set("payment", "success");
+  url.searchParams.set("payment_id", paymentId);
+  url.searchParams.set("flow", "new-listing");
+  url.searchParams.set("product", currentPlan);
+  url.searchParams.set("plan", currentPlan);
+  url.searchParams.set("source", "mobile");
+
+  if (kode.trim()) {
+    url.searchParams.set("kode", kode.trim());
+  }
+
+  return url.toString();
+}
+
+function buildOwnerMobileCancelDeepLink({
+  paymentId,
+  currentPlan,
+  kode,
+}: {
+  paymentId: string;
+  currentPlan: string;
+  kode: string;
+}) {
+  const url = new URL("tetamomobile://owner/payment");
+  url.searchParams.set("payment", "cancelled");
+  url.searchParams.set("payment_id", paymentId);
+  url.searchParams.set("flow", "new-listing");
+  url.searchParams.set("product", currentPlan);
+  url.searchParams.set("plan", currentPlan);
+  url.searchParams.set("source", "mobile");
+
+  if (kode.trim()) {
+    url.searchParams.set("kode", kode.trim());
+  }
+
+  return url.toString();
+}
+
+function buildOwnerMobileWebsiteSuccessUrl({
+  siteUrl,
+  paymentId,
+  currentPlan,
+  kode,
+}: {
+  siteUrl: string;
+  paymentId: string;
+  currentPlan: string;
+  kode: string;
+}) {
+  const url = new URL("/payment/mobile/success", siteUrl);
+  url.searchParams.set("payment", "success");
+  url.searchParams.set("payment_id", paymentId);
+  url.searchParams.set("flow", "new-listing");
+  url.searchParams.set("product", currentPlan);
+  url.searchParams.set("plan", currentPlan);
+  url.searchParams.set("role", "owner");
+  url.searchParams.set("source", "mobile");
+
+  if (kode.trim()) {
+    url.searchParams.set("kode", kode.trim());
+  }
+
+  return url.toString();
+}
+
+function buildOwnerMobileWebsiteCancelUrl({
+  siteUrl,
+  paymentId,
+  currentPlan,
+  kode,
+}: {
+  siteUrl: string;
+  paymentId: string;
+  currentPlan: string;
+  kode: string;
+}) {
+  const url = new URL("/payment/mobile/cancel", siteUrl);
+  url.searchParams.set("payment", "cancelled");
+  url.searchParams.set("payment_id", paymentId);
+  url.searchParams.set("flow", "new-listing");
+  url.searchParams.set("product", currentPlan);
+  url.searchParams.set("plan", currentPlan);
+  url.searchParams.set("role", "owner");
+  url.searchParams.set("source", "mobile");
+
+  if (kode.trim()) {
+    url.searchParams.set("kode", kode.trim());
+  }
+
+  return url.toString();
 }
 
 function buildDraftSnapshot(draft: any) {
@@ -916,24 +1063,6 @@ const styles = StyleSheet.create({
   },
   gatewayDescActive: {
     color: "#111111",
-  },
-  qrisNoteBox: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 9,
-    marginBottom: 10,
-  },
-  qrisNoteText: {
-    color: "#d6d6d6",
-    fontSize: 11.3,
-    lineHeight: 16,
-    fontWeight: "700",
-    flex: 1,
   },
   totalBox: {
     borderRadius: 18,
