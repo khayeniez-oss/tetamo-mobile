@@ -450,6 +450,10 @@ export default function HomeScreen() {
     Linking.openURL(`https://www.tetamo.com${path}`);
   };
 
+  const openScorpioAssist = () => {
+  router.push("/scorpio-assist" as any);
+};
+
   const handleHeroScrollEnd = (event: any) => {
     const nextIndex = Math.round(
       event.nativeEvent.contentOffset.x / heroCardWidth
@@ -919,6 +923,22 @@ export default function HomeScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <Pressable
+  style={styles.scorpioFloatingButton}
+  onPress={openScorpioAssist}
+>
+  <View style={styles.scorpioGoldGlow} />
+
+  <View style={styles.scorpioIconCircle}>
+    <Sparkles color="#111111" size={18} />
+  </View>
+
+  <View style={styles.scorpioTextBox}>
+    <Text style={styles.scorpioButtonText}>Need Help?</Text>
+    <Text style={styles.scorpioButtonSub}>Scorpio Assist</Text>
+  </View>
+</Pressable>
     </SafeAreaView>
   );
 }
@@ -2135,4 +2155,65 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
   },
+    scorpioFloatingButton: {
+  position: "absolute",
+  right: 16,
+  bottom: 76,
+  zIndex: 99,
+  minHeight: 58,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: "#fff1a8",
+  backgroundColor: "#e6c15c",
+  paddingLeft: 10,
+  paddingRight: 17,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 10,
+  overflow: "hidden",
+  shadowColor: "#e6c15c",
+  shadowOffset: {
+    width: 0,
+    height: 12,
+  },
+  shadowOpacity: 0.55,
+  shadowRadius: 22,
+  elevation: 18,
+},
+scorpioGoldGlow: {
+  position: "absolute",
+  top: -26,
+  right: -18,
+  width: 76,
+  height: 76,
+  borderRadius: 999,
+  backgroundColor: "rgba(255,255,255,0.36)",
+},
+scorpioIconCircle: {
+  width: 40,
+  height: 40,
+  borderRadius: 999,
+  borderWidth: 1,
+  borderColor: "rgba(17,17,17,0.14)",
+  backgroundColor: "rgba(255,255,255,0.42)",
+  alignItems: "center",
+  justifyContent: "center",
+},
+scorpioTextBox: {
+  paddingRight: 2,
+},
+scorpioButtonText: {
+  color: "#111111",
+  fontSize: 12.5,
+  fontWeight: "900",
+  lineHeight: 15,
+  letterSpacing: -0.1,
+},
+scorpioButtonSub: {
+  color: "#3a2a00",
+  fontSize: 10.5,
+  fontWeight: "900",
+  lineHeight: 13,
+  letterSpacing: 0.2,
+},
 });
