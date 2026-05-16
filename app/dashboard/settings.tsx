@@ -3,18 +3,30 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
     ArrowLeft,
+    Bell,
     BellRing,
     Camera,
     CheckCircle2,
+    ChevronRight,
+    FileText,
     Link2,
+    Lock,
     Mail,
     MapPin,
     Phone,
     Save,
+    ShieldCheck,
+    Trash2,
     UserRound,
-    XCircle,
+    XCircle
 } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+    type ReactNode,
+} from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -27,8 +39,8 @@ import {
     Switch,
     Text,
     TextInput,
-    type TextInputProps,
     View,
+    type TextInputProps,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
 
@@ -96,7 +108,10 @@ function getFileExtension(asset: ImagePicker.ImagePickerAsset) {
   return "jpg";
 }
 
-async function uploadProfilePhoto(userId: string, asset: ImagePicker.ImagePickerAsset) {
+async function uploadProfilePhoto(
+  userId: string,
+  asset: ImagePicker.ImagePickerAsset
+) {
   const fileExt = getFileExtension(asset);
   const filePath = `${userId}/avatar.${fileExt}`;
   const contentType = asset.mimeType || "image/jpeg";
@@ -115,7 +130,10 @@ async function uploadProfilePhoto(userId: string, asset: ImagePicker.ImagePicker
     throw new Error(uploadError.message);
   }
 
-  const { data } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
+  const { data } = supabase.storage
+    .from("profile-photos")
+    .getPublicUrl(filePath);
+
   const publicUrl = data?.publicUrl || "";
 
   if (!publicUrl) {
@@ -167,7 +185,8 @@ export default function DashboardSettingsScreen() {
       return {
         back: "Kembali",
         pageTitle: "Pengaturan",
-        pageSubtitle: "Kelola profil dan preferensi akun Tetamo Anda.",
+        pageSubtitle:
+          "Kelola profil, preferensi akun, legal, keamanan, dan bantuan Tetamo.",
         profilePhoto: "Foto Profil",
         changePhoto: "Ubah Foto",
         photoHint: "JPG, PNG, WEBP. Maksimal 5MB.",
@@ -180,11 +199,21 @@ export default function DashboardSettingsScreen() {
         socialMedia: "Social Media",
         socialDesc:
           "Tambahkan link social media Anda agar tampil di profil dan dashboard.",
-        notifications: "Notifikasi",
-        notificationsDesc: "Atur pemberitahuan yang ingin Anda terima.",
+        notifications: "Notifikasi Cepat",
+        notificationsDesc:
+          "Atur pemberitahuan utama yang ingin Anda terima.",
+        notificationCenter: "Pusat Notifikasi",
+        notificationCenterDesc:
+          "Lihat semua update listing, pembayaran, paket, dan pesan akun.",
+        notificationSettings: "Pengaturan Notifikasi",
+        notificationSettingsDesc:
+          "Kelola jenis notifikasi yang dikirim oleh Tetamo.",
         newLead: "Notifikasi Leads Baru",
         newLeadDesc: "Dapatkan pemberitahuan saat ada calon buyer/renter baru.",
-        renewal: role === "agent" ? "Pengingat Jadwal Viewing" : "Pengingat Perpanjangan Iklan",
+        renewal:
+          role === "agent"
+            ? "Pengingat Jadwal Viewing"
+            : "Pengingat Perpanjangan Iklan",
         renewalDesc:
           role === "agent"
             ? "Dapatkan pengingat untuk jadwal kunjungan properti."
@@ -194,6 +223,16 @@ export default function DashboardSettingsScreen() {
           role === "agent"
             ? "Dapatkan pemberitahuan pembaruan fitur dan status platform."
             : "Dapatkan pemberitahuan status pembayaran dan tagihan.",
+        legalSafety: "Legal & Keamanan",
+        privacyPolicy: "Kebijakan Privasi",
+        privacyPolicyDesc: "Pelajari bagaimana Tetamo melindungi data Anda.",
+        terms: "Syarat & Ketentuan",
+        termsDesc: "Aturan penggunaan aplikasi dan layanan Tetamo.",
+        support: "Pusat Bantuan",
+        supportDesc: "Hubungi Tetamo atau laporkan kendala aplikasi.",
+        deleteAccount: "Hapus Akun",
+        deleteAccountDesc:
+          "Ajukan penghapusan akun dan data pribadi dari Tetamo.",
         save: "Simpan Perubahan",
         saving: "Menyimpan...",
         loading: "Memuat pengaturan...",
@@ -213,7 +252,8 @@ export default function DashboardSettingsScreen() {
     return {
       back: "Back",
       pageTitle: "Settings",
-      pageSubtitle: "Manage your Tetamo profile and account preferences.",
+      pageSubtitle:
+        "Manage your Tetamo profile, account preferences, legal, safety, and support.",
       profilePhoto: "Profile Photo",
       changePhoto: "Change Photo",
       photoHint: "JPG, PNG, WEBP. Maximum 5MB.",
@@ -226,11 +266,18 @@ export default function DashboardSettingsScreen() {
       socialMedia: "Social Media",
       socialDesc:
         "Add your social media links so they can appear in your profile and dashboard.",
-      notifications: "Notifications",
-      notificationsDesc: "Choose the notifications you want to receive.",
+      notifications: "Quick Notifications",
+      notificationsDesc: "Choose the main notifications you want to receive.",
+      notificationCenter: "Notification Center",
+      notificationCenterDesc:
+        "View all listing, payment, package, and account updates.",
+      notificationSettings: "Notification Settings",
+      notificationSettingsDesc:
+        "Control the types of notifications Tetamo sends you.",
       newLead: "New Lead Notifications",
       newLeadDesc: "Get notified when there is a new buyer/renter inquiry.",
-      renewal: role === "agent" ? "Viewing Schedule Reminder" : "Ad Renewal Reminder",
+      renewal:
+        role === "agent" ? "Viewing Schedule Reminder" : "Ad Renewal Reminder",
       renewalDesc:
         role === "agent"
           ? "Get reminders for property viewing appointments."
@@ -240,6 +287,16 @@ export default function DashboardSettingsScreen() {
         role === "agent"
           ? "Get updates about feature and platform status."
           : "Get notified about payment and invoice status.",
+      legalSafety: "Legal & Safety",
+      privacyPolicy: "Privacy Policy",
+      privacyPolicyDesc: "Learn how Tetamo protects your data.",
+      terms: "Terms & Conditions",
+      termsDesc: "Rules for using the Tetamo app and services.",
+      support: "Support Center",
+      supportDesc: "Contact Tetamo or report an app issue.",
+      deleteAccount: "Delete Account",
+      deleteAccountDesc:
+        "Request deletion of your Tetamo account and personal data.",
       save: "Save Changes",
       saving: "Saving...",
       loading: "Loading settings...",
@@ -687,6 +744,53 @@ export default function DashboardSettingsScreen() {
                 value={paymentUpdates}
                 onValueChange={setPaymentUpdates}
               />
+
+              <SettingsLinkRow
+                icon={<Bell color="#ffffff" size={17} />}
+                title={ui.notificationCenter}
+                subtitle={ui.notificationCenterDesc}
+                onPress={() => router.push("/dashboard/notifications" as any)}
+              />
+
+              <SettingsLinkRow
+                icon={<BellRing color="#ffffff" size={17} />}
+                title={ui.notificationSettings}
+                subtitle={ui.notificationSettingsDesc}
+                onPress={() => router.push("/settings/notifications" as any)}
+              />
+            </View>
+
+            <View style={styles.formCard}>
+              <Text style={styles.cardTitle}>{ui.legalSafety}</Text>
+
+              <SettingsLinkRow
+                icon={<Lock color="#ffffff" size={17} />}
+                title={ui.privacyPolicy}
+                subtitle={ui.privacyPolicyDesc}
+                onPress={() => router.push("/legal/privacy" as any)}
+              />
+
+              <SettingsLinkRow
+                icon={<FileText color="#ffffff" size={17} />}
+                title={ui.terms}
+                subtitle={ui.termsDesc}
+                onPress={() => router.push("/legal/terms" as any)}
+              />
+
+              <SettingsLinkRow
+                icon={<ShieldCheck color="#ffffff" size={17} />}
+                title={ui.support}
+                subtitle={ui.supportDesc}
+                onPress={() => router.push("/support" as any)}
+              />
+
+              <SettingsLinkRow
+                icon={<Trash2 color="#fecaca" size={17} />}
+                title={ui.deleteAccount}
+                subtitle={ui.deleteAccountDesc}
+                danger
+                onPress={() => router.push("/settings/delete-account" as any)}
+              />
             </View>
 
             {message ? (
@@ -757,7 +861,7 @@ function FormInput({
   placeholder?: string;
   keyboardType?: TextInputProps["keyboardType"];
   autoCapitalize?: TextInputProps["autoCapitalize"];
-  icon?: React.ReactNode;
+  icon?: ReactNode;
 }) {
   return (
     <View style={styles.inputGroup}>
@@ -809,6 +913,47 @@ function ToggleRow({
         thumbColor={value ? "#e6c15c" : "#a9a9a9"}
       />
     </View>
+  );
+}
+
+function SettingsLinkRow({
+  icon,
+  title,
+  subtitle,
+  danger,
+  onPress,
+}: {
+  icon: ReactNode;
+  title: string;
+  subtitle: string;
+  danger?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={styles.settingsLinkRow} onPress={onPress}>
+      <View
+        style={[
+          styles.settingsLinkIcon,
+          danger && styles.settingsLinkIconDanger,
+        ]}
+      >
+        {icon}
+      </View>
+
+      <View style={styles.settingsLinkTextBox}>
+        <Text
+          style={[
+            styles.settingsLinkTitle,
+            danger && styles.settingsLinkTitleDanger,
+          ]}
+        >
+          {title}
+        </Text>
+        <Text style={styles.settingsLinkSubtitle}>{subtitle}</Text>
+      </View>
+
+      <ChevronRight color={danger ? "#fecaca" : "#ffffff"} size={16} />
+    </Pressable>
   );
 }
 
@@ -1063,6 +1208,50 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   toggleSubtitle: {
+    color: "#a9a9a9",
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+  settingsLinkRow: {
+    minHeight: 72,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#252525",
+    backgroundColor: "#050505",
+    padding: 11,
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  settingsLinkIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#303030",
+    backgroundColor: "#101010",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  settingsLinkIconDanger: {
+    borderColor: "#7f1d1d",
+    backgroundColor: "#2a0d0d",
+  },
+  settingsLinkTextBox: {
+    flex: 1,
+  },
+  settingsLinkTitle: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  settingsLinkTitleDanger: {
+    color: "#fecaca",
+  },
+  settingsLinkSubtitle: {
     color: "#a9a9a9",
     fontSize: 10.5,
     lineHeight: 15,
