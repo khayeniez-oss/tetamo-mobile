@@ -109,7 +109,7 @@ export default function NotificationSettingsScreen() {
           "Listing terkirim, pending verification, approved, rejected, atau perlu revisi.",
         inquiryTitle: "Inquiry / Leads",
         inquiryDesc:
-          "Update calon buyer/renter, jadwal viewing, dan pesan terkait listing.",
+          "Inquiry WhatsApp, permintaan jadwal viewing, pertanyaan buyer/renter, dan leads properti.",
         adminTitle: "Pesan Admin",
         adminDesc:
           "Pesan penting dari Tetamo terkait akun, verifikasi, atau keamanan.",
@@ -162,7 +162,7 @@ export default function NotificationSettingsScreen() {
         "Listing submitted, pending verification, approved, rejected, or needs revision.",
       inquiryTitle: "Inquiries / Leads",
       inquiryDesc:
-        "Buyer/renter inquiries, viewing schedules, and listing-related messages.",
+        "WhatsApp inquiries, schedule viewing requests, buyer/renter questions, and property leads.",
       adminTitle: "Admin Messages",
       adminDesc:
         "Important messages from Tetamo about your account, verification, or safety.",

@@ -1,31 +1,31 @@
 import {
-    ArrowLeft,
-    CalendarDays,
-    Check,
-    ChevronDown,
-    Home,
-    MapPin,
-    RotateCcw,
-    Search,
-    ShieldCheck,
+  ArrowLeft,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  Home,
+  MapPin,
+  RotateCcw,
+  Search,
+  ShieldCheck,
 } from "lucide-react-native";
 import {
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    type Dispatch,
-    type ReactNode,
-    type SetStateAction,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
 } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import type { ListingDraft } from "./ListingDraftContext";
 
@@ -56,6 +56,10 @@ type GoogleAddressComponent = {
   short_name: string;
   types: string[];
 };
+
+const TETAMO_PLACES_API_URL =
+  process.env.EXPO_PUBLIC_TETAMO_PLACES_API_URL ||
+  "https://www.tetamo.com/api/google/places";
 
 const DEFAULT_PROVINCES = [
   "Aceh",
@@ -181,7 +185,6 @@ export default function ListingIklan({
   const isId = language === "id";
   const mode = draft.mode === "edit" ? "edit" : "create";
 
-  const googleMapsKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
   const placesSessionToken = useRef(createLocalId()).current;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -234,12 +237,6 @@ export default function ListingIklan({
   ]);
 
   useEffect(() => {
-    if (!googleMapsKey) {
-      setAddressSuggestions([]);
-      setAddressError("");
-      return;
-    }
-
     const query = address.trim();
 
     if (!addressFocused || query.length < 3) {
@@ -261,7 +258,7 @@ export default function ListingIklan({
         clearTimeout(debounceRef.current);
       }
     };
-  }, [address, addressFocused, googleMapsKey]);
+  }, [address, addressFocused]);
 
   const sortedProvinces = useMemo(() => {
     return uniqueStrings(provinces);
@@ -293,28 +290,26 @@ export default function ListingIklan({
       setAddressError("");
 
       const url =
-        "https://maps.googleapis.com/maps/api/place/autocomplete/json" +
-        `?input=${encodeURIComponent(query)}` +
-        `&key=${encodeURIComponent(googleMapsKey)}` +
-        "&components=country:id" +
+        `${TETAMO_PLACES_API_URL}?type=autocomplete` +
+        `&input=${encodeURIComponent(query)}` +
         "&language=id" +
         `&sessiontoken=${encodeURIComponent(placesSessionToken)}`;
 
       const response = await fetch(url);
       const data = await response.json();
 
-      if (data?.status === "OK") {
+      if (data?.ok && data?.status === "OK") {
         setAddressSuggestions(data.predictions || []);
         return;
       }
 
-      if (data?.status === "ZERO_RESULTS") {
+      if (data?.ok && data?.status === "ZERO_RESULTS") {
         setAddressSuggestions([]);
         return;
       }
 
       setAddressSuggestions([]);
-      setAddressError(data?.error_message || data?.status || "");
+      setAddressError(data?.error || data?.status || "");
     } catch (error) {
       console.log("Tetamo address suggestion error:", error);
       setAddressSuggestions([]);
@@ -335,15 +330,17 @@ export default function ListingIklan({
       setAddressError("");
 
       const url =
-        "https://maps.googleapis.com/maps/api/place/details/json" +
-        `?place_id=${encodeURIComponent(item.place_id)}` +
-        `&key=${encodeURIComponent(googleMapsKey)}` +
-        "&fields=formatted_address,address_component,geometry" +
+        `${TETAMO_PLACES_API_URL}?type=details` +
+        `&place_id=${encodeURIComponent(item.place_id)}` +
         "&language=id" +
         `&sessiontoken=${encodeURIComponent(placesSessionToken)}`;
 
       const response = await fetch(url);
       const data = await response.json();
+
+      if (!data?.ok) {
+        throw new Error(data?.error || "Failed to load address details.");
+      }
 
       const result = data?.result;
       const formattedAddress =
@@ -564,8 +561,8 @@ export default function ListingIklan({
             </Text>
             <Text style={styles.sectionSub}>
               {isId
-                ? "Mulai ketik alamat. Saran Google Maps akan muncul otomatis."
-                : "Start typing the address. Google Maps suggestions will appear automatically."}
+                ? "Mulai ketik alamat. Saran alamat akan muncul otomatis."
+                : "Start typing the address. Address suggestions will appear automatically."}
             </Text>
           </View>
         </View>
@@ -587,11 +584,11 @@ export default function ListingIklan({
           loading={addressLoading}
           suggestions={addressSuggestions}
           error={addressError}
-          googleEnabled={Boolean(googleMapsKey)}
+          placesEnabled={Boolean(TETAMO_PLACES_API_URL)}
           emptyApiText={
             isId
-              ? "Google Maps key belum terbaca di mobile .env."
-              : "Google Maps key is not detected in mobile .env."
+              ? "Saran alamat belum tersedia sementara."
+              : "Address suggestions are temporarily unavailable."
           }
           onSelect={(item) => void selectAddressSuggestion(item)}
         />
@@ -773,7 +770,7 @@ function AddressInput({
   loading,
   suggestions,
   error,
-  googleEnabled,
+  placesEnabled,
   emptyApiText,
   onSelect,
 }: {
@@ -786,7 +783,7 @@ function AddressInput({
   loading: boolean;
   suggestions: GooglePlacePrediction[];
   error: string;
-  googleEnabled: boolean;
+  placesEnabled: boolean;
   emptyApiText: string;
   onSelect: (item: GooglePlacePrediction) => void;
 }) {
@@ -818,7 +815,7 @@ function AddressInput({
         </View>
       </View>
 
-      {!googleEnabled ? (
+      {!placesEnabled ? (
         <Text style={styles.addressHelperText}>{emptyApiText}</Text>
       ) : null}
 

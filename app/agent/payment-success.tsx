@@ -1,28 +1,28 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-  CheckCircle2,
-  Clock,
-  ExternalLink,
-  FileText,
-  Home,
-  ReceiptText,
-  RotateCcw,
-  ShieldCheck,
-  XCircle,
+    CheckCircle2,
+    Clock,
+    ExternalLink,
+    FileText,
+    Home,
+    PackageCheck,
+    ReceiptText,
+    RotateCcw,
+    ShieldCheck,
+    XCircle,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  ActivityIndicator,
-  Linking,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Linking,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
-import { useListingDraft } from "../../components/listing/ListingDraftContext";
 import { supabase } from "../../lib/supabase";
 
 type Language = "en" | "id";
@@ -45,7 +45,6 @@ type PaymentRow = {
   product_id: string | null;
   product_name_snapshot: string | null;
   product_type: string | null;
-  property_code_snapshot: string | null;
   amount_total: number | null;
   currency: string | null;
   status: PaymentStatus | null;
@@ -60,211 +59,177 @@ type PaymentRow = {
   metadata: Record<string, any> | null;
 };
 
-type LinkedPropertyRow = {
-  id: string;
-  kode: string | null;
-  title: string | null;
+type AgentMembershipRow = {
+  id?: string;
+  user_id: string | null;
+  payment_id: string | null;
+  package_id: string | null;
+  package_name: string | null;
+  billing_cycle: string | null;
   status: string | null;
-  verification_status: string | null;
+  starts_at: string | null;
+  expires_at: string | null;
+  metadata: Record<string, any> | null;
 };
 
-export default function OwnerPaymentSuccessScreen() {
+export default function AgentPaymentSuccessScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { clearDraft } = useListingDraft();
 
   const [language, setLanguage] = useState<Language>("en");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [payment, setPayment] = useState<PaymentRow | null>(null);
-  const [linkedProperty, setLinkedProperty] =
-    useState<LinkedPropertyRow | null>(null);
+  const [membership, setMembership] = useState<AgentMembershipRow | null>(null);
   const [pollCount, setPollCount] = useState(0);
 
   const isId = language === "id";
   const locale = isId ? "id-ID" : "en-US";
 
-  const siteUrl =
-    process.env.EXPO_PUBLIC_TETAMO_SITE_URL ||
-    process.env.EXPO_PUBLIC_SITE_URL ||
-    "https://www.tetamo.com";
-
-  const sessionId = readParam(params.session_id);
   const paymentId = readParam(params.payment_id);
-  const urlKode = readParam(params.kode);
+  const sessionId = readParam(params.session_id);
   const urlPayment = readParam(params.payment).toLowerCase();
-  const urlMode = readParam(params.mode).toLowerCase();
-  const urlStatus = readParam(params.status).toLowerCase();
-
-  const isEditApprovalFlow =
-    urlMode === "edit" && urlStatus === "pending-approval";
+  const urlPackage = readParam(params.package) || readParam(params.product);
+  const urlBilling = readParam(params.billing);
 
   const t = useMemo(() => {
     if (isId) {
       return {
-        loadingSubmission: "Memuat status pengiriman...",
-        loadingPayment: "Memuat status pembayaran...",
-        statusLabel: "Status",
-        amountLabel: "Jumlah",
-        typeLabel: "Tipe",
-        methodLabel: "Metode",
-        codeLabel: "Kode Listing",
-        createdLabel: "Dibuat",
-        paidAtLabel: "Dibayar Pada",
-        detailsTitle: "Detail Status",
-        continuePayment: "Lanjutkan Pembayaran",
-        seeListing: "Lihat Listing",
-        toOwnerBilling: "Ke Tagihan Pemilik",
-        toOwnerDashboard: "Ke Dashboard Pemilik",
-        receiptButton: "Lihat Receipt",
-        invoiceButton: "Lihat Invoice",
-        addAnother: "Tambah Listing Lain",
+        loadingPayment: "Memuat status pembayaran agen...",
         loginFirst: "Silakan login terlebih dahulu.",
         loadPaymentError: "Gagal memuat status pembayaran.",
         paymentNotFound: "Data pembayaran tidak ditemukan.",
-        successStatusText: "berhasil",
-        editApprovalDescription: (kode: string) =>
-          kode && kode !== "-"
-            ? `Perubahan listing ${kode} berhasil dikirim dan sekarang menunggu review admin.`
-            : "Perubahan listing berhasil dikirim dan sekarang menunggu review admin.",
-        editApprovalPoints: [
-          "Perubahan listing sudah berhasil dikirim",
-          "Status listing sekarang pending approval",
-          "Anda bisa cek status terbaru dari dashboard pemilik",
-        ],
-        successDescriptionPending: (product: string, kode: string) =>
-          kode && kode !== "-"
-            ? `${product} berhasil dibayar. Listing ${kode} sudah dikirim dan sekarang menunggu review admin.`
-            : `${product} berhasil dibayar dan sekarang menunggu review admin.`,
-        successDescriptionLive: (product: string, kode: string) =>
-          kode && kode !== "-"
-            ? `${product} berhasil dibayar. Listing ${kode} sudah tampil di marketplace.`
-            : `${product} berhasil dibayar dan listing sudah tampil di marketplace.`,
-        successDescriptionGeneric: (product: string) =>
-          `${product} berhasil dibayar.`,
-        successPointsPending: [
+        statusLabel: "Status",
+        amountLabel: "Jumlah",
+        packageLabel: "Paket",
+        billingLabel: "Tagihan",
+        methodLabel: "Metode",
+        createdLabel: "Dibuat",
+        paidAtLabel: "Dibayar Pada",
+        activeFromLabel: "Aktif Dari",
+        expiresAtLabel: "Aktif Sampai",
+        detailsTitle: "Detail Status",
+        continuePayment: "Lanjutkan Pembayaran",
+        toAgentDashboard: "Ke Dashboard Agen",
+        toPayments: "Lihat Pembayaran",
+        receiptButton: "Lihat Receipt",
+        invoiceButton: "Lihat Invoice",
+        choosePackage: "Pilih Paket Lain",
+        createListing: "Buat Listing",
+        paymentReceived: "Pembayaran Diterima",
+        membershipActive: "Membership Agen Aktif",
+        pendingTitle: "Pembayaran Sedang Dikonfirmasi",
+        cancelledTitle: "Pembayaran Dibatalkan",
+        failedTitle: "Pembayaran Belum Berhasil",
+        expiredTitle: "Pembayaran Kadaluarsa",
+        refundedTitle: "Pembayaran Direfund",
+        successDescription:
+          "Pembayaran paket agen Anda berhasil. Membership Anda sudah diproses dan siap digunakan sesuai status terbaru.",
+        successPoints: [
           "Pembayaran sudah tercatat",
-          "Listing sudah dikirim ke marketplace",
-          "Status listing sekarang pending review",
-        ],
-        successPointsLive: [
-          "Pembayaran sudah tercatat",
-          "Listing sudah tampil di marketplace",
-          "Anda bisa cek status terbaru dari dashboard pemilik",
+          "Paket agen sudah diproses",
+          "Anda bisa mulai mengelola listing dari dashboard agen",
         ],
         pendingDescription:
-          "Pembayaran Anda masih sedang dikonfirmasi. Silakan tunggu sebentar atau cek tagihan pemilik.",
+          "Pembayaran Anda sedang dikonfirmasi. Silakan tunggu sebentar, lalu refresh status pembayaran.",
         pendingPoints: [
           "Status pembayaran akan diperbarui otomatis",
-          "Anda bisa cek detail pembayaran di tagihan pemilik",
-        ],
-        expiredDescription:
-          "Checkout pembayaran sudah kadaluarsa. Silakan buat pembayaran baru dari tagihan pemilik.",
-        expiredPoints: [
-          "Checkout lama tidak bisa digunakan lagi",
-          "Silakan lanjutkan dari tagihan pemilik",
+          "Jangan membuat pembayaran baru jika Anda sudah membayar",
+          "Cek kembali status dari halaman ini atau halaman pembayaran",
         ],
         cancelledDescription:
-          "Pembayaran dibatalkan. Silakan kembali ke tagihan pemilik jika ingin mencoba lagi.",
+          "Pembayaran dibatalkan. Anda bisa kembali ke paket agen untuk mencoba lagi.",
         cancelledPoints: [
-          "Tidak ada aktivasi yang dijalankan",
-          "Silakan cek tagihan pemilik untuk mencoba lagi",
-        ],
-        refundedDescription:
-          "Pembayaran sudah direfund. Silakan cek invoice atau receipt untuk detail refund.",
-        refundedPoints: [
-          "Detail refund tersedia di invoice atau receipt",
-          "Hubungi admin jika Anda butuh klarifikasi lebih lanjut",
+          "Tidak ada aktivasi paket yang dijalankan",
+          "Anda bisa memilih paket dan mencoba pembayaran lagi",
         ],
         failedDescription:
-          "Pembayaran belum berhasil diselesaikan. Silakan cek tagihan pemilik untuk mencoba lagi.",
+          "Pembayaran belum berhasil diselesaikan. Silakan coba lagi dari halaman paket agen.",
         failedPoints: [
-          "Tidak ada aktivasi final yang dijalankan",
-          "Silakan lanjutkan dari tagihan pemilik",
+          "Paket belum aktif",
+          "Silakan coba ulang pembayaran jika ingin melanjutkan",
+        ],
+        expiredDescription:
+          "Checkout pembayaran sudah kadaluarsa. Silakan buat pembayaran baru dari halaman paket agen.",
+        expiredPoints: [
+          "Checkout lama tidak bisa digunakan lagi",
+          "Silakan pilih paket dan buat checkout baru",
+        ],
+        refundedDescription:
+          "Pembayaran ini sudah direfund. Silakan cek receipt atau hubungi admin jika butuh bantuan.",
+        refundedPoints: [
+          "Status pembayaran sudah berubah menjadi refund",
+          "Detail pembayaran tersimpan di riwayat pembayaran",
         ],
       };
     }
 
     return {
-      loadingSubmission: "Loading submission status...",
-      loadingPayment: "Loading payment status...",
-      statusLabel: "Status",
-      amountLabel: "Amount",
-      typeLabel: "Type",
-      methodLabel: "Method",
-      codeLabel: "Listing Code",
-      createdLabel: "Created",
-      paidAtLabel: "Paid At",
-      detailsTitle: "Status Details",
-      continuePayment: "Continue Payment",
-      seeListing: "See Listing",
-      toOwnerBilling: "Go to Owner Billing",
-      toOwnerDashboard: "Go to Owner Dashboard",
-      receiptButton: "View Receipt",
-      invoiceButton: "View Invoice",
-      addAnother: "Add Another Listing",
+      loadingPayment: "Loading agent payment status...",
       loginFirst: "Please log in first.",
       loadPaymentError: "Failed to load payment status.",
       paymentNotFound: "Payment data was not found.",
-      successStatusText: "success",
-      editApprovalDescription: (kode: string) =>
-        kode && kode !== "-"
-          ? `Your changes for listing ${kode} have been submitted and are now waiting for admin review.`
-          : "Your listing changes have been submitted and are now waiting for admin review.",
-      editApprovalPoints: [
-        "Your listing changes were submitted successfully",
-        "The listing status is now pending approval",
-        "You can check the latest status from the owner dashboard",
-      ],
-      successDescriptionPending: (product: string, kode: string) =>
-        kode && kode !== "-"
-          ? `${product} was paid successfully. Listing ${kode} has been submitted and is now pending admin review.`
-          : `${product} was paid successfully and is now pending admin review.`,
-      successDescriptionLive: (product: string, kode: string) =>
-        kode && kode !== "-"
-          ? `${product} was paid successfully. Listing ${kode} is now visible in the marketplace.`
-          : `${product} was paid successfully and the listing is now visible in the marketplace.`,
-      successDescriptionGeneric: (product: string) =>
-        `${product} was paid successfully.`,
-      successPointsPending: [
+      statusLabel: "Status",
+      amountLabel: "Amount",
+      packageLabel: "Package",
+      billingLabel: "Billing",
+      methodLabel: "Method",
+      createdLabel: "Created",
+      paidAtLabel: "Paid At",
+      activeFromLabel: "Active From",
+      expiresAtLabel: "Active Until",
+      detailsTitle: "Status Details",
+      continuePayment: "Continue Payment",
+      toAgentDashboard: "Go to Agent Dashboard",
+      toPayments: "View Payments",
+      receiptButton: "View Receipt",
+      invoiceButton: "View Invoice",
+      choosePackage: "Choose Another Package",
+      createListing: "Create Listing",
+      paymentReceived: "Payment Received",
+      membershipActive: "Agent Membership Active",
+      pendingTitle: "Payment Being Confirmed",
+      cancelledTitle: "Payment Cancelled",
+      failedTitle: "Payment Not Completed",
+      expiredTitle: "Payment Expired",
+      refundedTitle: "Payment Refunded",
+      successDescription:
+        "Your agent package payment was successful. Your membership has been processed and is ready based on the latest status.",
+      successPoints: [
         "Your payment has been recorded",
-        "Your listing has been submitted to the marketplace",
-        "The listing status is now pending review",
-      ],
-      successPointsLive: [
-        "Your payment has been recorded",
-        "Your listing is now visible in the marketplace",
-        "You can check the latest status from the owner dashboard",
+        "Your agent package has been processed",
+        "You can start managing listings from the agent dashboard",
       ],
       pendingDescription:
-        "Your payment is still being confirmed. Please wait a moment or check owner billing.",
+        "Your payment is being confirmed. Please wait a moment, then refresh the payment status.",
       pendingPoints: [
         "The payment status will update automatically",
-        "You can review the payment details in owner billing",
-      ],
-      expiredDescription:
-        "The payment checkout has expired. Please create a new payment from owner billing.",
-      expiredPoints: [
-        "The old checkout can no longer be used",
-        "Please continue from owner billing",
+        "Do not create a new payment if you already paid",
+        "Check this page or your payment page again shortly",
       ],
       cancelledDescription:
-        "The payment was cancelled. Please return to owner billing if you want to try again.",
+        "The payment was cancelled. You can return to agent packages and try again.",
       cancelledPoints: [
-        "No activation was completed",
-        "Please check owner billing to try again",
-      ],
-      refundedDescription:
-        "The payment has been refunded. Please check the invoice or receipt for refund details.",
-      refundedPoints: [
-        "Refund details are available in the invoice or receipt",
-        "Contact admin if you need further clarification",
+        "No package activation was completed",
+        "You can choose a package and try payment again",
       ],
       failedDescription:
-        "The payment was not completed successfully. Please check owner billing to try again.",
+        "The payment was not completed successfully. Please try again from the agent package page.",
       failedPoints: [
-        "No final activation was completed",
-        "Please continue from owner billing",
+        "Your package is not active yet",
+        "Please try payment again if you want to continue",
+      ],
+      expiredDescription:
+        "The payment checkout has expired. Please create a new checkout from the agent package page.",
+      expiredPoints: [
+        "The old checkout can no longer be used",
+        "Please choose a package and create a new checkout",
+      ],
+      refundedDescription:
+        "This payment has been refunded. Please check the receipt or contact admin if you need help.",
+      refundedPoints: [
+        "The payment status has changed to refunded",
+        "Payment details are saved in your payment history",
       ],
     };
   }, [isId]);
@@ -273,13 +238,6 @@ export default function OwnerPaymentSuccessScreen() {
     let ignore = false;
 
     async function loadPayment() {
-      if (isEditApprovalFlow) {
-        setPayment(null);
-        setErrorMessage("");
-        setLoading(false);
-        return;
-      }
-
       setLoading(true);
       setErrorMessage("");
 
@@ -292,6 +250,7 @@ export default function OwnerPaymentSuccessScreen() {
 
       if (authError || !user) {
         setPayment(null);
+        setMembership(null);
         setLoading(false);
         setErrorMessage(t.loginFirst);
         return;
@@ -303,7 +262,7 @@ export default function OwnerPaymentSuccessScreen() {
         const { data, error } = await supabase
           .from("payment_transactions")
           .select(
-            "id, source_role, payment_type, product_id, product_name_snapshot, product_type, property_code_snapshot, amount_total, currency, status, checkout_url, stripe_checkout_session_id, paid_at, checkout_expires_at, created_at, receipt_url, hosted_invoice_url, invoice_pdf_url, metadata"
+            "id, source_role, payment_type, product_id, product_name_snapshot, product_type, amount_total, currency, status, checkout_url, stripe_checkout_session_id, paid_at, checkout_expires_at, created_at, receipt_url, hosted_invoice_url, invoice_pdf_url, metadata"
           )
           .eq("id", paymentId)
           .eq("user_id", user.id)
@@ -318,7 +277,7 @@ export default function OwnerPaymentSuccessScreen() {
         const { data, error } = await supabase
           .from("payment_transactions")
           .select(
-            "id, source_role, payment_type, product_id, product_name_snapshot, product_type, property_code_snapshot, amount_total, currency, status, checkout_url, stripe_checkout_session_id, paid_at, checkout_expires_at, created_at, receipt_url, hosted_invoice_url, invoice_pdf_url, metadata"
+            "id, source_role, payment_type, product_id, product_name_snapshot, product_type, amount_total, currency, status, checkout_url, stripe_checkout_session_id, paid_at, checkout_expires_at, created_at, receipt_url, hosted_invoice_url, invoice_pdf_url, metadata"
           )
           .eq("user_id", user.id)
           .eq("stripe_checkout_session_id", sessionId)
@@ -333,15 +292,16 @@ export default function OwnerPaymentSuccessScreen() {
         let query = supabase
           .from("payment_transactions")
           .select(
-            "id, source_role, payment_type, product_id, product_name_snapshot, product_type, property_code_snapshot, amount_total, currency, status, checkout_url, stripe_checkout_session_id, paid_at, checkout_expires_at, created_at, receipt_url, hosted_invoice_url, invoice_pdf_url, metadata"
+            "id, source_role, payment_type, product_id, product_name_snapshot, product_type, amount_total, currency, status, checkout_url, stripe_checkout_session_id, paid_at, checkout_expires_at, created_at, receipt_url, hosted_invoice_url, invoice_pdf_url, metadata"
           )
           .eq("user_id", user.id)
-          .eq("source_role", "owner")
+          .eq("source_role", "agent")
+          .eq("payment_type", "package")
           .order("created_at", { ascending: false })
           .limit(10);
 
-        if (urlKode) {
-          query = query.eq("property_code_snapshot", urlKode);
+        if (urlPackage) {
+          query = query.eq("product_id", urlPackage);
         }
 
         const { data, error } = await query;
@@ -350,6 +310,7 @@ export default function OwnerPaymentSuccessScreen() {
 
         if (error) {
           setPayment(null);
+          setMembership(null);
           setLoading(false);
           setErrorMessage(error.message || t.loadPaymentError);
           return;
@@ -361,13 +322,23 @@ export default function OwnerPaymentSuccessScreen() {
 
       if (!foundPayment) {
         setPayment(null);
+        setMembership(null);
         setLoading(false);
         setErrorMessage(t.paymentNotFound);
         return;
       }
 
       setPayment(foundPayment);
-      setLoading(false);
+
+      const linkedMembership = await loadMembershipForPayment({
+        userId: user.id,
+        paymentId: foundPayment.id,
+      });
+
+      if (!ignore) {
+        setMembership(linkedMembership);
+        setLoading(false);
+      }
     }
 
     void loadPayment();
@@ -376,10 +347,9 @@ export default function OwnerPaymentSuccessScreen() {
       ignore = true;
     };
   }, [
-    isEditApprovalFlow,
     paymentId,
     sessionId,
-    urlKode,
+    urlPackage,
     pollCount,
     t.loginFirst,
     t.loadPaymentError,
@@ -387,65 +357,19 @@ export default function OwnerPaymentSuccessScreen() {
   ]);
 
   const resolvedStatus = useMemo(() => {
-    if (isEditApprovalFlow) return "pending" as PaymentStatus;
-    if (urlPayment === "cancelled") return "canceled" as PaymentStatus;
+    if (urlPayment === "cancelled") return "cancelled" as PaymentStatus;
     return normalizeStatus(payment?.status);
-  }, [isEditApprovalFlow, payment?.status, urlPayment]);
+  }, [payment?.status, urlPayment]);
 
-  const returnedFromSuccess = urlPayment === "success";
-  const successfulScreen =
-    isEditApprovalFlow || returnedFromSuccess || resolvedStatus === "paid";
-
-  const resolvedKode = isEditApprovalFlow
-    ? urlKode || "-"
-    : payment?.property_code_snapshot || urlKode || "-";
-
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadLinkedProperty() {
-      if (isEditApprovalFlow || !resolvedKode || resolvedKode === "-") {
-        setLinkedProperty(null);
-        return;
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (ignore || !user) return;
-
-      const { data, error } = await supabase
-        .from("properties")
-        .select("id, kode, title, status, verification_status")
-        .eq("user_id", user.id)
-        .eq("kode", resolvedKode)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (ignore) return;
-
-      if (error || !data) {
-        setLinkedProperty(null);
-        return;
-      }
-
-      setLinkedProperty(data as LinkedPropertyRow);
-    }
-
-    void loadLinkedProperty();
-
-    return () => {
-      ignore = true;
-    };
-  }, [isEditApprovalFlow, resolvedKode, pollCount]);
+  const isPaid = resolvedStatus === "paid" || membership?.status === "active";
+  const isPending =
+    resolvedStatus === "pending" || resolvedStatus === "checkout_created";
 
   const shouldPoll =
-    !isEditApprovalFlow &&
-    pollCount < 6 &&
-    (Boolean(sessionId) || Boolean(paymentId) || returnedFromSuccess) &&
-    resolvedStatus !== "paid";
+    pollCount < 8 &&
+    (Boolean(paymentId) || Boolean(sessionId) || urlPayment === "success") &&
+    !isPaid &&
+    isPending;
 
   useEffect(() => {
     if (!shouldPoll) return;
@@ -458,105 +382,48 @@ export default function OwnerPaymentSuccessScreen() {
   }, [shouldPoll]);
 
   const statusUI = getStateUI({
-    isEditApprovalFlow,
-    returnedFromSuccess,
     status: resolvedStatus,
+    isPaid,
     isId,
+    t,
   });
 
-  const detailStatusText = successfulScreen
-    ? t.successStatusText
-    : resolvedStatus === "checkout_created"
-      ? "pending"
-      : resolvedStatus;
-
-  const productName =
+  const metadata = asObject(payment?.metadata);
+  const packageName =
+    membership?.package_name ||
     payment?.product_name_snapshot ||
-    humanizePaymentType(payment?.payment_type, isId);
+    String(metadata.package_name || metadata.packageName || urlPackage || "-");
 
-  const propertyPendingReview = isPropertyPendingReview(linkedProperty);
+  const billingCycle =
+    membership?.billing_cycle ||
+    String(
+      metadata.billing_cycle ||
+        metadata.billingCycle ||
+        metadata.selected_billing_cycle ||
+        urlBilling ||
+        "-"
+    );
+
+  const listingLimit =
+    Number(
+      metadata.listing_limit ||
+        metadata.active_listing_limit ||
+        metadata.max_listings ||
+        asObject(membership?.metadata).listing_limit ||
+        0
+    ) || 0;
+
+  const methodText = humanizePaymentMethod(payment, isId);
 
   const content = useMemo(() => {
-    if (isEditApprovalFlow) {
+    if (isPaid) {
       return {
-        description: t.editApprovalDescription(resolvedKode),
-        points: t.editApprovalPoints,
+        description: t.successDescription,
+        points: t.successPoints,
       };
     }
 
-    if (successfulScreen) {
-      if (payment?.payment_type === "education") {
-        return {
-          description: isId
-            ? `${productName} berhasil dibayar. Akses premium Anda sudah diproses.`
-            : `${productName} was paid successfully. Your premium access has been processed.`,
-          points: isId
-            ? [
-                "Pembayaran sudah tercatat",
-                "Akses premium akan tersedia sesuai status terbaru",
-                "Anda bisa cek detail pembayaran di tagihan pemilik",
-              ]
-            : [
-                "Your payment has been recorded",
-                "Premium access will be available based on the latest status",
-                "You can check payment details in owner billing",
-              ],
-        };
-      }
-
-      if (
-        payment?.payment_type === "boost" ||
-        payment?.payment_type === "spotlight"
-      ) {
-        return {
-          description: isId
-            ? `${productName} berhasil dibayar untuk listing ${resolvedKode}.`
-            : `${productName} was paid successfully for listing ${resolvedKode}.`,
-          points: isId
-            ? [
-                "Pembayaran sudah tercatat",
-                "Add-on sedang atau sudah diterapkan ke listing terkait",
-                "Anda bisa cek status terbaru dari dashboard pemilik",
-              ]
-            : [
-                "Your payment has been recorded",
-                "The add-on is being applied or has already been applied to the related listing",
-                "You can check the latest status from the owner dashboard",
-              ],
-        };
-      }
-
-      if (propertyPendingReview) {
-        return {
-          description: t.successDescriptionPending(productName, resolvedKode),
-          points: t.successPointsPending,
-        };
-      }
-
-      if (linkedProperty?.id) {
-        return {
-          description: t.successDescriptionLive(productName, resolvedKode),
-          points: t.successPointsLive,
-        };
-      }
-
-      return {
-        description: t.successDescriptionGeneric(productName),
-        points: isId
-          ? [
-              "Pembayaran sudah tercatat",
-              "Anda bisa cek status terbaru dari dashboard pemilik",
-              "Riwayat pembayaran tersimpan di tagihan pemilik",
-            ]
-          : [
-              "Your payment has been recorded",
-              "You can check the latest status from the owner dashboard",
-              "Payment history is saved in owner billing",
-            ],
-      };
-    }
-
-    if (resolvedStatus === "pending" || resolvedStatus === "checkout_created") {
+    if (isPending) {
       return {
         description: t.pendingDescription,
         points: t.pendingPoints,
@@ -570,7 +437,7 @@ export default function OwnerPaymentSuccessScreen() {
       };
     }
 
-    if (resolvedStatus === "canceled" || resolvedStatus === "cancelled") {
+    if (resolvedStatus === "cancelled" || resolvedStatus === "canceled") {
       return {
         description: t.cancelledDescription,
         points: t.cancelledPoints,
@@ -591,44 +458,36 @@ export default function OwnerPaymentSuccessScreen() {
       description: t.failedDescription,
       points: t.failedPoints,
     };
-  }, [
-    isEditApprovalFlow,
-    successfulScreen,
-    resolvedStatus,
-    resolvedKode,
-    payment?.payment_type,
-    productName,
-    propertyPendingReview,
-    linkedProperty?.id,
-    isId,
-    t,
-  ]);
+  }, [isPaid, isPending, resolvedStatus, t]);
 
   const shouldShowContinuePayment =
-    !successfulScreen &&
-    (resolvedStatus === "pending" || resolvedStatus === "checkout_created") &&
+    !isPaid &&
+    isPending &&
     Boolean(payment?.checkout_url);
 
-  async function openOwnerBilling() {
-    await Linking.openURL(`${siteUrl}/pemilikdashboard/tagihan`);
+  async function openAgentDashboard() {
+    router.push("/(tabs)/profile" as any);
   }
 
-  async function openOwnerDashboard() {
-    await Linking.openURL(`${siteUrl}/pemilikdashboard`);
+  async function openPayments() {
+    router.push("/dashboard/payments" as any);
   }
 
-  async function openListing() {
-    if (linkedProperty?.id) {
-      router.push(`/properti/${linkedProperty.id}` as any);
+  async function openReceipt() {
+    if (payment?.id) {
+      router.push(`/dashboard/receipt/${payment.id}` as any);
       return;
     }
 
-    router.push("/(tabs)/property" as any);
+    router.push("/dashboard/payments" as any);
   }
 
-  async function addAnotherListing() {
-    await clearDraft();
-    router.replace("/owner/packages" as any);
+  async function openPackages() {
+    router.push("/agent/packages" as any);
+  }
+
+  async function createListing() {
+    router.push("/agent/create-listing" as any);
   }
 
   return (
@@ -678,10 +537,10 @@ export default function OwnerPaymentSuccessScreen() {
           </View>
 
           <Text style={styles.kicker}>
-            {successfulScreen
+            {isPaid
               ? isId
-                ? "STATUS BERHASIL"
-                : "SUCCESS STATUS"
+                ? "PEMBAYARAN DITERIMA"
+                : "PAYMENT RECEIVED"
               : isId
                 ? "STATUS PEMBAYARAN"
                 : "PAYMENT STATUS"}
@@ -694,9 +553,7 @@ export default function OwnerPaymentSuccessScreen() {
         {loading ? (
           <View style={styles.sectionCard}>
             <ActivityIndicator color="#e6c15c" />
-            <Text style={styles.centerText}>
-              {isEditApprovalFlow ? t.loadingSubmission : t.loadingPayment}
-            </Text>
+            <Text style={styles.centerText}>{t.loadingPayment}</Text>
           </View>
         ) : null}
 
@@ -706,24 +563,37 @@ export default function OwnerPaymentSuccessScreen() {
           </View>
         ) : null}
 
-        {!loading && !errorMessage && !isEditApprovalFlow && payment ? (
+        {!loading && !errorMessage && payment ? (
           <View style={styles.sectionCard}>
             <SectionHeader
               icon={<ReceiptText color="#e6c15c" size={21} />}
               title={isId ? "Detail Pembayaran" : "Payment Details"}
             />
 
-            <InfoRow label={t.statusLabel} value={detailStatusText} />
+            <InfoRow
+              label={t.statusLabel}
+              value={isPaid ? (isId ? "berhasil" : "success") : resolvedStatus}
+            />
+            <InfoRow label={t.packageLabel} value={packageName || "-"} />
+            <InfoRow
+              label={t.billingLabel}
+              value={humanizeBillingCycle(billingCycle, isId)}
+            />
+
+            {listingLimit > 0 ? (
+              <InfoRow
+                label={isId ? "Limit Listing Aktif" : "Active Listing Limit"}
+                value={`${listingLimit} ${
+                  isId ? "listing aktif" : "active listings"
+                }`}
+              />
+            ) : null}
+
             <InfoRow
               label={t.amountLabel}
               value={formatCurrency(payment.amount_total, payment.currency, locale)}
             />
-            <InfoRow label={t.typeLabel} value={productName} />
-            <InfoRow
-              label={t.methodLabel}
-              value={humanizePaymentMethod(payment, isId)}
-            />
-            <InfoRow label={t.codeLabel} value={resolvedKode} />
+            <InfoRow label={t.methodLabel} value={methodText} />
             <InfoRow
               label={t.createdLabel}
               value={formatDate(payment.created_at, locale)}
@@ -733,6 +603,20 @@ export default function OwnerPaymentSuccessScreen() {
               <InfoRow
                 label={t.paidAtLabel}
                 value={formatDate(payment.paid_at, locale)}
+              />
+            ) : null}
+
+            {membership?.starts_at ? (
+              <InfoRow
+                label={t.activeFromLabel}
+                value={formatDate(membership.starts_at, locale)}
+              />
+            ) : null}
+
+            {membership?.expires_at ? (
+              <InfoRow
+                label={t.expiresAtLabel}
+                value={formatDate(membership.expires_at, locale)}
               />
             ) : null}
           </View>
@@ -751,8 +635,13 @@ export default function OwnerPaymentSuccessScreen() {
           </View>
         ) : null}
 
-        {!loading && !errorMessage && payment && successfulScreen ? (
+        {!loading && !errorMessage && payment && isPaid ? (
           <View style={styles.receiptRow}>
+            <Pressable style={styles.linkButton} onPress={openReceipt}>
+              <FileText color="#ffffff" size={15} />
+              <Text style={styles.linkButtonText}>{t.receiptButton}</Text>
+            </Pressable>
+
             {payment.receipt_url ? (
               <Pressable
                 style={styles.linkButton}
@@ -777,28 +666,28 @@ export default function OwnerPaymentSuccessScreen() {
           </View>
         ) : null}
 
-        {successfulScreen ? (
+        {isPaid ? (
           <View style={styles.actionsCard}>
-            <Pressable style={styles.primaryButton} onPress={openListing}>
+            <Pressable style={styles.primaryButton} onPress={openAgentDashboard}>
               <Home color="#111111" size={17} />
-              <Text style={styles.primaryButtonText}>{t.seeListing}</Text>
-            </Pressable>
-
-            <Pressable style={styles.secondaryButton} onPress={openOwnerBilling}>
-              <FileText color="#ffffff" size={16} />
-              <Text style={styles.secondaryButtonText}>{t.toOwnerBilling}</Text>
-            </Pressable>
-
-            <Pressable style={styles.secondaryButton} onPress={openOwnerDashboard}>
-              <ShieldCheck color="#ffffff" size={16} />
-              <Text style={styles.secondaryButtonText}>
-                {t.toOwnerDashboard}
+              <Text style={styles.primaryButtonText}>
+                {t.toAgentDashboard}
               </Text>
             </Pressable>
 
-            <Pressable style={styles.secondaryButton} onPress={addAnotherListing}>
+            <Pressable style={styles.secondaryButton} onPress={createListing}>
+              <PackageCheck color="#ffffff" size={16} />
+              <Text style={styles.secondaryButtonText}>{t.createListing}</Text>
+            </Pressable>
+
+            <Pressable style={styles.secondaryButton} onPress={openPayments}>
+              <FileText color="#ffffff" size={16} />
+              <Text style={styles.secondaryButtonText}>{t.toPayments}</Text>
+            </Pressable>
+
+            <Pressable style={styles.secondaryButton} onPress={openPackages}>
               <RotateCcw color="#ffffff" size={16} />
-              <Text style={styles.secondaryButtonText}>{t.addAnother}</Text>
+              <Text style={styles.secondaryButtonText}>{t.choosePackage}</Text>
             </Pressable>
           </View>
         ) : (
@@ -814,23 +703,62 @@ export default function OwnerPaymentSuccessScreen() {
                 </Text>
               </Pressable>
             ) : (
-              <Pressable style={styles.primaryButton} onPress={openOwnerBilling}>
-                <FileText color="#111111" size={17} />
-                <Text style={styles.primaryButtonText}>{t.toOwnerBilling}</Text>
+              <Pressable style={styles.primaryButton} onPress={openPackages}>
+                <PackageCheck color="#111111" size={17} />
+                <Text style={styles.primaryButtonText}>{t.choosePackage}</Text>
               </Pressable>
             )}
 
-            <Pressable style={styles.secondaryButton} onPress={openOwnerDashboard}>
+            <Pressable style={styles.secondaryButton} onPress={openAgentDashboard}>
               <ShieldCheck color="#ffffff" size={16} />
               <Text style={styles.secondaryButtonText}>
-                {t.toOwnerDashboard}
+                {t.toAgentDashboard}
               </Text>
+            </Pressable>
+
+            <Pressable style={styles.secondaryButton} onPress={openPayments}>
+              <FileText color="#ffffff" size={16} />
+              <Text style={styles.secondaryButtonText}>{t.toPayments}</Text>
             </Pressable>
           </View>
         )}
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+async function loadMembershipForPayment({
+  userId,
+  paymentId,
+}: {
+  userId: string;
+  paymentId: string;
+}) {
+  const { data: exactMembership } = await supabase
+    .from("agent_memberships")
+    .select(
+      "id, user_id, payment_id, package_id, package_name, billing_cycle, status, starts_at, expires_at, metadata"
+    )
+    .eq("user_id", userId)
+    .eq("payment_id", paymentId)
+    .maybeSingle();
+
+  if (exactMembership) {
+    return exactMembership as AgentMembershipRow;
+  }
+
+  const { data: activeMembership } = await supabase
+    .from("agent_memberships")
+    .select(
+      "id, user_id, payment_id, package_id, package_name, billing_cycle, status, starts_at, expires_at, metadata"
+    )
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return (activeMembership as AgentMembershipRow | null) ?? null;
 }
 
 function SectionHeader({ icon, title }: { icon: ReactNode; title: string }) {
@@ -873,6 +801,25 @@ function readParam(value: unknown) {
   return String(value || "");
 }
 
+function normalizeStatus(value?: string | null): PaymentStatus {
+  const v = String(value || "").toLowerCase();
+
+  if (
+    v === "checkout_created" ||
+    v === "paid" ||
+    v === "failed" ||
+    v === "expired" ||
+    v === "canceled" ||
+    v === "cancelled" ||
+    v === "refunded" ||
+    v === "partially_refunded"
+  ) {
+    return v as PaymentStatus;
+  }
+
+  return "pending";
+}
+
 function formatCurrency(
   amount: number | null | undefined,
   currency: string | null | undefined,
@@ -904,36 +851,13 @@ function formatDate(value: string | null | undefined, locale: string) {
   }).format(date);
 }
 
-function normalizeStatus(value?: string | null): PaymentStatus {
+function humanizeBillingCycle(value: string | null | undefined, isId: boolean) {
   const v = String(value || "").toLowerCase();
 
-  if (
-    v === "checkout_created" ||
-    v === "paid" ||
-    v === "failed" ||
-    v === "expired" ||
-    v === "canceled" ||
-    v === "cancelled" ||
-    v === "refunded" ||
-    v === "partially_refunded"
-  ) {
-    return v as PaymentStatus;
-  }
+  if (v === "monthly") return isId ? "Bulanan" : "Monthly";
+  if (v === "yearly") return isId ? "Tahunan" : "Yearly";
 
-  return "pending";
-}
-
-function humanizePaymentType(value?: string | null, isId = true) {
-  const v = String(value || "").toLowerCase();
-
-  if (v === "listing_fee") return isId ? "Iklan Listing" : "Listing Payment";
-  if (v === "featured") return "Featured Listing";
-  if (v === "boost") return "Boost Listing";
-  if (v === "spotlight") return "Homepage Spotlight";
-  if (v === "education") return "Education Pass";
-  if (v === "package") return isId ? "Paket Membership" : "Membership Package";
-
-  return isId ? "Pembayaran" : "Payment";
+  return value || "-";
 }
 
 function humanizePaymentMethod(payment: PaymentRow | null, isId: boolean) {
@@ -967,43 +891,20 @@ function humanizePaymentMethod(payment: PaymentRow | null, isId: boolean) {
   return "Debit / Credit Card";
 }
 
-function isPropertyPendingReview(property: LinkedPropertyRow | null) {
-  if (!property) return false;
-
-  const status = String(property.status || "").toLowerCase();
-  const verification = String(property.verification_status || "").toLowerCase();
-
-  return (
-    status === "pending" ||
-    status === "pending_approval" ||
-    verification === "pending_verification" ||
-    verification === "pending_approval"
-  );
-}
-
 function getStateUI({
-  isEditApprovalFlow,
-  returnedFromSuccess,
   status,
+  isPaid,
   isId,
+  t,
 }: {
-  isEditApprovalFlow: boolean;
-  returnedFromSuccess: boolean;
   status: PaymentStatus;
+  isPaid: boolean;
   isId: boolean;
+  t: any;
 }) {
-  if (isEditApprovalFlow) {
+  if (isPaid) {
     return {
-      title: isId ? "Dikirim untuk Approval" : "Submitted for Approval",
-      iconType: "success" as const,
-      heroStyle: styles.heroWarning,
-      iconStyle: styles.statusIconWarning,
-    };
-  }
-
-  if (returnedFromSuccess || status === "paid") {
-    return {
-      title: isId ? "Pembayaran Berhasil" : "Payment Successful",
+      title: isId ? t.membershipActive : t.membershipActive,
       iconType: "success" as const,
       heroStyle: styles.heroSuccess,
       iconStyle: styles.statusIconSuccess,
@@ -1012,7 +913,7 @@ function getStateUI({
 
   if (status === "pending" || status === "checkout_created") {
     return {
-      title: isId ? "Pembayaran Menunggu Konfirmasi" : "Payment Pending",
+      title: t.pendingTitle,
       iconType: "pending" as const,
       heroStyle: styles.heroWarning,
       iconStyle: styles.statusIconWarning,
@@ -1021,16 +922,16 @@ function getStateUI({
 
   if (status === "expired") {
     return {
-      title: isId ? "Pembayaran Kadaluarsa" : "Payment Expired",
+      title: t.expiredTitle,
       iconType: "error" as const,
       heroStyle: styles.heroWarning,
       iconStyle: styles.statusIconWarning,
     };
   }
 
-  if (status === "canceled" || status === "cancelled") {
+  if (status === "cancelled" || status === "canceled") {
     return {
-      title: isId ? "Pembayaran Dibatalkan" : "Payment Cancelled",
+      title: t.cancelledTitle,
       iconType: "error" as const,
       heroStyle: styles.heroNeutral,
       iconStyle: styles.statusIconNeutral,
@@ -1039,7 +940,7 @@ function getStateUI({
 
   if (status === "refunded" || status === "partially_refunded") {
     return {
-      title: isId ? "Pembayaran Direfund" : "Payment Refunded",
+      title: t.refundedTitle,
       iconType: "pending" as const,
       heroStyle: styles.heroInfo,
       iconStyle: styles.statusIconInfo,
@@ -1047,7 +948,7 @@ function getStateUI({
   }
 
   return {
-    title: isId ? "Pembayaran Gagal" : "Payment Failed",
+    title: t.failedTitle,
     iconType: "error" as const,
     heroStyle: styles.heroError,
     iconStyle: styles.statusIconError,

@@ -59,6 +59,7 @@ type Listing = TetamoProperty;
 const tetamoLogo = require("../../assets/images/tetamo-logo.png");
 
 const SCORPIO_GOLD = "#e6c15c";
+const TETAMO_FALLBACK_WHATSAPP = "628133947717";
 
 const HERO_PROPERTY_CODES = ["TTM TBB 81", "TTM0 - UB", "TTM TNH 83"];
 
@@ -210,6 +211,8 @@ const copy = {
     boosted: "Boosted",
     spotlight: "Spotlight",
     verified: "Verified",
+    whatsapp: "WhatsApp",
+    schedule: "Schedule",
     findPrefix: "Find your property with",
     whyPrefix: "Why Choose",
     whyListPrefix: "Why list with",
@@ -265,6 +268,8 @@ const copy = {
     boosted: "Boosted",
     spotlight: "Spotlight",
     verified: "Terverifikasi",
+    whatsapp: "WhatsApp",
+    schedule: "Jadwal",
     findPrefix: "Temukan properti Anda dengan",
     whyPrefix: "Mengapa Pilih",
     whyListPrefix: "Kenapa listing dengan",
@@ -441,20 +446,39 @@ export default function HomeScreen() {
   }, [allProperties]);
 
   const formatPrice = useMemo(() => {
-    return (priceIdr: number) => {
+    return (priceIdr: number, rentalType?: string | null) => {
       const converted = priceIdr * currencyRates[currency];
 
       if (!priceIdr || priceIdr <= 0) {
         return currency === "IDR" ? "Price on Request" : "Contact Us";
       }
 
-      if (currency === "IDR") {
-        return `IDR ${Math.round(converted).toLocaleString("en-US")}`;
+      let base =
+        currency === "IDR"
+          ? `IDR ${Math.round(converted).toLocaleString("en-US")}`
+          : `${currency} ${Math.round(converted).toLocaleString("en-US")}`;
+
+      const rentType = String(rentalType || "").toLowerCase();
+
+      if (rentType.includes("monthly") || rentType.includes("bulanan")) {
+        base += language === "id" ? " /bln" : " /mo";
       }
 
-      return `${currency} ${Math.round(converted).toLocaleString("en-US")}`;
+      if (
+        rentType.includes("yearly") ||
+        rentType.includes("annual") ||
+        rentType.includes("tahunan")
+      ) {
+        base += language === "id" ? " /thn" : " /yr";
+      }
+
+      if (rentType.includes("daily") || rentType.includes("harian")) {
+        base += language === "id" ? " /hari" : " /day";
+      }
+
+      return base;
     };
-  }, [currency]);
+  }, [currency, language]);
 
   const goSearch = (params?: Record<string, string>) => {
     const query = new URLSearchParams();
@@ -478,9 +502,9 @@ export default function HomeScreen() {
     goSearch();
   };
 
-  const goDetails = (property: Listing) => {
+  const goDetails = (property: Listing, schedule = false) => {
     const pathKey = encodeURIComponent(property.slug || property.id);
-    router.push(`/properti/${pathKey}` as any);
+    router.push(`/properti/${pathKey}${schedule ? "?schedule=1" : ""}` as any);
   };
 
   const goAddListing = (audience?: string) => {
@@ -501,6 +525,36 @@ export default function HomeScreen() {
 
   const openScorpioAssist = () => {
     router.push("/scorpio-assist" as any);
+  };
+
+  const openWhatsapp = (property: Listing) => {
+    const phone =
+      normalizeWhatsappPhone(property.contactPhone) || TETAMO_FALLBACK_WHATSAPP;
+    const title = language === "en" ? property.titleEn : property.titleId;
+    const receiverName = property.contactName || "Tetamo";
+
+    const message =
+      language === "id"
+        ? `Halo ${receiverName}, saya tertarik dengan properti ini di TETAMO.
+
+Properti: ${title}
+Kode: ${property.kode || "-"}
+Lokasi: ${property.location}
+Harga: ${formatPrice(property.priceIdr, property.rentalType)}
+
+Apakah properti ini masih tersedia?`
+        : `Hello ${receiverName}, I'm interested in this property on TETAMO.
+
+Property: ${title}
+Code: ${property.kode || "-"}
+Location: ${property.location}
+Price: ${formatPrice(property.priceIdr, property.rentalType)}
+
+Is this property still available?`;
+
+    void Linking.openURL(
+      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    );
   };
 
   const handleHeroScrollEnd = (event: any) => {
@@ -674,7 +728,7 @@ export default function HomeScreen() {
                   <View style={styles.heroPriceLocationRow}>
                     <View style={styles.heroPriceBox}>
                       <Text style={styles.heroPrice}>
-                        {formatPrice(hero.priceIdr)}
+                        {formatPrice(hero.priceIdr, hero.rentalType)}
                       </Text>
 
                       {currency === "IDR" && hero.priceIdr > 0 && (
@@ -713,6 +767,19 @@ export default function HomeScreen() {
                     listing={hero}
                     photosLabel={t.photos}
                     variant="dark"
+                  />
+
+                  <PropertyActionRow
+                    whatsappLabel={t.whatsapp}
+                    scheduleLabel={t.schedule}
+                    onWhatsapp={(event) => {
+                      event?.stopPropagation?.();
+                      openWhatsapp(hero);
+                    }}
+                    onSchedule={(event) => {
+                      event?.stopPropagation?.();
+                      goDetails(hero, true);
+                    }}
                   />
                 </View>
               </SafeImageBackground>
@@ -775,6 +842,10 @@ export default function HomeScreen() {
               language={language}
               formatPrice={formatPrice}
               photosLabel={t.photos}
+              whatsappLabel={t.whatsapp}
+              scheduleLabel={t.schedule}
+              onWhatsapp={() => openWhatsapp(listing)}
+              onSchedule={() => goDetails(listing, true)}
               onPress={() => goDetails(listing)}
             />
           ))}
@@ -1010,6 +1081,17 @@ export default function HomeScreen() {
   );
 }
 
+function normalizeWhatsappPhone(value?: string | null) {
+  const digits = String(value || "").replace(/[^\d]/g, "");
+
+  if (!digits) return "";
+  if (digits.startsWith("62")) return digits;
+  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
+  if (digits.startsWith("8")) return `62${digits}`;
+
+  return digits;
+}
+
 function formatUnreadCount(value: number) {
   if (value > 99) return "99+";
   return String(value);
@@ -1206,6 +1288,32 @@ function Badge({
   return (
     <View style={[styles.badge, { backgroundColor: color }]}>
       <Text style={[styles.badgeText, { color: textColor }]}>{label}</Text>
+    </View>
+  );
+}
+
+function PropertyActionRow({
+  whatsappLabel,
+  scheduleLabel,
+  onWhatsapp,
+  onSchedule,
+}: {
+  whatsappLabel: string;
+  scheduleLabel: string;
+  onWhatsapp: (event?: any) => void;
+  onSchedule: (event?: any) => void;
+}) {
+  return (
+    <View style={styles.propertyActionRow}>
+      <Pressable style={styles.propertyActionButton} onPress={onWhatsapp}>
+        <MessageCircle color="#25D366" size={13} />
+        <Text style={styles.propertyActionText}>{whatsappLabel}</Text>
+      </Pressable>
+
+      <Pressable style={styles.propertyActionButton} onPress={onSchedule}>
+        <CalendarDays color={SCORPIO_GOLD} size={13} />
+        <Text style={styles.propertyActionText}>{scheduleLabel}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -1419,13 +1527,21 @@ function PropertyCard({
   language,
   formatPrice,
   photosLabel,
+  whatsappLabel,
+  scheduleLabel,
+  onWhatsapp,
+  onSchedule,
   onPress,
 }: {
   listing: Listing;
   currency: Currency;
   language: Language;
-  formatPrice: (priceIdr: number) => string;
+  formatPrice: (priceIdr: number, rentalType?: string | null) => string;
   photosLabel: string;
+  whatsappLabel: string;
+  scheduleLabel: string;
+  onWhatsapp: () => void;
+  onSchedule: () => void;
   onPress: () => void;
 }) {
   return (
@@ -1448,7 +1564,9 @@ function PropertyCard({
       </SafeImageBackground>
 
       <View style={styles.propertyBody}>
-        <Text style={styles.propertyPrice}>{formatPrice(listing.priceIdr)}</Text>
+        <Text style={styles.propertyPrice}>
+          {formatPrice(listing.priceIdr, listing.rentalType)}
+        </Text>
 
         {currency !== "IDR" && listing.priceIdr > 0 && (
           <Text style={styles.propertySubPrice}>
@@ -1499,6 +1617,19 @@ function PropertyCard({
           variant="dark"
           hidePhotos
           compact
+        />
+
+        <PropertyActionRow
+          whatsappLabel={whatsappLabel}
+          scheduleLabel={scheduleLabel}
+          onWhatsapp={(event) => {
+            event?.stopPropagation?.();
+            onWhatsapp();
+          }}
+          onSchedule={(event) => {
+            event?.stopPropagation?.();
+            onSchedule();
+          }}
         />
       </View>
     </Pressable>
@@ -1745,7 +1876,7 @@ const styles = StyleSheet.create({
     paddingRight: 0,
   },
   heroCard: {
-    height: 390,
+    height: 424,
     borderRadius: 27,
     overflow: "hidden",
     justifyContent: "space-between",
@@ -2107,6 +2238,30 @@ const styles = StyleSheet.create({
   engagementMetricTextCompact: {
     fontSize: 7.8,
   },
+  propertyActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginTop: 10,
+  },
+  propertyActionButton: {
+    flex: 1,
+    minHeight: 31,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.28)",
+    backgroundColor: "rgba(255,255,255,0.075)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 7,
+  },
+  propertyActionText: {
+    color: "#ffffff",
+    fontSize: 9.2,
+    fontWeight: "900",
+  },
   ctaBanner: {
     borderRadius: 24,
     borderWidth: 1,
@@ -2232,13 +2387,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   projectImage: {
-    width: 112,
-    height: 70,
+    width: 150,
+    height: 82,
     borderRadius: 15,
   },
   projectTextBox: {
     flex: 1,
     justifyContent: "center",
+    minWidth: 0,
   },
   projectTitle: {
     color: "#ffffff",
