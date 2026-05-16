@@ -391,13 +391,6 @@ export default function DashboardSettingsScreen() {
     setMessage("");
     setMessageType("");
 
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (permission.status !== "granted") {
-      Alert.alert(ui.imagePermission);
-      return;
-    }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
