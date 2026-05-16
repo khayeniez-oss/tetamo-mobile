@@ -8,6 +8,7 @@ import {
     CreditCard,
     ExternalLink,
     FileText,
+    Flag,
     HelpCircle,
     Home,
     Languages,
@@ -86,6 +87,13 @@ export default function SupportScreen() {
         contactCardTitle: "Kontak Tetamo",
         emailSupport: "Email Support",
         openWebsite: "Buka Website",
+        safetyReportsTitle: "Keamanan & Laporan",
+        safetyReportsSub:
+          "Laporkan listing, pengguna, agen, atau aktivitas yang mencurigakan agar Tetamo dapat meninjau dengan cepat.",
+        reportListingTitle: "Laporkan Listing",
+        reportListingSub: "Listing palsu, detail salah, atau konten mencurigakan",
+        reportUserTitle: "Laporkan Pengguna / Agen",
+        reportUserSub: "Akun mencurigakan, scam, atau perilaku tidak pantas",
         formTitle: "Kirim Permintaan Bantuan",
         category: "Kategori",
         email: "Email Kontak",
@@ -130,6 +138,13 @@ export default function SupportScreen() {
       contactCardTitle: "Contact Tetamo",
       emailSupport: "Email Support",
       openWebsite: "Open Website",
+      safetyReportsTitle: "Safety & Reports",
+      safetyReportsSub:
+        "Report a listing, user, agent, or suspicious activity so Tetamo can review it quickly.",
+      reportListingTitle: "Report a Listing",
+      reportListingSub: "Fake listing, wrong details, or suspicious content",
+      reportUserTitle: "Report a User / Agent",
+      reportUserSub: "Suspicious account, scam concern, or inappropriate behavior",
       formTitle: "Send Support Request",
       category: "Category",
       email: "Contact Email",
@@ -253,6 +268,14 @@ export default function SupportScreen() {
       ignore = true;
     };
   }, []);
+
+  function openReportListing() {
+    router.push("/report/listing" as any);
+  }
+
+  function openReportUser() {
+    router.push("/report/user" as any);
+  }
 
   async function openWebsite() {
     try {
@@ -441,6 +464,29 @@ export default function SupportScreen() {
           />
         </View>
 
+        <View style={styles.safetyCard}>
+          <SectionHeader
+            icon={<ShieldAlert color="#e6c15c" size={20} />}
+            title={ui.safetyReportsTitle}
+          />
+
+          <Text style={styles.safetyIntro}>{ui.safetyReportsSub}</Text>
+
+          <ReportButton
+            icon={<Flag color="#e6c15c" size={18} />}
+            title={ui.reportListingTitle}
+            subtitle={ui.reportListingSub}
+            onPress={openReportListing}
+          />
+
+          <ReportButton
+            icon={<UserRound color="#e6c15c" size={18} />}
+            title={ui.reportUserTitle}
+            subtitle={ui.reportUserSub}
+            onPress={openReportUser}
+          />
+        </View>
+
         <View style={styles.warningCard}>
           <AlertTriangle color="#e6c15c" size={20} />
           <View style={styles.warningTextBox}>
@@ -590,9 +636,7 @@ function ContactButton({
       style={[styles.contactButton, primary && styles.contactButtonPrimary]}
       onPress={onPress}
     >
-      <View
-        style={[styles.contactIcon, primary && styles.contactIconPrimary]}
-      >
+      <View style={[styles.contactIcon, primary && styles.contactIconPrimary]}>
         {icon}
       </View>
 
@@ -609,6 +653,31 @@ function ContactButton({
           ]}
           numberOfLines={1}
         >
+          {subtitle}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function ReportButton({
+  icon,
+  title,
+  subtitle,
+  onPress,
+}: {
+  icon: ReactNode;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={styles.reportButton} onPress={onPress}>
+      <View style={styles.reportIcon}>{icon}</View>
+
+      <View style={styles.reportTextBox}>
+        <Text style={styles.reportTitle}>{title}</Text>
+        <Text style={styles.reportSubtitle} numberOfLines={2}>
           {subtitle}
         </Text>
       </View>
@@ -772,6 +841,22 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 13,
   },
+  safetyCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#705d2c",
+    backgroundColor: "#12100a",
+    padding: 15,
+    marginBottom: 13,
+  },
+  safetyIntro: {
+    color: "#d8d8d8",
+    fontSize: 11.5,
+    lineHeight: 17,
+    fontWeight: "700",
+    marginTop: -4,
+    marginBottom: 12,
+  },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -844,6 +929,43 @@ const styles = StyleSheet.create({
   },
   contactSubtitlePrimary: {
     color: "#111111",
+  },
+  reportButton: {
+    minHeight: 64,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.28)",
+    backgroundColor: "#050505",
+    padding: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 10,
+  },
+  reportIcon: {
+    width: 39,
+    height: 39,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#705d2c",
+    backgroundColor: "#211a0b",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reportTextBox: {
+    flex: 1,
+  },
+  reportTitle: {
+    color: "#ffffff",
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+  reportSubtitle: {
+    color: "#bdbdbd",
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontWeight: "700",
+    marginTop: 3,
   },
   warningCard: {
     borderRadius: 22,
