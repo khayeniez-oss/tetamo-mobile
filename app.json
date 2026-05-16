@@ -39,6 +39,14 @@
           }
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/tetamo_notification.wav"
+          ]
+        }
+      ],
       "expo-web-browser"
     ],
     "experiments": {
