@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   Bath,
   BedDouble,
+  Bell,
   Bookmark,
   BrainCircuit,
   BriefcaseBusiness,
@@ -15,12 +16,10 @@ import {
   ChevronRight,
   Eye,
   Heart,
-  Hotel,
   House,
   Languages,
   MapPin,
   MessageCircle,
-  Palmtree,
   Ruler,
   Search,
   Share2,
@@ -28,8 +27,6 @@ import {
   SlidersHorizontal,
   Sparkles,
   Star,
-  Store,
-  Trees,
   UserRound,
 } from "lucide-react-native";
 import type { ReactNode } from "react";
@@ -48,6 +45,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { supabase } from "../../lib/supabase";
 import {
   fetchHomepageProperties,
   fetchPropertiesByCodes,
@@ -59,6 +57,8 @@ type Currency = "IDR" | "USD" | "AUD";
 type Listing = TetamoProperty;
 
 const tetamoLogo = require("../../assets/images/tetamo-logo.png");
+
+const SCORPIO_GOLD = "#e6c15c";
 
 const HERO_PROPERTY_CODES = ["TTM TBB 81", "TTM0 - UB", "TTM TNH 83"];
 
@@ -186,6 +186,17 @@ const fallbackProjects: Listing[] = [
   },
 ];
 
+const fallbackAreaNames = [
+  "Bali",
+  "Jakarta",
+  "Surabaya",
+  "Bandung",
+  "Seminyak",
+  "Canggu",
+  "Uluwatu",
+  "BSD City",
+];
+
 const copy = {
   en: {
     subtitle: "Properti Marketplace",
@@ -199,16 +210,15 @@ const copy = {
     boosted: "Boosted",
     spotlight: "Spotlight",
     verified: "Verified",
-    find: "Find your property with TETAMO",
-    why: "Why Choose TETAMO",
+    findPrefix: "Find your property with",
+    whyPrefix: "Why Choose",
+    whyListPrefix: "Why list with",
     verifiedListings: "Verified Listings",
-    verifiedListingsSub: "Trusted & screened",
     verifiedAgents: "Verified Agents",
-    verifiedAgentsSub: "Professional & reliable",
     verifiedOwners: "Verified Owners",
-    verifiedOwnersSub: "Real & verified owners",
     trustedPlatform: "Trusted Platform",
-    trustedPlatformSub: "Secure & transparent",
+    aiPowered: "AI Powered",
+    directInquiries: "Direct Inquiries",
     smart: "Smart System for Smarter Buyers & Renters",
     smartSub:
       "AI-assisted bilingual listings, direct inquiries, viewing schedule, AI Powered tools, and commission system for agents.",
@@ -221,17 +231,11 @@ const copy = {
     featuredListings: "Featured Listings",
     popular: "Popular Areas",
     newProjects: "New Projects",
-    whyList: "Why list with Tetamo?",
-    directWhatsApp: "Direct WhatsApp",
-    directWhatsAppSub: "Chat instantly",
-    scheduling: "Scheduling",
-    schedulingSub: "Book viewing easily",
-    aiTitle: "AI Title & Description",
-    aiTitleSub: "Better visibility",
-    aiCaption: "AI Auto Caption",
-    aiCaptionSub: "Social Media",
-    calculator: "Commission Calculator",
-    calculatorSub: "Calculate earnings",
+    directWhatsApp: "WhatsApp",
+    scheduling: "Schedule",
+    aiTitle: "AI Titles",
+    aiCaption: "AI Caption",
+    calculator: "Calculator",
     owner: "Owner",
     ownerSub: "Manage your property",
     agent: "Agent",
@@ -261,16 +265,15 @@ const copy = {
     boosted: "Boosted",
     spotlight: "Spotlight",
     verified: "Terverifikasi",
-    find: "Temukan properti Anda dengan TETAMO",
-    why: "Mengapa Pilih TETAMO",
-    verifiedListings: "Listing Terverifikasi",
-    verifiedListingsSub: "Terpercaya & disaring",
-    verifiedAgents: "Agen Terverifikasi",
-    verifiedAgentsSub: "Profesional & terpercaya",
-    verifiedOwners: "Pemilik Terverifikasi",
-    verifiedOwnersSub: "Pemilik asli & jelas",
-    trustedPlatform: "Platform Terpercaya",
-    trustedPlatformSub: "Aman & transparan",
+    findPrefix: "Temukan properti Anda dengan",
+    whyPrefix: "Mengapa Pilih",
+    whyListPrefix: "Kenapa listing dengan",
+    verifiedListings: "Listing Verified",
+    verifiedAgents: "Agen Verified",
+    verifiedOwners: "Pemilik Verified",
+    trustedPlatform: "Platform Aman",
+    aiPowered: "AI Powered",
+    directInquiries: "Inquiry Langsung",
     smart: "Sistem Pintar untuk Buyer & Renter",
     smartSub:
       "Listing bilingual dengan AI, inquiry langsung, jadwal viewing, AI Powered tools, dan sistem komisi untuk agen.",
@@ -283,17 +286,11 @@ const copy = {
     featuredListings: "Listing Unggulan",
     popular: "Area Populer",
     newProjects: "Proyek Baru",
-    whyList: "Kenapa listing di Tetamo?",
-    directWhatsApp: "WhatsApp Langsung",
-    directWhatsAppSub: "Chat instan",
-    scheduling: "Jadwal Viewing",
-    schedulingSub: "Booking lebih mudah",
-    aiTitle: "AI Judul & Deskripsi",
-    aiTitleSub: "Visibilitas lebih baik",
-    aiCaption: "AI Auto Caption",
-    aiCaptionSub: "Media sosial",
-    calculator: "Kalkulator Komisi",
-    calculatorSub: "Hitung penghasilan",
+    directWhatsApp: "WhatsApp",
+    scheduling: "Jadwal",
+    aiTitle: "AI Judul",
+    aiCaption: "AI Caption",
+    calculator: "Kalkulator",
     owner: "Pemilik",
     ownerSub: "Kelola properti",
     agent: "Agen",
@@ -324,6 +321,7 @@ export default function HomeScreen() {
   const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);
   const [allProperties, setAllProperties] = useState<Listing[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   const t = copy[language];
   const heroCardWidth = width - 36;
@@ -364,8 +362,68 @@ export default function HomeScreen() {
     };
   }, []);
 
-  const heroItems =
-    heroListings.length > 0 ? heroListings : fallbackHeroListings;
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadUnreadNotificationCount() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!isMounted) return;
+
+      if (!user?.id) {
+        setUnreadNotificationCount(0);
+        return;
+      }
+
+      const { count, error } = await supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .is("read_at", null);
+
+      if (!isMounted) return;
+
+      if (error) {
+        setUnreadNotificationCount(0);
+        return;
+      }
+
+      setUnreadNotificationCount(count || 0);
+    }
+
+    void loadUnreadNotificationCount();
+
+    const interval = setInterval(() => {
+      void loadUnreadNotificationCount();
+    }, 60000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const heroItems = useMemo(() => {
+    const base = heroListings.length > 0 ? heroListings : fallbackHeroListings;
+    const featuredBase =
+      featuredListings.length > 0 ? featuredListings : fallbackFeaturedListings;
+
+    const combined = [...base, ...featuredBase.slice(0, 3)];
+    const seen = new Set<string>();
+
+    return combined
+      .filter((item) => {
+        const key = String(item.kode || item.slug || item.id || item.titleEn);
+
+        if (seen.has(key)) return false;
+
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 6);
+  }, [heroListings, featuredListings]);
 
   const featuredItems =
     featuredListings.length > 0 ? featuredListings : fallbackFeaturedListings;
@@ -377,22 +435,9 @@ export default function HomeScreen() {
       .map((area) => String(area).split(",")[0].trim())
       .filter(Boolean);
 
-    const uniqueAreas = Array.from(new Set(areas));
+    const merged = Array.from(new Set([...areas, ...fallbackAreaNames]));
 
-    if (uniqueAreas.length > 0) {
-      return uniqueAreas.slice(0, 8);
-    }
-
-    return [
-      "Bali",
-      "Jakarta",
-      "Surabaya",
-      "Bandung",
-      "Seminyak",
-      "Canggu",
-      "Uluwatu",
-      "BSD City",
-    ];
+    return merged.slice(0, 8);
   }, [allProperties]);
 
   const formatPrice = useMemo(() => {
@@ -446,13 +491,17 @@ export default function HomeScreen() {
     );
   };
 
+  const goNotifications = () => {
+    router.push("/dashboard/notifications" as any);
+  };
+
   const openWebsite = (path: string) => {
     Linking.openURL(`https://www.tetamo.com${path}`);
   };
 
   const openScorpioAssist = () => {
-  router.push("/scorpio-assist" as any);
-};
+    router.push("/scorpio-assist" as any);
+  };
 
   const handleHeroScrollEnd = (event: any) => {
     const nextIndex = Math.round(
@@ -486,14 +535,31 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.headerControls}>
-            <Pressable
-              style={styles.locationPill}
-              onPress={() => goSearch({ query: "Indonesia" })}
-            >
-              <MapPin color="#ffffff" size={12} />
-              <Text style={styles.pillText}>Indonesia</Text>
-              <ChevronDown color="#ffffff" size={12} />
-            </Pressable>
+            <View style={styles.locationBellRow}>
+              <Pressable
+                style={styles.locationPill}
+                onPress={() => goSearch({ query: "Indonesia" })}
+              >
+                <MapPin color={SCORPIO_GOLD} size={12} />
+                <Text style={styles.pillText}>Indonesia</Text>
+                <ChevronDown color={SCORPIO_GOLD} size={12} />
+              </Pressable>
+
+              <Pressable
+                style={styles.notificationBellButton}
+                onPress={goNotifications}
+              >
+                <Bell color={SCORPIO_GOLD} size={17} />
+
+                {unreadNotificationCount > 0 ? (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {formatUnreadCount(unreadNotificationCount)}
+                    </Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            </View>
 
             <View style={styles.toggleLine}>
               <View style={styles.toggleRow}>
@@ -543,22 +609,24 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.searchBar}>
-          <Search color="#ffffff" size={20} />
+        <View style={styles.searchGlowWrap}>
+          <View style={styles.searchBar}>
+            <Search color={SCORPIO_GOLD} size={20} />
 
-          <TextInput
-            value={searchInput}
-            onChangeText={setSearchInput}
-            placeholder={t.search}
-            placeholderTextColor="#9f9f9f"
-            style={styles.searchInput}
-            returnKeyType="search"
-            onSubmitEditing={submitSearch}
-          />
+            <TextInput
+              value={searchInput}
+              onChangeText={setSearchInput}
+              placeholder={t.search}
+              placeholderTextColor="#8f8f8f"
+              style={styles.searchInput}
+              returnKeyType="search"
+              onSubmitEditing={submitSearch}
+            />
 
-          <Pressable onPress={() => goSearch()}>
-            <SlidersHorizontal color="#ffffff" size={19} />
-          </Pressable>
+            <Pressable style={styles.filterButton} onPress={() => goSearch()}>
+              <SlidersHorizontal color="#111111" size={19} />
+            </Pressable>
+          </View>
         </View>
 
         <ScrollView
@@ -603,33 +671,43 @@ export default function HomeScreen() {
                 </View>
 
                 <View style={styles.heroBottom}>
-                  <Text style={styles.heroPrice}>
-                    {formatPrice(hero.priceIdr)}
-                  </Text>
+                  <View style={styles.heroPriceLocationRow}>
+                    <View style={styles.heroPriceBox}>
+                      <Text style={styles.heroPrice}>
+                        {formatPrice(hero.priceIdr)}
+                      </Text>
 
-                  {currency === "IDR" && hero.priceIdr > 0 && (
-                    <Text style={styles.heroConverted}>
-                      ≈ USD{" "}
-                      {Math.round(
-                        hero.priceIdr * currencyRates.USD
-                      ).toLocaleString("en-US")}{" "}
-                      · AUD{" "}
-                      {Math.round(
-                        hero.priceIdr * currencyRates.AUD
-                      ).toLocaleString("en-US")}
-                    </Text>
-                  )}
+                      {currency === "IDR" && hero.priceIdr > 0 && (
+                        <Text style={styles.heroConverted}>
+                          ≈ USD{" "}
+                          {Math.round(
+                            hero.priceIdr * currencyRates.USD
+                          ).toLocaleString("en-US")}{" "}
+                          · AUD{" "}
+                          {Math.round(
+                            hero.priceIdr * currencyRates.AUD
+                          ).toLocaleString("en-US")}
+                        </Text>
+                      )}
+
+                      {currency !== "IDR" && hero.priceIdr > 0 && (
+                        <Text style={styles.heroConverted}>
+                          IDR {hero.priceIdr.toLocaleString("en-US")}
+                        </Text>
+                      )}
+                    </View>
+
+                    <View style={styles.heroLocationPill}>
+                      <MapPin color={SCORPIO_GOLD} size={12} />
+                      <Text style={styles.heroLocation} numberOfLines={2}>
+                        {hero.location}
+                      </Text>
+                    </View>
+                  </View>
 
                   <Text style={styles.heroTitle} numberOfLines={2}>
                     {language === "en" ? hero.titleEn : hero.titleId}
                   </Text>
-
-                  <View style={styles.locationRow}>
-                    <MapPin color="#ffffff" size={13} />
-                    <Text style={styles.heroLocation} numberOfLines={1}>
-                      {hero.location}
-                    </Text>
-                  </View>
 
                   <EngagementMetrics
                     listing={hero}
@@ -651,48 +729,32 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        <SectionHeader
-          title={t.find}
-          action={t.seeAll}
-          onPress={() => goSearch()}
-        />
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryRow}
-        >
-          <Category
-            icon={<Palmtree color="#22c55e" size={24} />}
-            label="Villa"
-            onPress={() => goSearch({ category: "Villa" })}
+        <CompactFeaturePanel titlePrefix={t.findPrefix}>
+          <CompactFeatureCard
+            icon={<BadgeCheck color="#111111" size={13} />}
+            title={t.verifiedListings}
           />
-          <Category
-            icon={<House color="#60a5fa" size={24} />}
-            label="House"
-            onPress={() => goSearch({ category: "House" })}
+          <CompactFeatureCard
+            icon={<UserRound color="#111111" size={13} />}
+            title={t.verifiedAgents}
           />
-          <Category
-            icon={<Hotel color="#f59e0b" size={24} />}
-            label="Hotel"
-            onPress={() => goSearch({ category: "Hotel" })}
+          <CompactFeatureCard
+            icon={<House color="#111111" size={13} />}
+            title={t.verifiedOwners}
           />
-          <Category
-            icon={<Store color="#fb7185" size={24} />}
-            label="Ruko"
-            onPress={() => goSearch({ category: "Ruko" })}
+          <CompactFeatureCard
+            icon={<ShieldCheck color="#111111" size={13} />}
+            title={t.trustedPlatform}
           />
-          <Category
-            icon={<Building2 color="#a78bfa" size={24} />}
-            label="Apartment"
-            onPress={() => goSearch({ category: "Apartment" })}
+          <CompactFeatureCard
+            icon={<BrainCircuit color="#111111" size={13} />}
+            title={t.aiPowered}
           />
-          <Category
-            icon={<Trees color="#34d399" size={24} />}
-            label="Land"
-            onPress={() => goSearch({ category: "Land" })}
+          <CompactFeatureCard
+            icon={<MessageCircle color="#111111" size={13} />}
+            title={t.directInquiries}
           />
-        </ScrollView>
+        </CompactFeaturePanel>
 
         <SectionHeader
           title={t.featuredListings}
@@ -718,34 +780,52 @@ export default function HomeScreen() {
           ))}
         </ScrollView>
 
-        <Text style={styles.sectionTitle}>{t.why}</Text>
+        <View style={styles.ctaBanner}>
+          <View style={styles.ctaIconBubble}>
+            <House color="#111111" size={23} />
+          </View>
 
-        <View style={styles.trustGrid}>
-          <TrustCard
-            icon={<BadgeCheck color="#22c55e" size={23} />}
-            title={t.verifiedListings}
-            subtitle={t.verifiedListingsSub}
-          />
-          <TrustCard
-            icon={<UserRound color="#60a5fa" size={23} />}
-            title={t.verifiedAgents}
-            subtitle={t.verifiedAgentsSub}
-          />
-          <TrustCard
-            icon={<UserRound color="#f59e0b" size={23} />}
-            title={t.verifiedOwners}
-            subtitle={t.verifiedOwnersSub}
-          />
-          <TrustCard
-            icon={<ShieldCheck color="#a78bfa" size={23} />}
-            title={t.trustedPlatform}
-            subtitle={t.trustedPlatformSub}
-          />
+          <View style={styles.ctaTextBox}>
+            <Text style={styles.ctaTitle}>{t.listCta}</Text>
+            <Text style={styles.ctaSub}>{t.listCtaSub}</Text>
+          </View>
+
+          <Pressable onPress={() => goAddListing()} style={styles.ctaButton}>
+            <Text style={styles.ctaButtonText}>{t.getStarted}</Text>
+            <ChevronRight color="#111111" size={15} />
+          </Pressable>
         </View>
+
+        <CompactFeaturePanel titlePrefix={t.whyPrefix}>
+          <CompactFeatureCard
+            icon={<MessageCircle color="#111111" size={13} />}
+            title={t.directWhatsApp}
+          />
+          <CompactFeatureCard
+            icon={<CalendarDays color="#111111" size={13} />}
+            title={t.scheduling}
+          />
+          <CompactFeatureCard
+            icon={<Sparkles color="#111111" size={13} />}
+            title={t.aiTitle}
+          />
+          <CompactFeatureCard
+            icon={<Languages color="#111111" size={13} />}
+            title={t.smartBilingual}
+          />
+          <CompactFeatureCard
+            icon={<Calculator color="#111111" size={13} />}
+            title={t.calculator}
+          />
+          <CompactFeatureCard
+            icon={<Share2 color="#111111" size={13} />}
+            title={t.smartExposure}
+          />
+        </CompactFeaturePanel>
 
         <View style={styles.smartBanner}>
           <View style={styles.smartIconBox}>
-            <BrainCircuit color="#e6c15c" size={28} />
+            <BrainCircuit color={SCORPIO_GOLD} size={26} />
           </View>
 
           <View style={styles.smartContent}>
@@ -754,47 +834,30 @@ export default function HomeScreen() {
 
             <View style={styles.smartChipRow}>
               <SmartChip
-                icon={<Languages color="#ffffff" size={11} />}
+                icon={<Languages color={SCORPIO_GOLD} size={11} />}
                 label={t.smartBilingual}
               />
               <SmartChip
-                icon={<Camera color="#ffffff" size={11} />}
+                icon={<Camera color={SCORPIO_GOLD} size={11} />}
                 label={t.smartMedia}
               />
               <SmartChip
-                icon={<Search color="#ffffff" size={11} />}
+                icon={<Search color={SCORPIO_GOLD} size={11} />}
                 label={t.smartSeo}
               />
               <SmartChip
-                icon={<Share2 color="#ffffff" size={11} />}
+                icon={<Share2 color={SCORPIO_GOLD} size={11} />}
                 label={t.smartExposure}
               />
               <SmartChip
-                icon={<Sparkles color="#ffffff" size={11} />}
+                icon={<Sparkles color={SCORPIO_GOLD} size={11} />}
                 label={t.smartAiPowered}
               />
               <SmartChip
-                icon={<Calculator color="#ffffff" size={11} />}
+                icon={<Calculator color={SCORPIO_GOLD} size={11} />}
                 label={t.smartCommission}
               />
             </View>
-          </View>
-        </View>
-
-        <View style={styles.panel}>
-          <SectionHeader title={t.popular} compact />
-
-          <View style={styles.areaWrap}>
-            {popularAreas.map((area) => (
-              <Pressable
-                key={area}
-                style={styles.areaPill}
-                onPress={() => goSearch({ area })}
-              >
-                <MapPin color="#ffffff" size={12} />
-                <Text style={styles.areaText}>{area}</Text>
-              </Pressable>
-            ))}
           </View>
         </View>
 
@@ -824,61 +887,54 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>{t.whyList}</Text>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.benefitRow}
-        >
-          <Benefit
-            icon={<MessageCircle color="#22c55e" size={22} />}
+        <CompactFeaturePanel titlePrefix={t.whyListPrefix}>
+          <CompactFeatureCard
+            icon={<MessageCircle color="#111111" size={13} />}
             title={t.directWhatsApp}
-            subtitle={t.directWhatsAppSub}
           />
-          <Benefit
-            icon={<CalendarDays color="#60a5fa" size={22} />}
+          <CompactFeatureCard
+            icon={<CalendarDays color="#111111" size={13} />}
             title={t.scheduling}
-            subtitle={t.schedulingSub}
           />
-          <Benefit
-            icon={<Sparkles color="#f59e0b" size={22} />}
+          <CompactFeatureCard
+            icon={<Sparkles color="#111111" size={13} />}
             title={t.aiTitle}
-            subtitle={t.aiTitleSub}
           />
-          <Benefit
-            icon={<Languages color="#a78bfa" size={22} />}
+          <CompactFeatureCard
+            icon={<Languages color="#111111" size={13} />}
             title={t.aiCaption}
-            subtitle={t.aiCaptionSub}
           />
-          <Benefit
-            icon={<Calculator color="#fb7185" size={22} />}
+          <CompactFeatureCard
+            icon={<Calculator color="#111111" size={13} />}
             title={t.calculator}
-            subtitle={t.calculatorSub}
           />
-        </ScrollView>
+          <CompactFeatureCard
+            icon={<Share2 color="#111111" size={13} />}
+            title={t.smartExposure}
+          />
+        </CompactFeaturePanel>
 
         <View style={styles.entryGrid}>
           <EntryCard
-            icon={<UserRound color="#ffffff" size={25} />}
+            icon={<UserRound color={SCORPIO_GOLD} size={24} />}
             title={t.owner}
             subtitle={t.ownerSub}
             onPress={() => goAddListing("owner")}
           />
           <EntryCard
-            icon={<BriefcaseBusiness color="#ffffff" size={25} />}
+            icon={<BriefcaseBusiness color={SCORPIO_GOLD} size={24} />}
             title={t.agent}
             subtitle={t.agentSub}
             onPress={() => goAddListing("agent")}
           />
           <EntryCard
-            icon={<Building2 color="#ffffff" size={25} />}
+            icon={<Building2 color={SCORPIO_GOLD} size={24} />}
             title={t.developer}
             subtitle={t.developerSub}
             onPress={() => goAddListing("developer")}
           />
           <EntryCard
-            icon={<House color="#ffffff" size={25} />}
+            icon={<House color={SCORPIO_GOLD} size={24} />}
             title={t.buyRent}
             subtitle={t.buyRentSub}
             onPress={() => goSearch()}
@@ -911,36 +967,52 @@ export default function HomeScreen() {
           />
         </View>
 
-        <View style={styles.ctaBanner}>
-          <View style={styles.ctaTextBox}>
-            <Text style={styles.ctaTitle}>{t.listCta}</Text>
-            <Text style={styles.ctaSub}>{t.listCtaSub}</Text>
-          </View>
+        <View style={styles.popularBottomPanel}>
+          <SectionHeader
+            title={t.popular}
+            action={t.seeAll}
+            onPress={() => goSearch()}
+            compact
+          />
 
-          <Pressable onPress={() => goAddListing()} style={styles.ctaButton}>
-            <Text style={styles.ctaButtonText}>{t.getStarted}</Text>
-            <ChevronRight color="#111111" size={16} />
-          </Pressable>
+          <View style={styles.areaGrid}>
+            {popularAreas.map((area) => (
+              <Pressable
+                key={area}
+                style={styles.areaCard}
+                onPress={() => goSearch({ area })}
+              >
+                <View style={styles.areaIconCircle}>
+                  <MapPin color="#111111" size={12} />
+                </View>
+                <Text style={styles.areaText} numberOfLines={1}>
+                  {area}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
       </ScrollView>
 
-      <Pressable
-  style={styles.scorpioFloatingButton}
-  onPress={openScorpioAssist}
->
-  <View style={styles.scorpioGoldGlow} />
+      <Pressable style={styles.scorpioFloatingButton} onPress={openScorpioAssist}>
+        <View style={styles.scorpioGoldGlow} />
 
-  <View style={styles.scorpioIconCircle}>
-    <Sparkles color="#111111" size={18} />
-  </View>
+        <View style={styles.scorpioIconCircle}>
+          <Sparkles color="#111111" size={18} />
+        </View>
 
-  <View style={styles.scorpioTextBox}>
-    <Text style={styles.scorpioButtonText}>Need Help?</Text>
-    <Text style={styles.scorpioButtonSub}>Scorpio Assist</Text>
-  </View>
-</Pressable>
+        <View style={styles.scorpioTextBox}>
+          <Text style={styles.scorpioButtonText}>Need Help?</Text>
+          <Text style={styles.scorpioButtonSub}>Scorpio Assist</Text>
+        </View>
+      </Pressable>
     </SafeAreaView>
   );
+}
+
+function formatUnreadCount(value: number) {
+  if (value > 99) return "99+";
+  return String(value);
 }
 
 function getPhotoCount(listing: Listing) {
@@ -1142,50 +1214,87 @@ function EngagementMetrics({
   listing,
   photosLabel,
   variant,
+  hidePhotos = false,
+  compact = false,
 }: {
   listing: Listing;
   photosLabel: string;
   variant: "dark" | "light";
+  hidePhotos?: boolean;
+  compact?: boolean;
 }) {
   const isLight = variant === "light";
 
   return (
-    <View style={[styles.engagementRow, isLight && styles.engagementRowLight]}>
+    <View
+      style={[
+        styles.engagementRow,
+        isLight && styles.engagementRowLight,
+        compact && styles.engagementRowCompact,
+      ]}
+    >
       <EngagementMetric
-        icon={<Heart color={isLight ? "#111111" : "#ffffff"} size={11} />}
+        icon={
+          <Heart color={isLight ? "#111111" : "#ffffff"} size={compact ? 10 : 11} />
+        }
         value={formatCompactNumber(listing.likeCount)}
         variant={variant}
+        compact={compact}
       />
 
       <EngagementMetric
-        icon={<Bookmark color={isLight ? "#111111" : "#ffffff"} size={11} />}
+        icon={
+          <Bookmark
+            color={isLight ? "#111111" : "#ffffff"}
+            size={compact ? 10 : 11}
+          />
+        }
         value={formatCompactNumber(listing.saveCount)}
         variant={variant}
+        compact={compact}
       />
 
       <EngagementMetric
-        icon={<Star color="#e6c15c" size={11} />}
+        icon={<Star color={SCORPIO_GOLD} size={compact ? 10 : 11} />}
         value={formatRating(listing)}
         variant={variant}
+        compact={compact}
       />
 
       <EngagementMetric
-        icon={<Share2 color={isLight ? "#111111" : "#ffffff"} size={11} />}
+        icon={
+          <Share2
+            color={isLight ? "#111111" : "#ffffff"}
+            size={compact ? 10 : 11}
+          />
+        }
         value={formatCompactNumber(listing.shareCount)}
         variant={variant}
+        compact={compact}
       />
 
       <EngagementMetric
-        icon={<Eye color={isLight ? "#111111" : "#ffffff"} size={11} />}
+        icon={
+          <Eye color={isLight ? "#111111" : "#ffffff"} size={compact ? 10 : 11} />
+        }
         value={formatCompactNumber(listing.viewCount)}
         variant={variant}
+        compact={compact}
       />
 
-      <EngagementMetric
-        icon={<Camera color={isLight ? "#111111" : "#ffffff"} size={11} />}
-        value={`${getPhotoCount(listing)} ${photosLabel}`}
-        variant={variant}
-      />
+      {!hidePhotos ? (
+        <EngagementMetric
+          icon={
+            <Camera
+              color={isLight ? "#111111" : "#ffffff"}
+              size={compact ? 10 : 11}
+            />
+          }
+          value={`${getPhotoCount(listing)} ${photosLabel}`}
+          variant={variant}
+          compact={compact}
+        />
+      ) : null}
     </View>
   );
 }
@@ -1194,26 +1303,75 @@ function EngagementMetric({
   icon,
   value,
   variant,
+  compact = false,
 }: {
   icon: ReactNode;
   value: string;
   variant: "dark" | "light";
+  compact?: boolean;
 }) {
   const isLight = variant === "light";
 
   return (
     <View
-      style={[styles.engagementMetric, isLight && styles.engagementMetricLight]}
+      style={[
+        styles.engagementMetric,
+        isLight && styles.engagementMetricLight,
+        compact && styles.engagementMetricCompact,
+      ]}
     >
       {icon}
       <Text
         style={[
           styles.engagementMetricText,
           isLight && styles.engagementMetricTextLight,
+          compact && styles.engagementMetricTextCompact,
         ]}
         numberOfLines={1}
       >
         {value}
+      </Text>
+    </View>
+  );
+}
+
+function CompactFeaturePanel({
+  titlePrefix,
+  children,
+}: {
+  titlePrefix: string;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.compactFeaturePanel}>
+      <View style={styles.compactFeatureTitleRow}>
+        <Text style={styles.compactFeatureTitleText}>{titlePrefix} </Text>
+        <Text style={styles.compactFeatureTitleGold}>TETAMO</Text>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.compactFeatureRow}
+      >
+        {children}
+      </ScrollView>
+    </View>
+  );
+}
+
+function CompactFeatureCard({
+  icon,
+  title,
+}: {
+  icon: ReactNode;
+  title: string;
+}) {
+  return (
+    <View style={styles.compactFeatureCard}>
+      <View style={styles.compactFeatureIconCircle}>{icon}</View>
+      <Text style={styles.compactFeatureCardText} numberOfLines={2}>
+        {title}
       </Text>
     </View>
   );
@@ -1239,46 +1397,9 @@ function SectionHeader({
       {action ? (
         <Pressable style={styles.seeAllRow} onPress={onPress}>
           <Text style={styles.seeAllText}>{action}</Text>
-          <ChevronRight color="#e6c15c" size={13} />
+          <ChevronRight color={SCORPIO_GOLD} size={13} />
         </Pressable>
       ) : null}
-    </View>
-  );
-}
-
-function Category({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: ReactNode;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable style={styles.categoryCard} onPress={onPress}>
-      {icon}
-      <Text style={styles.categoryLabel}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function TrustCard({
-  icon,
-  title,
-  subtitle,
-}: {
-  icon: ReactNode;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <View style={styles.trustCard}>
-      <View style={styles.trustIcon}>{icon}</View>
-      <View style={styles.trustTextBox}>
-        <Text style={styles.trustTitle}>{title}</Text>
-        <Text style={styles.trustSubtitle}>{subtitle}</Text>
-      </View>
     </View>
   );
 }
@@ -1315,6 +1436,8 @@ function PropertyCard({
         style={styles.propertyImage}
         imageStyle={styles.propertyImageRadius}
       >
+        <View style={styles.propertyImageShade} />
+
         <View style={styles.propertyBadge}>
           <Text style={styles.propertyBadgeText}>{listing.badge}</Text>
         </View>
@@ -1333,12 +1456,21 @@ function PropertyCard({
           </Text>
         )}
 
+        {currency === "IDR" && listing.priceIdr > 0 && (
+          <Text style={styles.propertySubPrice}>
+            ≈ USD{" "}
+            {Math.round(listing.priceIdr * currencyRates.USD).toLocaleString(
+              "en-US"
+            )}
+          </Text>
+        )}
+
         <Text style={styles.propertyTitle} numberOfLines={1}>
           {language === "en" ? listing.titleEn : listing.titleId}
         </Text>
 
         <View style={styles.propertyLocationRow}>
-          <MapPin color="#5f5f5f" size={11} />
+          <MapPin color={SCORPIO_GOLD} size={11} />
           <Text style={styles.propertyLocation} numberOfLines={1}>
             {listing.location}
           </Text>
@@ -1346,17 +1478,17 @@ function PropertyCard({
 
         <View style={styles.propertyMeta}>
           <View style={styles.metaItem}>
-            <BedDouble color="#111111" size={12} />
+            <BedDouble color={SCORPIO_GOLD} size={12} />
             <Text style={styles.metaText}>{listing.beds || 0}</Text>
           </View>
 
           <View style={styles.metaItem}>
-            <Bath color="#111111" size={12} />
+            <Bath color={SCORPIO_GOLD} size={12} />
             <Text style={styles.metaText}>{listing.baths || 0}</Text>
           </View>
 
           <View style={styles.metaItem}>
-            <Ruler color="#111111" size={12} />
+            <Ruler color={SCORPIO_GOLD} size={12} />
             <Text style={styles.metaText}>{listing.size || 0} m²</Text>
           </View>
         </View>
@@ -1364,28 +1496,12 @@ function PropertyCard({
         <EngagementMetrics
           listing={listing}
           photosLabel={photosLabel}
-          variant="light"
+          variant="dark"
+          hidePhotos
+          compact
         />
       </View>
     </Pressable>
-  );
-}
-
-function Benefit({
-  icon,
-  title,
-  subtitle,
-}: {
-  icon: ReactNode;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <View style={styles.benefitCard}>
-      {icon}
-      <Text style={styles.benefitTitle}>{title}</Text>
-      <Text style={styles.benefitSubtitle}>{subtitle}</Text>
-    </View>
   );
 }
 
@@ -1407,7 +1523,7 @@ function EntryCard({
         <Text style={styles.entryTitle}>{title}</Text>
         <Text style={styles.entrySubtitle}>{subtitle}</Text>
       </View>
-      <ChevronRight color="#ffffff" size={17} />
+      <ChevronRight color={SCORPIO_GOLD} size={17} />
     </Pressable>
   );
 }
@@ -1454,7 +1570,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 18,
     paddingTop: 14,
-    paddingBottom: 34,
+    paddingBottom: 38,
   },
   header: {
     flexDirection: "row",
@@ -1487,22 +1603,57 @@ const styles = StyleSheet.create({
   },
   headerControls: {
     alignItems: "flex-end",
-    gap: 6,
+    gap: 7,
+  },
+  locationBellRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
   },
   locationPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
     borderWidth: 1,
-    borderColor: "#343434",
+    borderColor: "#5f4b17",
+    backgroundColor: "#101010",
     borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
   },
   pillText: {
     color: "#ffffff",
     fontSize: 11,
-    fontWeight: "700",
+    fontWeight: "800",
+  },
+  notificationBellButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: SCORPIO_GOLD,
+    backgroundColor: "#101010",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: -6,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#050505",
+    backgroundColor: SCORPIO_GOLD,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
+    color: "#111111",
+    fontSize: 9,
+    fontWeight: "900",
   },
   toggleLine: {
     flexDirection: "row",
@@ -1515,6 +1666,7 @@ const styles = StyleSheet.create({
     borderColor: "#343434",
     borderRadius: 999,
     overflow: "hidden",
+    backgroundColor: "#090909",
   },
   smallToggle: {
     paddingHorizontal: 8,
@@ -1526,7 +1678,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   activeToggle: {
-    backgroundColor: "#e6c15c",
+    backgroundColor: SCORPIO_GOLD,
   },
   activeToggleText: {
     color: "#111111",
@@ -1537,6 +1689,7 @@ const styles = StyleSheet.create({
     borderColor: "#343434",
     borderRadius: 999,
     overflow: "hidden",
+    backgroundColor: "#090909",
   },
   currencyToggle: {
     paddingHorizontal: 6,
@@ -1547,23 +1700,43 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "800",
   },
+  searchGlowWrap: {
+    borderRadius: 23,
+    marginBottom: 14,
+    shadowColor: SCORPIO_GOLD,
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    elevation: 12,
+  },
   searchBar: {
-    height: 54,
-    borderRadius: 21,
+    height: 56,
+    borderRadius: 23,
     borderWidth: 1,
-    borderColor: "#373737",
-    backgroundColor: "#101010",
+    borderColor: SCORPIO_GOLD,
+    backgroundColor: "#0c0c0c",
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 15,
+    paddingLeft: 16,
+    paddingRight: 7,
     gap: 11,
-    marginBottom: 12,
   },
   searchInput: {
     flex: 1,
     color: "#ffffff",
     fontSize: 14,
     paddingVertical: 0,
+  },
+  filterButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 18,
+    backgroundColor: SCORPIO_GOLD,
+    alignItems: "center",
+    justifyContent: "center",
   },
   heroCarousel: {
     overflow: "visible",
@@ -1572,31 +1745,33 @@ const styles = StyleSheet.create({
     paddingRight: 0,
   },
   heroCard: {
-    height: 350,
-    borderRadius: 25,
+    height: 390,
+    borderRadius: 27,
     overflow: "hidden",
     justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: "#383838",
+    borderColor: "#705d2c",
+    backgroundColor: "#101010",
   },
   heroImage: {
-    borderRadius: 25,
+    borderRadius: 27,
   },
   heroShade: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.24)",
+    backgroundColor: "rgba(0,0,0,0.15)",
   },
   heroTop: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 8,
-    padding: 12,
+    padding: 13,
   },
   badgeRow: {
     flexDirection: "row",
     gap: 5,
     flex: 1,
+    flexWrap: "wrap",
   },
   badge: {
     paddingHorizontal: 8,
@@ -1608,7 +1783,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   counterBadge: {
-    backgroundColor: "rgba(0,0,0,0.72)",
+    backgroundColor: "rgba(0,0,0,0.76)",
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.45)",
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 999,
@@ -1619,85 +1796,63 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   heroBottom: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(230,193,92,0.35)",
+    backgroundColor: "rgba(5,5,5,0.92)",
     padding: 15,
   },
+  heroPriceLocationRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  heroPriceBox: {
+    flex: 1,
+  },
   heroPrice: {
-    color: "#ffffff",
+    color: SCORPIO_GOLD,
     fontSize: 21,
     fontWeight: "900",
     letterSpacing: -0.4,
   },
   heroConverted: {
-    color: "#e4e4e4",
-    fontSize: 11.5,
+    color: "#d8d8d8",
+    fontSize: 11.3,
     marginTop: 2,
     fontWeight: "700",
+  },
+  heroLocationPill: {
+    maxWidth: 122,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.35)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 5,
+  },
+  heroLocation: {
+    color: "#ffffff",
+    fontSize: 10.8,
+    lineHeight: 14,
+    fontWeight: "800",
+    flex: 1,
   },
   heroTitle: {
     color: "#ffffff",
     fontSize: 17,
     lineHeight: 21,
     fontWeight: "900",
-    marginTop: 6,
-  },
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginTop: 6,
-  },
-  heroLocation: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "700",
-    flex: 1,
-  },
-  engagementRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 10,
-  },
-  engagementRowLight: {
-    marginTop: 10,
-    gap: 5,
-  },
-  engagementMetric: {
-    minHeight: 27,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-    backgroundColor: "rgba(0,0,0,0.58)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  engagementMetricLight: {
-    backgroundColor: "#f2f2f2",
-    borderColor: "#e2e2e2",
-    minHeight: 25,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-  },
-  engagementMetricText: {
-    color: "#ffffff",
-    fontSize: 9.5,
-    fontWeight: "900",
-  },
-  engagementMetricTextLight: {
-    color: "#111111",
-    fontSize: 8.6,
+    marginTop: 8,
   },
   dots: {
     flexDirection: "row",
     justifyContent: "center",
     gap: 7,
-    marginTop: 10,
-    marginBottom: 22,
+    marginTop: 11,
+    marginBottom: 21,
   },
   dot: {
     width: 7,
@@ -1706,8 +1861,68 @@ const styles = StyleSheet.create({
     backgroundColor: "#3a3a3a",
   },
   activeDot: {
-    width: 18,
-    backgroundColor: "#e6c15c",
+    width: 20,
+    backgroundColor: SCORPIO_GOLD,
+  },
+  compactFeaturePanel: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#303030",
+    backgroundColor: "#0d0d0d",
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 2,
+    marginBottom: 22,
+  },
+  compactFeatureTitleRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  compactFeatureTitleText: {
+    color: "#ffffff",
+    fontSize: 14.2,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+  },
+  compactFeatureTitleGold: {
+    color: SCORPIO_GOLD,
+    fontSize: 14.2,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+  },
+  compactFeatureRow: {
+    gap: 8,
+    paddingBottom: 12,
+  },
+  compactFeatureCard: {
+    width: 78,
+    minHeight: 68,
+    borderWidth: 1,
+    borderColor: "#5f4b17",
+    borderRadius: 16,
+    backgroundColor: "#171200",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 5,
+    paddingVertical: 7,
+  },
+  compactFeatureIconCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    backgroundColor: SCORPIO_GOLD,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  compactFeatureCardText: {
+    color: "#ffffff",
+    fontSize: 8.8,
+    lineHeight: 11,
+    fontWeight: "900",
+    textAlign: "center",
   },
   sectionHeader: {
     flexDirection: "row",
@@ -1733,69 +1948,214 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   seeAllText: {
-    color: "#e6c15c",
+    color: SCORPIO_GOLD,
     fontSize: 11,
     fontWeight: "900",
   },
-  categoryRow: {
-    gap: 10,
-    paddingBottom: 22,
+  listingRow: {
+    gap: 12,
+    paddingBottom: 20,
   },
-  categoryCard: {
-    width: 98,
-    height: 78,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#383838",
+  propertyCard: {
+    width: 218,
     backgroundColor: "#101010",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  categoryLabel: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  trustGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  trustCard: {
-    width: "48.5%",
-    borderRadius: 18,
+    borderRadius: 21,
+    overflow: "hidden",
     borderWidth: 1,
     borderColor: "#303030",
-    backgroundColor: "#101010",
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 11,
-    gap: 9,
   },
-  trustIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 14,
-    backgroundColor: "#1b1b1b",
+  propertyImage: {
+    height: 124,
+    justifyContent: "space-between",
+    padding: 9,
+    overflow: "hidden",
+  },
+  propertyImageRadius: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  propertyImageShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.08)",
+  },
+  propertyBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: SCORPIO_GOLD,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  propertyBadgeText: {
+    color: "#111111",
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  favoriteBubble: {
+    position: "absolute",
+    right: 9,
+    top: 9,
+    width: 31,
+    height: 31,
+    borderRadius: 13,
+    backgroundColor: "rgba(0,0,0,0.58)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
   },
-  trustTextBox: {
-    flex: 1,
+  propertyBody: {
+    padding: 12,
   },
-  trustTitle: {
-    color: "#ffffff",
-    fontSize: 10.5,
+  propertyPrice: {
+    color: SCORPIO_GOLD,
+    fontSize: 14.5,
     fontWeight: "900",
   },
-  trustSubtitle: {
-    color: "#9e9e9e",
-    fontSize: 9.5,
+  propertySubPrice: {
+    color: "#b2b2b2",
+    fontSize: 10,
     marginTop: 2,
-    lineHeight: 13,
+    fontWeight: "700",
+  },
+  propertyTitle: {
+    color: "#ffffff",
+    fontSize: 12.5,
+    fontWeight: "900",
+    marginTop: 5,
+  },
+  propertyLocationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginTop: 5,
+  },
+  propertyLocation: {
+    color: "#d8d8d8",
+    fontSize: 10.5,
+    flex: 1,
+    fontWeight: "700",
+  },
+  propertyMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 9,
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  metaText: {
+    color: "#ffffff",
+    fontSize: 9.5,
+    fontWeight: "900",
+  },
+  engagementRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 11,
+  },
+  engagementRowLight: {
+    marginTop: 10,
+    gap: 5,
+  },
+  engagementRowCompact: {
+    flexWrap: "nowrap",
+    justifyContent: "space-between",
+    gap: 3,
+    marginTop: 10,
+  },
+  engagementMetric: {
+    minHeight: 27,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.24)",
+    backgroundColor: "rgba(255,255,255,0.055)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  engagementMetricLight: {
+    backgroundColor: "#f2f2f2",
+    borderColor: "#e2e2e2",
+    minHeight: 25,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+  },
+  engagementMetricCompact: {
+    minHeight: 24,
+    paddingHorizontal: 5,
+    paddingVertical: 4,
+    gap: 2,
+    flex: 1,
+  },
+  engagementMetricText: {
+    color: "#ffffff",
+    fontSize: 9.5,
+    fontWeight: "900",
+  },
+  engagementMetricTextLight: {
+    color: "#111111",
+    fontSize: 8.6,
+  },
+  engagementMetricTextCompact: {
+    fontSize: 7.8,
+  },
+  ctaBanner: {
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: SCORPIO_GOLD,
+    backgroundColor: "#12100a",
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 24,
+  },
+  ctaIconBubble: {
+    width: 46,
+    height: 46,
+    borderRadius: 18,
+    backgroundColor: SCORPIO_GOLD,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ctaTextBox: {
+    flex: 1,
+  },
+  ctaTitle: {
+    color: SCORPIO_GOLD,
+    fontSize: 16.5,
+    lineHeight: 21,
+    fontWeight: "900",
+    letterSpacing: -0.25,
+  },
+  ctaSub: {
+    color: "#d6d6d6",
+    fontSize: 11.2,
+    lineHeight: 16,
+    marginTop: 5,
+    fontWeight: "700",
+  },
+  ctaButton: {
+    backgroundColor: SCORPIO_GOLD,
+    borderRadius: 17,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  ctaButtonText: {
+    color: "#111111",
+    fontSize: 12,
+    fontWeight: "900",
   },
   smartBanner: {
     borderRadius: 24,
@@ -1809,9 +2169,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   smartIconBox: {
-    width: 52,
-    height: 52,
-    borderRadius: 19,
+    width: 50,
+    height: 50,
+    borderRadius: 18,
     backgroundColor: "#151106",
     borderWidth: 1,
     borderColor: "#705d2c",
@@ -1857,95 +2217,6 @@ const styles = StyleSheet.create({
     fontSize: 8.7,
     fontWeight: "800",
   },
-  listingRow: {
-    gap: 12,
-    paddingBottom: 20,
-  },
-  propertyCard: {
-    width: 210,
-    backgroundColor: "#ffffff",
-    borderRadius: 20,
-    overflow: "hidden",
-  },
-  propertyImage: {
-    height: 116,
-    justifyContent: "space-between",
-    padding: 9,
-  },
-  propertyImageRadius: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  propertyBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(0,0,0,0.75)",
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  propertyBadgeText: {
-    color: "#ffffff",
-    fontSize: 10,
-    fontWeight: "900",
-  },
-  favoriteBubble: {
-    position: "absolute",
-    right: 9,
-    top: 9,
-    width: 31,
-    height: 31,
-    borderRadius: 13,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  propertyBody: {
-    padding: 12,
-  },
-  propertyPrice: {
-    color: "#111111",
-    fontSize: 13.5,
-    fontWeight: "900",
-  },
-  propertySubPrice: {
-    color: "#777777",
-    fontSize: 10,
-    marginTop: 2,
-    fontWeight: "700",
-  },
-  propertyTitle: {
-    color: "#111111",
-    fontSize: 12.5,
-    fontWeight: "800",
-    marginTop: 4,
-  },
-  propertyLocationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    marginTop: 4,
-  },
-  propertyLocation: {
-    color: "#5d5d5d",
-    fontSize: 10.5,
-    flex: 1,
-  },
-  propertyMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginTop: 9,
-  },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-  },
-  metaText: {
-    color: "#111111",
-    fontSize: 9.5,
-    fontWeight: "800",
-  },
   panel: {
     borderRadius: 22,
     borderWidth: 1,
@@ -1953,26 +2224,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#0f0f0f",
     padding: 12,
     marginBottom: 14,
-  },
-  areaWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 7,
-  },
-  areaPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    borderWidth: 1,
-    borderColor: "#363636",
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 7,
-  },
-  areaText: {
-    color: "#ffffff",
-    fontSize: 11,
-    fontWeight: "800",
   },
   projectRow: {
     flexDirection: "row",
@@ -2005,32 +2256,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: 3,
   },
-  benefitRow: {
-    gap: 10,
-    paddingTop: 12,
-    paddingBottom: 16,
-  },
-  benefitCard: {
-    width: 136,
-    minHeight: 86,
-    borderRadius: 19,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 12,
-    justifyContent: "center",
-  },
-  benefitTitle: {
-    color: "#ffffff",
-    fontSize: 11.5,
-    fontWeight: "900",
-    marginTop: 8,
-  },
-  benefitSubtitle: {
-    color: "#9b9b9b",
-    fontSize: 9.5,
-    marginTop: 2,
-  },
   entryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2052,7 +2277,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 14,
-    backgroundColor: "#1a1a1a",
+    backgroundColor: "#211a0b",
+    borderWidth: 1,
+    borderColor: "#5f4b17",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2094,7 +2321,7 @@ const styles = StyleSheet.create({
   articleTag: {
     alignSelf: "flex-start",
     color: "#111111",
-    backgroundColor: "#ffffff",
+    backgroundColor: SCORPIO_GOLD,
     borderRadius: 999,
     overflow: "hidden",
     paddingHorizontal: 8,
@@ -2115,105 +2342,106 @@ const styles = StyleSheet.create({
     marginTop: 7,
     fontWeight: "700",
   },
-  ctaBanner: {
-    borderRadius: 24,
+  popularBottomPanel: {
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 16,
+    backgroundColor: "#0f0f0f",
+    padding: 11,
+    marginBottom: 24,
+  },
+  areaGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+  areaCard: {
+    width: "23.3%",
+    minHeight: 58,
+    borderWidth: 1,
+    borderColor: SCORPIO_GOLD,
+    borderRadius: 16,
+    backgroundColor: "#171200",
     alignItems: "center",
-    gap: 12,
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    paddingVertical: 7,
   },
-  ctaTextBox: {
-    flex: 1,
+  areaIconCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 999,
+    backgroundColor: SCORPIO_GOLD,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 5,
   },
-  ctaTitle: {
+  areaText: {
     color: "#ffffff",
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 8.7,
+    lineHeight: 11,
     fontWeight: "900",
-    letterSpacing: -0.25,
+    textAlign: "center",
   },
-  ctaSub: {
-    color: "#b2b2b2",
-    fontSize: 11.5,
-    lineHeight: 16,
-    marginTop: 5,
-  },
-  ctaButton: {
-    backgroundColor: "#e6c15c",
-    borderRadius: 17,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+  scorpioFloatingButton: {
+    position: "absolute",
+    right: 16,
+    bottom: 76,
+    zIndex: 99,
+    minHeight: 58,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#fff1a8",
+    backgroundColor: SCORPIO_GOLD,
+    paddingLeft: 10,
+    paddingRight: 17,
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
+    gap: 10,
+    overflow: "hidden",
+    shadowColor: SCORPIO_GOLD,
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+    shadowOpacity: 0.55,
+    shadowRadius: 22,
+    elevation: 18,
   },
-  ctaButtonText: {
+  scorpioGoldGlow: {
+    position: "absolute",
+    top: -26,
+    right: -18,
+    width: 76,
+    height: 76,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.36)",
+  },
+  scorpioIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(17,17,17,0.14)",
+    backgroundColor: "rgba(255,255,255,0.42)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scorpioTextBox: {
+    paddingRight: 2,
+  },
+  scorpioButtonText: {
     color: "#111111",
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: "900",
+    lineHeight: 15,
+    letterSpacing: -0.1,
   },
-    scorpioFloatingButton: {
-  position: "absolute",
-  right: 16,
-  bottom: 76,
-  zIndex: 99,
-  minHeight: 58,
-  borderRadius: 999,
-  borderWidth: 1,
-  borderColor: "#fff1a8",
-  backgroundColor: "#e6c15c",
-  paddingLeft: 10,
-  paddingRight: 17,
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 10,
-  overflow: "hidden",
-  shadowColor: "#e6c15c",
-  shadowOffset: {
-    width: 0,
-    height: 12,
+  scorpioButtonSub: {
+    color: "#3a2a00",
+    fontSize: 10.5,
+    fontWeight: "900",
+    lineHeight: 13,
+    letterSpacing: 0.2,
   },
-  shadowOpacity: 0.55,
-  shadowRadius: 22,
-  elevation: 18,
-},
-scorpioGoldGlow: {
-  position: "absolute",
-  top: -26,
-  right: -18,
-  width: 76,
-  height: 76,
-  borderRadius: 999,
-  backgroundColor: "rgba(255,255,255,0.36)",
-},
-scorpioIconCircle: {
-  width: 40,
-  height: 40,
-  borderRadius: 999,
-  borderWidth: 1,
-  borderColor: "rgba(17,17,17,0.14)",
-  backgroundColor: "rgba(255,255,255,0.42)",
-  alignItems: "center",
-  justifyContent: "center",
-},
-scorpioTextBox: {
-  paddingRight: 2,
-},
-scorpioButtonText: {
-  color: "#111111",
-  fontSize: 12.5,
-  fontWeight: "900",
-  lineHeight: 15,
-  letterSpacing: -0.1,
-},
-scorpioButtonSub: {
-  color: "#3a2a00",
-  fontSize: 10.5,
-  fontWeight: "900",
-  lineHeight: 13,
-  letterSpacing: 0.2,
-},
 });
