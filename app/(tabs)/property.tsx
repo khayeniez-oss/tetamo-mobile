@@ -2,45 +2,50 @@ import { FontAwesome5 } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    Bookmark,
-    Building2,
-    CalendarDays,
-    Camera,
-    ChevronDown,
-    ChevronRight,
-    Eye,
-    Heart,
-    Home,
-    MapPin,
-    MessageCircle,
-    Search,
-    Share2,
-    ShieldCheck,
-    SlidersHorizontal,
-    Star,
-    Store,
-    Tag,
-    UserRound,
+  Bath,
+  BedDouble,
+  Bell,
+  Bookmark,
+  Building2,
+  CalendarDays,
+  Camera,
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  Heart,
+  Home,
+  MapPin,
+  MessageCircle,
+  Ruler,
+  Search,
+  Share2,
+  ShieldCheck,
+  SlidersHorizontal,
+  Star,
+  Store,
+  Tag,
+  UserRound,
 } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
-    Image,
-    ImageBackground,
-    Linking,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Image,
+  ImageBackground,
+  Linking,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
+import { supabase } from "../../lib/supabase";
 import { fetchFeaturedAgents, type TetamoAgent } from "../../services/agents";
 import {
-    fetchHomepageProperties,
-    fetchPropertiesByCodes,
-    type TetamoProperty,
+  fetchHomepageProperties,
+  fetchPropertiesByCodes,
+  type TetamoProperty,
 } from "../../services/properties";
 
 type Language = "en" | "id";
@@ -60,6 +65,8 @@ type AgentSocialItem = {
 };
 
 const tetamoLogo = require("../../assets/images/tetamo-logo.png");
+
+const SCORPIO_GOLD = "#e6c15c";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=1400&auto=format&fit=crop";
@@ -326,6 +333,7 @@ export default function PropertyScreen() {
   const [featuredRent, setFeaturedRent] =
     useState<TetamoProperty>(fallbackFeaturedRent);
   const [featuredAgents, setFeaturedAgents] = useState<TetamoAgent[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   const t = copy[language];
 
@@ -375,6 +383,49 @@ export default function PropertyScreen() {
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadUnreadNotificationCount() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!isMounted) return;
+
+      if (!user?.id) {
+        setUnreadNotificationCount(0);
+        return;
+      }
+
+      const { count, error } = await supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .is("read_at", null);
+
+      if (!isMounted) return;
+
+      if (error) {
+        setUnreadNotificationCount(0);
+        return;
+      }
+
+      setUnreadNotificationCount(count || 0);
+    }
+
+    void loadUnreadNotificationCount();
+
+    const interval = setInterval(() => {
+      void loadUnreadNotificationCount();
+    }, 60000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
     };
   }, []);
 
@@ -442,6 +493,7 @@ export default function PropertyScreen() {
 
   const approxUsd = (priceIdr: number) => {
     if (!priceIdr || priceIdr <= 0) return "";
+
     return `≈ USD ${Math.round(priceIdr * currencyRates.USD).toLocaleString(
       "en-US"
     )}`;
@@ -488,6 +540,10 @@ export default function PropertyScreen() {
     router.push(`/properti/${pathKey}${schedule ? "?schedule=1" : ""}` as any);
   };
 
+  const goNotifications = () => {
+    router.push("/dashboard/notifications" as any);
+  };
+
   const openWhatsapp = (property: TetamoProperty) => {
     const phone =
       normalizeWhatsappPhone(property.contactPhone) || TETAMO_FALLBACK_WHATSAPP;
@@ -513,7 +569,9 @@ Price: ${formatPrice(property.priceIdr, property.rentalType)}
 
 Is this property still available?`;
 
-    void safeOpenUrl(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+    void Linking.openURL(
+      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    );
   };
 
   return (
@@ -532,6 +590,7 @@ Is this property still available?`;
               style={styles.logoImage}
               resizeMode="contain"
             />
+
             <View style={styles.brandTextWrap}>
               <Text style={styles.brandText}>TETAMO</Text>
               <Text style={styles.brandSub}>{t.subtitle}</Text>
@@ -539,14 +598,31 @@ Is this property still available?`;
           </View>
 
           <View style={styles.headerControls}>
-            <Pressable
-              style={styles.locationPill}
-              onPress={() => goSearch({ query: "Indonesia" })}
-            >
-              <MapPin color="#e6c15c" size={12} />
-              <Text style={styles.pillText}>Indonesia</Text>
-              <ChevronDown color="#e6c15c" size={12} />
-            </Pressable>
+            <View style={styles.locationBellRow}>
+              <Pressable
+                style={styles.locationPill}
+                onPress={() => goSearch({ query: "Indonesia" })}
+              >
+                <MapPin color={SCORPIO_GOLD} size={12} />
+                <Text style={styles.pillText}>Indonesia</Text>
+                <ChevronDown color={SCORPIO_GOLD} size={12} />
+              </Pressable>
+
+              <Pressable
+                style={styles.notificationBellButton}
+                onPress={goNotifications}
+              >
+                <Bell color={SCORPIO_GOLD} size={17} />
+
+                {unreadNotificationCount > 0 ? (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {formatUnreadCount(unreadNotificationCount)}
+                    </Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            </View>
 
             <View style={styles.toggleLine}>
               <View style={styles.toggleGroup}>
@@ -596,28 +672,30 @@ Is this property still available?`;
           </View>
         </View>
 
-        <View style={styles.searchBar}>
-          <Search color="#ffffff" size={22} />
+        <View style={styles.searchGlowWrap}>
+          <View style={styles.searchBar}>
+            <Search color={SCORPIO_GOLD} size={20} />
 
-          <TextInput
-            value={searchInput}
-            onChangeText={setSearchInput}
-            placeholder={t.search}
-            placeholderTextColor="#9b9b9b"
-            style={styles.searchInput}
-            returnKeyType="search"
-            onSubmitEditing={submitSearch}
-          />
+            <TextInput
+              value={searchInput}
+              onChangeText={setSearchInput}
+              placeholder={t.search}
+              placeholderTextColor="#8f8f8f"
+              style={styles.searchInput}
+              returnKeyType="search"
+              onSubmitEditing={submitSearch}
+            />
 
-          <Pressable onPress={() => goSearch()}>
-            <SlidersHorizontal color="#ffffff" size={21} />
-          </Pressable>
+            <Pressable style={styles.filterButton} onPress={() => goSearch()}>
+              <SlidersHorizontal color="#111111" size={19} />
+            </Pressable>
+          </View>
         </View>
 
         {(viewMode === "all" || viewMode === "sale") && (
           <>
             <SectionTitle
-              icon={<Tag color="#e6c15c" size={20} />}
+              icon={<Tag color={SCORPIO_GOLD} size={19} />}
               title={t.sale}
               action={t.seeAll}
               onPress={() => goSeeAll("sale")}
@@ -644,7 +722,7 @@ Is this property still available?`;
               ))}
             </ScrollView>
 
-            <FeaturedBanner
+            <FeaturedPropertyShowcase
               property={featuredSale}
               label={t.featuredProperty}
               buttonText={t.viewDetails}
@@ -653,7 +731,6 @@ Is this property still available?`;
               language={language}
               formatPrice={formatPrice}
               approxUsd={approxUsd}
-              accent="#e6c15c"
               onWhatsapp={() => openWhatsapp(featuredSale)}
               onSchedule={() => goDetails(featuredSale, true)}
               onViewDetails={() => goDetails(featuredSale)}
@@ -664,7 +741,7 @@ Is this property still available?`;
         {(viewMode === "all" || viewMode === "rent") && (
           <>
             <SectionTitle
-              icon={<Home color="#e6c15c" size={20} />}
+              icon={<Home color={SCORPIO_GOLD} size={19} />}
               title={t.rent}
               action={t.seeAll}
               onPress={() => goSeeAll("rent")}
@@ -691,7 +768,7 @@ Is this property still available?`;
               ))}
             </ScrollView>
 
-            <FeaturedBanner
+            <FeaturedPropertyShowcase
               property={featuredRent}
               label={t.featuredRental}
               buttonText={t.viewDetails}
@@ -700,7 +777,6 @@ Is this property still available?`;
               language={language}
               formatPrice={formatPrice}
               approxUsd={approxUsd}
-              accent="#7c3aed"
               onWhatsapp={() => openWhatsapp(featuredRent)}
               onSchedule={() => goDetails(featuredRent, true)}
               onViewDetails={() => goDetails(featuredRent)}
@@ -708,76 +784,11 @@ Is this property still available?`;
           </>
         )}
 
-        <SectionTitle
-          icon={<MapPin color="#ffffff" size={20} />}
-          title={t.popularAreas}
-          action=""
-        />
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.areaCarousel}
-        >
-          {dynamicPopularAreas.map((area) => (
-            <Pressable
-              key={area.name}
-              style={styles.areaCard}
-              onPress={() => goSearch({ area: area.name })}
-            >
-              <Image source={{ uri: area.image }} style={styles.areaImage} />
-              <View>
-                <Text style={styles.areaName}>{area.name}</Text>
-                <Text style={styles.areaListings}>{area.listings}</Text>
-              </View>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        <SectionTitle
-          icon={<Building2 color="#ffffff" size={20} />}
-          title={t.newProjects}
-          action=""
-        />
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.projectCarousel}
-        >
-          {newProjects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              language={language}
-              formatPrice={formatPrice}
-              fromText={t.from}
-              onPress={() => goSearch({ query: project.location })}
-            />
-          ))}
-        </ScrollView>
-
-        <SectionTitle
-          icon={<UserRound color="#ffffff" size={20} />}
-          title={t.featuredAgents}
-          action=""
-        />
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.agentCarousel}
-        >
-          {featuredAgents.map((agent) => (
-            <AgentCard
-              key={agent.id}
-              agent={agent}
-              verifiedText={t.verifiedAgent}
-            />
-          ))}
-        </ScrollView>
-
         <View style={styles.ctaBanner}>
+          <View style={styles.ctaIconCircle}>
+            <Home color="#111111" size={22} />
+          </View>
+
           <View style={styles.ctaContent}>
             <Text style={styles.ctaTitle} numberOfLines={1}>
               {t.listTitle}
@@ -805,9 +816,89 @@ Is this property still available?`;
             <ChevronRight color="#111111" size={14} />
           </Pressable>
         </View>
+
+        <View style={styles.popularPanel}>
+          <SectionTitle
+            icon={<MapPin color={SCORPIO_GOLD} size={19} />}
+            title={t.popularAreas}
+            action=""
+          />
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.areaCarousel}
+          >
+            {dynamicPopularAreas.map((area) => (
+              <Pressable
+                key={area.name}
+                style={styles.areaCard}
+                onPress={() => goSearch({ area: area.name })}
+              >
+                <Image source={{ uri: area.image }} style={styles.areaImage} />
+                <View style={styles.areaTextBox}>
+                  <Text style={styles.areaName} numberOfLines={1}>
+                    {area.name}
+                  </Text>
+                  <Text style={styles.areaListings} numberOfLines={1}>
+                    {area.listings}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+
+        <SectionTitle
+          icon={<UserRound color={SCORPIO_GOLD} size={19} />}
+          title={t.featuredAgents}
+          action=""
+        />
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.agentCarousel}
+        >
+          {featuredAgents.map((agent) => (
+            <AgentCard
+              key={agent.id}
+              agent={agent}
+              verifiedText={t.verifiedAgent}
+            />
+          ))}
+        </ScrollView>
+
+        <SectionTitle
+          icon={<Building2 color={SCORPIO_GOLD} size={19} />}
+          title={t.newProjects}
+          action=""
+        />
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.projectCarousel}
+        >
+          {newProjects.map((project) => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              language={language}
+              formatPrice={formatPrice}
+              fromText={t.from}
+              onPress={() => goSearch({ query: project.location })}
+            />
+          ))}
+        </ScrollView>
       </ScrollView>
     </SafeAreaView>
   );
+}
+
+function formatUnreadCount(value: number) {
+  if (value > 99) return "99+";
+  return String(value);
 }
 
 function normalizeValue(value?: string | null) {
@@ -1020,7 +1111,7 @@ function SectionTitle({
       {!!action && (
         <Pressable style={styles.seeAllButton} onPress={onPress}>
           <Text style={styles.seeAllText}>{action}</Text>
-          <ChevronRight color="#e6c15c" size={15} />
+          <ChevronRight color={SCORPIO_GOLD} size={14} />
         </Pressable>
       )}
     </View>
@@ -1041,7 +1132,7 @@ function EngagementMetrics({ property }: { property: TetamoProperty }) {
       />
 
       <RealMetric
-        icon={<Star color="#e6c15c" size={9} />}
+        icon={<Star color={SCORPIO_GOLD} size={9} />}
         value={formatRating(property)}
         wide
       />
@@ -1060,6 +1151,62 @@ function EngagementMetrics({ property }: { property: TetamoProperty }) {
         icon={<Camera color="#ffffff" size={9} />}
         value={formatCompactNumber(getPhotoCount(property))}
       />
+    </View>
+  );
+}
+
+function FeaturedEngagementMetrics({ property }: { property: TetamoProperty }) {
+  return (
+    <View style={styles.featuredMetricColumn}>
+      <FeaturedMetric
+        icon={<Heart color={SCORPIO_GOLD} size={10} />}
+        value={formatCompactNumber(property.likeCount)}
+      />
+
+      <FeaturedMetric
+        icon={<Bookmark color={SCORPIO_GOLD} size={10} />}
+        value={formatCompactNumber(property.saveCount)}
+      />
+
+      <FeaturedMetric
+        icon={<Star color={SCORPIO_GOLD} size={10} />}
+        value={formatRating(property)}
+        wide
+      />
+
+      <FeaturedMetric
+        icon={<Share2 color={SCORPIO_GOLD} size={10} />}
+        value={formatCompactNumber(property.shareCount)}
+      />
+
+      <FeaturedMetric
+        icon={<Eye color={SCORPIO_GOLD} size={10} />}
+        value={formatCompactNumber(property.viewCount)}
+      />
+
+      <FeaturedMetric
+        icon={<Camera color={SCORPIO_GOLD} size={10} />}
+        value={formatCompactNumber(getPhotoCount(property))}
+      />
+    </View>
+  );
+}
+
+function FeaturedMetric({
+  icon,
+  value,
+  wide = false,
+}: {
+  icon: ReactNode;
+  value: string;
+  wide?: boolean;
+}) {
+  return (
+    <View style={[styles.featuredMetricPill, wide && styles.featuredMetricPillWide]}>
+      {icon}
+      <Text style={styles.featuredMetricText} numberOfLines={1}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -1090,81 +1237,108 @@ function MarketPropertyCard({
 
   return (
     <Pressable style={styles.marketCard} onPress={onDetails}>
-      <ImageBackground
-        source={{ uri: property.image || FALLBACK_IMAGE }}
-        resizeMode="cover"
-        style={styles.marketImage}
-        imageStyle={styles.marketImageRadius}
-      >
-        <View style={styles.marketImageShade} />
+      <View style={styles.marketImageWrap}>
+        <Image
+          source={{ uri: property.image || FALLBACK_IMAGE }}
+          style={styles.marketImage}
+        />
 
-        <View style={styles.marketTopRow}>
-          <View style={styles.badgeRow}>
-            {getBadgesForProperty(property).map((badge) => (
-              <StatusBadge
-                key={badge.key}
-                label={badge.label}
-                bg={badge.bg}
-                color={badge.color}
-              />
-            ))}
-          </View>
+        <View style={styles.marketBadgeRow}>
+          {getBadgesForProperty(property).map((badge) => (
+            <StatusBadge
+              key={badge.key}
+              label={badge.label}
+              bg={badge.bg}
+              color={badge.color}
+            />
+          ))}
         </View>
 
-        <View style={styles.marketOverlay}>
-          <Text style={styles.marketPrice} numberOfLines={1}>
-            {formatPrice(property.priceIdr, property.rentalType)}
+        <Pressable
+          style={styles.marketHeartButton}
+          onPress={(event: any) => event.stopPropagation?.()}
+        >
+          <Heart color="#ffffff" size={16} />
+        </Pressable>
+      </View>
+
+      <View style={styles.marketBody}>
+        <Text style={styles.marketPrice} numberOfLines={1}>
+          {formatPrice(property.priceIdr, property.rentalType)}
+        </Text>
+
+        {!!usdText && (
+          <Text style={styles.marketUsd} numberOfLines={1}>
+            {usdText}
           </Text>
+        )}
 
-          {!!usdText && (
-            <Text style={styles.marketUsd} numberOfLines={1}>
-              {usdText}
-            </Text>
-          )}
+        <Text style={styles.marketTitle} numberOfLines={1}>
+          {title}
+        </Text>
 
-          <Text style={styles.marketTitle} numberOfLines={1}>
-            {title}
+        <View style={styles.inlineLocation}>
+          <MapPin color={SCORPIO_GOLD} size={10} />
+          <Text style={styles.inlineLocationText} numberOfLines={1}>
+            {property.location}
           </Text>
-
-          <View style={styles.inlineLocation}>
-            <MapPin color="#ffffff" size={10} />
-            <Text style={styles.inlineLocationText} numberOfLines={1}>
-              {property.location}
-            </Text>
-          </View>
-
-          <EngagementMetrics property={property} />
-
-          <View style={styles.marketActionRow}>
-            <Pressable
-              style={styles.marketActionPill}
-              onPress={(event: any) => {
-                event.stopPropagation?.();
-                onWhatsapp();
-              }}
-            >
-              <MessageCircle color="#25D366" size={12} />
-              <Text style={styles.marketActionText}>{whatsappLabel}</Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.marketActionPill}
-              onPress={(event: any) => {
-                event.stopPropagation?.();
-                onSchedule();
-              }}
-            >
-              <CalendarDays color="#e6c15c" size={12} />
-              <Text style={styles.marketActionText}>{scheduleLabel}</Text>
-            </Pressable>
-          </View>
         </View>
-      </ImageBackground>
+
+        <View style={styles.marketMetaRow}>
+          <MarketMeta
+            icon={<BedDouble color={SCORPIO_GOLD} size={10} />}
+            value={property.beds || 0}
+          />
+          <MarketMeta
+            icon={<Bath color={SCORPIO_GOLD} size={10} />}
+            value={property.baths || 0}
+          />
+          <MarketMeta
+            icon={<Ruler color={SCORPIO_GOLD} size={10} />}
+            value={`${property.size || 0} m²`}
+          />
+        </View>
+
+        <EngagementMetrics property={property} />
+
+        <View style={styles.marketActionRow}>
+          <Pressable
+            style={styles.marketActionPill}
+            onPress={(event: any) => {
+              event.stopPropagation?.();
+              onWhatsapp();
+            }}
+          >
+            <MessageCircle color="#25D366" size={12} />
+            <Text style={styles.marketActionText}>{whatsappLabel}</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.marketActionPill}
+            onPress={(event: any) => {
+              event.stopPropagation?.();
+              onSchedule();
+            }}
+          >
+            <CalendarDays color={SCORPIO_GOLD} size={12} />
+            <Text style={styles.marketActionText}>{scheduleLabel}</Text>
+          </Pressable>
+        </View>
+      </View>
     </Pressable>
   );
 }
 
-function FeaturedBanner({
+function MarketMeta({ icon, value }: { icon: ReactNode; value: string | number }) {
+  return (
+    <View style={styles.marketMetaItem}>
+      {icon}
+      <Text style={styles.marketMetaText}>{value}</Text>
+    </View>
+  );
+}
+
+function FeaturedPropertyShowcase({
   property,
   label,
   buttonText,
@@ -1173,7 +1347,6 @@ function FeaturedBanner({
   language,
   formatPrice,
   approxUsd,
-  accent,
   onWhatsapp,
   onSchedule,
   onViewDetails,
@@ -1186,7 +1359,6 @@ function FeaturedBanner({
   language: Language;
   formatPrice: (priceIdr: number, rentalType?: string | null) => string;
   approxUsd: (priceIdr: number) => string;
-  accent: string;
   onWhatsapp: () => void;
   onSchedule: () => void;
   onViewDetails: () => void;
@@ -1195,88 +1367,118 @@ function FeaturedBanner({
   const usdText = approxUsd(property.priceIdr);
 
   return (
-    <View style={styles.featuredBanner}>
-      <Pressable style={styles.featuredImageWrap} onPress={onViewDetails}>
+    <Pressable style={styles.featuredShowcase} onPress={onViewDetails}>
+      <View style={styles.featuredImageWrap}>
         <ImageBackground
           source={{ uri: property.image || FALLBACK_IMAGE }}
           resizeMode="cover"
           style={styles.featuredImage}
           imageStyle={styles.featuredImageRadius}
         >
-          <View style={styles.featuredShade} />
+          <View style={styles.featuredImageShade} />
 
-          <View style={[styles.featuredRibbon, { backgroundColor: accent }]}>
-            <Star color={accent === "#e6c15c" ? "#111111" : "#ffffff"} size={11} />
-            <Text
-              style={[
-                styles.featuredRibbonText,
-                { color: accent === "#e6c15c" ? "#111111" : "#ffffff" },
-              ]}
-            >
-              Featured
-            </Text>
+          <View style={styles.featuredTopBadge}>
+            <Star color="#111111" size={11} />
+            <Text style={styles.featuredTopBadgeText}>Featured</Text>
           </View>
         </ImageBackground>
-      </Pressable>
-
-      <View style={styles.featuredTextBox}>
-        <Text style={[styles.featuredLabel, { color: accent }]} numberOfLines={1}>
-          {label}
-        </Text>
-
-        <Text style={styles.featuredTitle} numberOfLines={2}>
-          {title}
-        </Text>
-
-        <Text style={styles.featuredPrice} numberOfLines={1}>
-          {formatPrice(property.priceIdr, property.rentalType)}
-        </Text>
-
-        {!!usdText && (
-          <Text style={styles.featuredUsd} numberOfLines={1}>
-            {usdText}
-          </Text>
-        )}
-
-        <View style={styles.inlineLocation}>
-          <MapPin color="#ffffff" size={10} />
-          <Text style={styles.inlineLocationText} numberOfLines={1}>
-            {property.location}
-          </Text>
-        </View>
-
-        <EngagementMetrics property={property} />
-
-        <View style={styles.featuredButtonRow}>
-          <Pressable style={styles.featuredGhostButton} onPress={onWhatsapp}>
-            <MessageCircle color="#25D366" size={11} />
-            <Text style={styles.featuredGhostButtonText}>{whatsappLabel}</Text>
-          </Pressable>
-
-          <Pressable style={styles.featuredGhostButton} onPress={onSchedule}>
-            <CalendarDays color="#e6c15c" size={11} />
-            <Text style={styles.featuredGhostButtonText}>{scheduleLabel}</Text>
-          </Pressable>
-        </View>
-
-        <Pressable
-          style={[styles.viewButton, { backgroundColor: accent }]}
-          onPress={onViewDetails}
-        >
-          <Text
-            style={[
-              styles.viewButtonText,
-              { color: accent === "#e6c15c" ? "#111111" : "#ffffff" },
-            ]}
-          >
-            {buttonText}
-          </Text>
-          <ChevronRight
-            color={accent === "#e6c15c" ? "#111111" : "#ffffff"}
-            size={14}
-          />
-        </Pressable>
       </View>
+
+      <View style={styles.featuredInfoPanel}>
+        <View style={styles.featuredMainContent}>
+          <View style={styles.featuredLeftContent}>
+            <View style={styles.featuredHeaderRow}>
+              <View style={styles.featuredHeaderLeft}>
+                <Text style={styles.featuredSectionLabel} numberOfLines={1}>
+                  {label}
+                </Text>
+
+                <Text style={styles.featuredPrice} numberOfLines={1}>
+                  {formatPrice(property.priceIdr, property.rentalType)}
+                </Text>
+
+                {!!usdText && (
+                  <Text style={styles.featuredUsd} numberOfLines={1}>
+                    {usdText}
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.featuredLocationBox}>
+                <MapPin color={SCORPIO_GOLD} size={11} />
+                <Text style={styles.featuredLocationText} numberOfLines={2}>
+                  {property.location}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.featuredTitle} numberOfLines={2}>
+              {title}
+            </Text>
+
+            <View style={styles.featuredMetaRow}>
+              <FeaturedMeta
+                icon={<BedDouble color={SCORPIO_GOLD} size={12} />}
+                value={property.beds || 0}
+              />
+              <FeaturedMeta
+                icon={<Bath color={SCORPIO_GOLD} size={12} />}
+                value={property.baths || 0}
+              />
+              <FeaturedMeta
+                icon={<Ruler color={SCORPIO_GOLD} size={12} />}
+                value={`${property.size || 0} m²`}
+              />
+            </View>
+
+            <View style={styles.featuredActionRow}>
+              <Pressable
+                style={styles.featuredActionButton}
+                onPress={(event: any) => {
+                  event.stopPropagation?.();
+                  onWhatsapp();
+                }}
+              >
+                <MessageCircle color="#25D366" size={12} />
+                <Text style={styles.featuredActionText}>{whatsappLabel}</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.featuredActionButton}
+                onPress={(event: any) => {
+                  event.stopPropagation?.();
+                  onSchedule();
+                }}
+              >
+                <CalendarDays color={SCORPIO_GOLD} size={12} />
+                <Text style={styles.featuredActionText}>{scheduleLabel}</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.featuredActionButtonGold}
+                onPress={(event: any) => {
+                  event.stopPropagation?.();
+                  onViewDetails();
+                }}
+              >
+                <Text style={styles.featuredActionTextDark}>{buttonText}</Text>
+                <ChevronRight color="#111111" size={13} />
+              </Pressable>
+            </View>
+          </View>
+
+          <FeaturedEngagementMetrics property={property} />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function FeaturedMeta({ icon, value }: { icon: ReactNode; value: string | number }) {
+  return (
+    <View style={styles.featuredMetaItem}>
+      {icon}
+      <Text style={styles.featuredMetaText}>{value}</Text>
     </View>
   );
 }
@@ -1383,7 +1585,7 @@ function AgentCard({
         </Text>
 
         <View style={styles.agentRoleRow}>
-          <ShieldCheck color="#e6c15c" size={11} />
+          <ShieldCheck color={SCORPIO_GOLD} size={11} />
           <Text style={styles.agentRole} numberOfLines={1}>
             {agent.agency || verifiedText}
           </Text>
@@ -1408,7 +1610,7 @@ function AgentCard({
         ) : (
           <View style={styles.agentSocialRow}>
             <View style={styles.agentSocialPill}>
-              <ShieldCheck color="#e6c15c" size={13} />
+              <ShieldCheck color={SCORPIO_GOLD} size={13} />
             </View>
             <Text style={styles.agentSocialFallback}>{verifiedText}</Text>
           </View>
@@ -1448,23 +1650,48 @@ function getBadgesForProperty(property: TetamoProperty) {
   const rentalType = normalizeValue(property.rentalType);
 
   if (isSaleProperty(property)) {
-    badges.push({ key: "sale", label: "Dijual", bg: "#2f7d32", color: "#ffffff" });
+    badges.push({
+      key: "sale",
+      label: "Dijual",
+      bg: "#2f7d32",
+      color: "#ffffff",
+    });
   }
 
   if (isRentProperty(property)) {
-    badges.push({ key: "rent", label: "Disewa", bg: "#7c3aed", color: "#ffffff" });
+    badges.push({
+      key: "rent",
+      label: "Disewa",
+      bg: "#7c3aed",
+      color: "#ffffff",
+    });
   }
 
   if (rentalType.includes("monthly") || rentalType.includes("bulanan")) {
-    badges.push({ key: "monthly", label: "Bulanan", bg: "#e6c15c", color: "#111111" });
+    badges.push({
+      key: "monthly",
+      label: "Bulanan",
+      bg: SCORPIO_GOLD,
+      color: "#111111",
+    });
   }
 
   if (rentalType.includes("yearly") || rentalType.includes("tahunan")) {
-    badges.push({ key: "yearly", label: "Tahunan", bg: "#e6c15c", color: "#111111" });
+    badges.push({
+      key: "yearly",
+      label: "Tahunan",
+      bg: SCORPIO_GOLD,
+      color: "#111111",
+    });
   }
 
   if (rentalType.includes("daily") || rentalType.includes("harian")) {
-    badges.push({ key: "daily", label: "Harian", bg: "#e6c15c", color: "#111111" });
+    badges.push({
+      key: "daily",
+      label: "Harian",
+      bg: SCORPIO_GOLD,
+      color: "#111111",
+    });
   }
 
   if (property.badge && property.badge !== "Verified" && badges.length < 2) {
@@ -1477,7 +1704,12 @@ function getBadgesForProperty(property: TetamoProperty) {
   }
 
   if (badges.length === 0) {
-    badges.push({ key: "verified", label: "Verified", bg: "#111111", color: "#ffffff" });
+    badges.push({
+      key: "verified",
+      label: "Verified",
+      bg: "#111111",
+      color: "#ffffff",
+    });
   }
 
   return badges.slice(0, 3);
@@ -1514,22 +1746,27 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   logoImage: {
-    width: 42,
-    height: 42,
+    width: 38,
+    height: 38,
   },
   brandText: {
     color: "#ffffff",
-    fontSize: 22,
+    fontSize: 20,
     letterSpacing: 4,
     fontWeight: "800",
   },
   brandSub: {
     color: "#b9b9b9",
-    fontSize: 11,
+    fontSize: 10.5,
     marginTop: 1,
   },
   headerControls: {
     alignItems: "flex-end",
+    gap: 7,
+  },
+  locationBellRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 7,
   },
   locationPill: {
@@ -1537,15 +1774,45 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     borderWidth: 1,
-    borderColor: "#5b4a24",
+    borderColor: "#5f4b17",
+    backgroundColor: "#101010",
     borderRadius: 999,
-    paddingHorizontal: 11,
+    paddingHorizontal: 10,
     paddingVertical: 7,
   },
   pillText: {
     color: "#ffffff",
     fontSize: 11,
     fontWeight: "800",
+  },
+  notificationBellButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: SCORPIO_GOLD,
+    backgroundColor: "#101010",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: -6,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#050505",
+    backgroundColor: SCORPIO_GOLD,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
+    color: "#111111",
+    fontSize: 9,
+    fontWeight: "900",
   },
   toggleLine: {
     flexDirection: "row",
@@ -1555,51 +1822,72 @@ const styles = StyleSheet.create({
   toggleGroup: {
     flexDirection: "row",
     borderWidth: 1,
-    borderColor: "#5b4a24",
+    borderColor: "#343434",
     borderRadius: 999,
     overflow: "hidden",
+    backgroundColor: "#090909",
   },
   toggleItem: {
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-  },
-  currencyItem: {
     paddingHorizontal: 8,
     paddingVertical: 5,
   },
+  currencyItem: {
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+  },
   toggleItemActive: {
-    backgroundColor: "#e6c15c",
+    backgroundColor: SCORPIO_GOLD,
   },
   toggleText: {
-    color: "#e6c15c",
+    color: "#9c9c9c",
     fontSize: 10,
     fontWeight: "900",
   },
   currencyText: {
-    color: "#e6c15c",
-    fontSize: 9.5,
+    color: "#9c9c9c",
+    fontSize: 9,
     fontWeight: "900",
   },
   toggleTextActive: {
     color: "#111111",
   },
+  searchGlowWrap: {
+    borderRadius: 23,
+    marginBottom: 18,
+    shadowColor: SCORPIO_GOLD,
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    elevation: 12,
+  },
   searchBar: {
     height: 56,
-    borderRadius: 19,
+    borderRadius: 23,
     borderWidth: 1,
-    borderColor: "#2c2c2c",
-    backgroundColor: "#111111",
+    borderColor: SCORPIO_GOLD,
+    backgroundColor: "#0c0c0c",
     flexDirection: "row",
     alignItems: "center",
+    paddingLeft: 16,
+    paddingRight: 7,
     gap: 11,
-    paddingHorizontal: 15,
-    marginBottom: 18,
   },
   searchInput: {
     flex: 1,
     color: "#ffffff",
     fontSize: 13,
     paddingVertical: 0,
+  },
+  filterButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 18,
+    backgroundColor: SCORPIO_GOLD,
+    alignItems: "center",
+    justifyContent: "center",
   },
   sectionHeader: {
     flexDirection: "row",
@@ -1615,7 +1903,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: "#ffffff",
-    fontSize: 21,
+    fontSize: 17,
     fontWeight: "900",
     letterSpacing: -0.3,
   },
@@ -1625,7 +1913,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   seeAllText: {
-    color: "#e6c15c",
+    color: SCORPIO_GOLD,
     fontSize: 11.5,
     fontWeight: "900",
   },
@@ -1634,310 +1922,468 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   marketCard: {
-    width: 270,
-    height: 285,
-    borderRadius: 18,
+    width: 178,
+    borderRadius: 17,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#303030",
     backgroundColor: "#101010",
   },
+  marketImageWrap: {
+    height: 118,
+    position: "relative",
+    backgroundColor: "#111111",
+  },
   marketImage: {
-    flex: 1,
-    padding: 10,
-    justifyContent: "space-between",
+    width: "100%",
+    height: "100%",
   },
-  marketImageRadius: {
-    borderRadius: 18,
-  },
-  marketImageShade: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.02)",
-  },
-  marketTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  badgeRow: {
+  marketBadgeRow: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    right: 40,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 5,
-    flex: 1,
-    paddingRight: 6,
+    gap: 4,
+  },
+  marketHeartButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.62)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  marketBody: {
+    padding: 9,
   },
   statusBadge: {
     alignSelf: "flex-start",
     borderRadius: 999,
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 4,
   },
   statusBadgeText: {
-    fontSize: 9.3,
+    fontSize: 8.4,
     fontWeight: "900",
   },
-  marketOverlay: {
-    borderRadius: 14,
-    backgroundColor: "rgba(0,0,0,0.66)",
-    paddingHorizontal: 9,
-    paddingVertical: 8,
-  },
   marketPrice: {
-    color: "#ffffff",
+    color: SCORPIO_GOLD,
     fontSize: 12.8,
     fontWeight: "900",
   },
   marketUsd: {
     color: "#d0d0d0",
-    fontSize: 8.8,
+    fontSize: 8.5,
     fontWeight: "700",
     marginTop: 1,
   },
   marketTitle: {
     color: "#ffffff",
-    fontSize: 10.7,
-    fontWeight: "800",
-    marginTop: 3,
+    fontSize: 10.2,
+    fontWeight: "900",
+    marginTop: 4,
   },
   inlineLocation: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginTop: 3,
+    marginTop: 4,
   },
   inlineLocationText: {
     color: "#ffffff",
-    fontSize: 9.2,
+    fontSize: 8.8,
     flex: 1,
     fontWeight: "700",
+  },
+  marketMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
+  },
+  marketMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  marketMetaText: {
+    color: "#ffffff",
+    fontSize: 8.4,
+    fontWeight: "900",
   },
   engagementRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    marginTop: 6,
+    gap: 3,
+    marginTop: 7,
   },
   realMetricPill: {
-    minWidth: 31,
-    height: 23,
+    minWidth: 24,
+    height: 22,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
+    borderColor: "rgba(230,193,92,0.24)",
     backgroundColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 5,
+    paddingHorizontal: 4,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 3,
+    gap: 2,
   },
   realMetricPillWide: {
-    minWidth: 46,
+    minWidth: 36,
   },
   realMetricText: {
     color: "#ffffff",
-    fontSize: 7.4,
+    fontSize: 6.8,
     fontWeight: "900",
   },
   marketActionRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginTop: 6,
+    gap: 5,
+    marginTop: 7,
   },
   marketActionPill: {
     flex: 1,
-    minHeight: 26,
+    minHeight: 25,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(230,193,92,0.24)",
     backgroundColor: "rgba(255,255,255,0.08)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: 3,
     paddingHorizontal: 5,
   },
   marketActionText: {
     color: "#ffffff",
-    fontSize: 8.8,
+    fontSize: 7.8,
     fontWeight: "800",
   },
-  featuredBanner: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#3a3a3a",
-    backgroundColor: "#101010",
+  featuredShowcase: {
+    borderRadius: 24,
     overflow: "hidden",
-    flexDirection: "row",
-    height: 215,
+    borderWidth: 1,
+    borderColor: "#705d2c",
+    backgroundColor: "#0b0b0b",
     marginBottom: 24,
+    shadowColor: SCORPIO_GOLD,
+    shadowOffset: {
+      width: 0,
+      height: 14,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
   },
   featuredImageWrap: {
-    width: "70%",
+    height: 250,
+    backgroundColor: "#111111",
   },
   featuredImage: {
     flex: 1,
-    padding: 9,
+    padding: 13,
   },
   featuredImageRadius: {
-    borderTopLeftRadius: 18,
-    borderBottomLeftRadius: 18,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
-  featuredShade: {
+  featuredImageShade: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.03)",
+    backgroundColor: "rgba(0,0,0,0.08)",
   },
-  featuredRibbon: {
+  featuredTopBadge: {
     alignSelf: "flex-start",
+    backgroundColor: SCORPIO_GOLD,
     borderRadius: 999,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
   },
-  featuredRibbonText: {
-    fontSize: 8.4,
+  featuredTopBadgeText: {
+    color: "#111111",
+    fontSize: 9,
     fontWeight: "900",
   },
-  featuredTextBox: {
+  featuredInfoPanel: {
+    backgroundColor: "#0b0b0b",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(230,193,92,0.36)",
+    padding: 12,
+  },
+  featuredMainContent: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 10,
+  },
+  featuredLeftContent: {
     flex: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 9,
+    minWidth: 0,
   },
-  featuredLabel: {
+  featuredHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  featuredHeaderLeft: {
+    flex: 1,
+    minWidth: 0,
+  },
+  featuredSectionLabel: {
+    color: SCORPIO_GOLD,
+    fontSize: 8.8,
     textTransform: "uppercase",
-    fontSize: 7.2,
-    letterSpacing: 0.8,
+    letterSpacing: 0.9,
     fontWeight: "900",
+    marginBottom: 3,
+  },
+  featuredPrice: {
+    color: SCORPIO_GOLD,
+    fontSize: 15.2,
+    fontWeight: "900",
+  },
+  featuredUsd: {
+    color: "#cfcfcf",
+    fontSize: 8.5,
+    fontWeight: "800",
+    marginTop: 1,
+  },
+  featuredLocationBox: {
+    width: 104,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.24)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 6,
+  },
+  featuredLocationText: {
+    color: "#ffffff",
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: "800",
+    flex: 1,
   },
   featuredTitle: {
     color: "#ffffff",
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 12.8,
+    lineHeight: 16,
     fontWeight: "900",
-    marginTop: 4,
-  },
-  featuredPrice: {
-    color: "#ffffff",
-    fontSize: 9.5,
-    fontWeight: "900",
-    marginTop: 4,
-  },
-  featuredUsd: {
-    color: "#bdbdbd",
-    fontSize: 7.3,
-    fontWeight: "700",
-    marginTop: 1,
-  },
-  featuredButtonRow: {
-    flexDirection: "row",
-    gap: 4,
     marginTop: 7,
   },
-  featuredGhostButton: {
-    flex: 1,
-    minHeight: 24,
+  featuredMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 7,
+  },
+  featuredMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  featuredMetaText: {
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "900",
+  },
+  featuredMetricColumn: {
+    width: 52,
+    minHeight: 142,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.32)",
+    backgroundColor: "rgba(255,255,255,0.045)",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 6,
+    paddingHorizontal: 5,
+  },
+  featuredMetricPill: {
+    width: 40,
+    minHeight: 22,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#2b2b2b",
-    backgroundColor: "#151515",
+    borderColor: "rgba(230,193,92,0.28)",
+    backgroundColor: "#101010",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 2,
+    paddingHorizontal: 3,
   },
-  featuredGhostButtonText: {
+  featuredMetricPillWide: {
+    width: 46,
+  },
+  featuredMetricText: {
     color: "#ffffff",
-    fontSize: 7,
+    fontSize: 6.8,
+    fontWeight: "900",
+  },
+  featuredActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 10,
+    flexWrap: "wrap",
+  },
+  featuredActionButton: {
+    minHeight: 28,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.24)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+  },
+  featuredActionButtonGold: {
+    minHeight: 28,
+    borderRadius: 999,
+    backgroundColor: SCORPIO_GOLD,
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.55)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    paddingHorizontal: 9,
+  },
+  featuredActionText: {
+    color: "#ffffff",
+    fontSize: 8.2,
+    fontWeight: "900",
+  },
+  featuredActionTextDark: {
+    color: "#111111",
+    fontSize: 8.2,
+    fontWeight: "900",
+  },
+  ctaBanner: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: SCORPIO_GOLD,
+    backgroundColor: "#12100a",
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 18,
+  },
+  ctaIconCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 18,
+    backgroundColor: SCORPIO_GOLD,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ctaContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  ctaTitle: {
+    color: SCORPIO_GOLD,
+    fontSize: 14.1,
+    fontWeight: "900",
+  },
+  ctaSub: {
+    color: "#d8d8d8",
+    fontSize: 10.2,
+    marginTop: 4,
+  },
+  ctaChips: {
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    gap: 4,
+    marginTop: 9,
+  },
+  miniChip: {
+    borderWidth: 1,
+    borderColor: "#705d2c",
+    borderRadius: 999,
+    paddingHorizontal: 5,
+    paddingVertical: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  miniChipText: {
+    color: "#ffffff",
+    fontSize: 7.8,
     fontWeight: "800",
   },
-  viewButton: {
-    alignSelf: "flex-start",
-    borderRadius: 9,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+  ctaButton: {
+    backgroundColor: SCORPIO_GOLD,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
-    marginTop: 7,
   },
-  viewButtonText: {
-    fontSize: 7.8,
+  ctaButtonText: {
+    color: "#111111",
+    fontSize: 10,
     fontWeight: "900",
+  },
+  popularPanel: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#303030",
+    backgroundColor: "#0f0f0f",
+    padding: 11,
+    marginBottom: 18,
   },
   areaCarousel: {
     gap: 10,
-    paddingBottom: 18,
+    paddingBottom: 4,
   },
   areaCard: {
     minWidth: 132,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: "#333333",
-    backgroundColor: "#101010",
+    borderColor: "#705d2c",
+    backgroundColor: "#171200",
     padding: 8,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
   areaImage: {
-    width: 42,
-    height: 42,
+    width: 38,
+    height: 38,
     borderRadius: 999,
+  },
+  areaTextBox: {
+    flex: 1,
   },
   areaName: {
     color: "#ffffff",
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: "900",
   },
   areaListings: {
-    color: "#a9a9a9",
-    fontSize: 9.5,
+    color: "#cfcfcf",
+    fontSize: 9,
     marginTop: 2,
     fontWeight: "700",
-  },
-  projectCarousel: {
-    gap: 12,
-    paddingBottom: 18,
-  },
-  projectCard: {
-    width: 188,
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#333333",
-    backgroundColor: "#101010",
-  },
-  projectImage: {
-    height: 104,
-  },
-  projectImageRadius: {
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  projectShade: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.12)",
-  },
-  projectBody: {
-    padding: 11,
-  },
-  projectTitle: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  projectLocation: {
-    color: "#d8d8d8",
-    fontSize: 10,
-    flex: 1,
-  },
-  projectPrice: {
-    color: "#ffffff",
-    fontSize: 10.5,
-    fontWeight: "900",
-    marginTop: 7,
   },
   agentCarousel: {
     gap: 10,
@@ -1945,9 +2391,9 @@ const styles = StyleSheet.create({
   },
   agentCard: {
     width: 230,
-    borderRadius: 15,
+    borderRadius: 17,
     borderWidth: 1,
-    borderColor: "#333333",
+    borderColor: "#705d2c",
     backgroundColor: "#101010",
     padding: 10,
     flexDirection: "row",
@@ -1971,7 +2417,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   agentInitialsText: {
-    color: "#e6c15c",
+    color: SCORPIO_GOLD,
     fontSize: 15,
     fontWeight: "900",
   },
@@ -2016,64 +2462,46 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "800",
   },
-  ctaBanner: {
-    borderRadius: 18,
+  projectCarousel: {
+    gap: 12,
+    paddingBottom: 18,
+  },
+  projectCard: {
+    width: 188,
+    borderRadius: 17,
+    overflow: "hidden",
     borderWidth: 1,
     borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    marginBottom: 6,
+    backgroundColor: "#101010",
   },
-  ctaContent: {
-    flex: 1,
-    minWidth: 0,
+  projectImage: {
+    height: 104,
   },
-  ctaTitle: {
+  projectImageRadius: {
+    borderTopLeftRadius: 17,
+    borderTopRightRadius: 17,
+  },
+  projectShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.12)",
+  },
+  projectBody: {
+    padding: 11,
+  },
+  projectTitle: {
     color: "#ffffff",
-    fontSize: 14.1,
+    fontSize: 12,
     fontWeight: "900",
   },
-  ctaSub: {
+  projectLocation: {
     color: "#d8d8d8",
-    fontSize: 10.2,
-    marginTop: 4,
-  },
-  ctaChips: {
-    flexDirection: "row",
-    flexWrap: "nowrap",
-    gap: 4,
-    marginTop: 9,
-  },
-  miniChip: {
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    borderRadius: 999,
-    paddingHorizontal: 5,
-    paddingVertical: 4,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-  },
-  miniChipText: {
-    color: "#ffffff",
-    fontSize: 7.8,
-    fontWeight: "800",
-  },
-  ctaButton: {
-    backgroundColor: "#e6c15c",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-  },
-  ctaButtonText: {
-    color: "#111111",
     fontSize: 10,
+    flex: 1,
+  },
+  projectPrice: {
+    color: SCORPIO_GOLD,
+    fontSize: 10.5,
     fontWeight: "900",
+    marginTop: 7,
   },
 });
