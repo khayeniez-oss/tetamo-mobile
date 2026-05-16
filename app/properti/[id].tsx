@@ -1,51 +1,55 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    ArrowLeft,
-    Bath,
-    BedDouble,
-    CalendarDays,
-    CarFront,
-    Clock,
-    Droplets,
-    Eye,
-    FileText,
-    Heart,
-    Home,
-    Image as ImageIcon,
-    Layers3,
-    MapPin,
-    MessageCircle,
-    PlayCircle,
-    Ruler,
-    ShieldCheck,
-    Square,
-    Star,
-    Video,
-    X,
-    Zap,
+  AlertTriangle,
+  ArrowLeft,
+  Bath,
+  BedDouble,
+  CalendarDays,
+  CarFront,
+  Clock,
+  Droplets,
+  Eye,
+  FileText,
+  Flag,
+  Heart,
+  Home,
+  Image as ImageIcon,
+  Layers3,
+  MapPin,
+  MessageCircle,
+  PlayCircle,
+  Ruler,
+  ShieldAlert,
+  ShieldCheck,
+  Square,
+  Star,
+  UserRound,
+  Video,
+  X,
+  Zap,
 } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ImageBackground,
-    Linking,
-    Modal,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ImageBackground,
+  Linking,
+  Modal,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import {
-    fetchPropertyByPathKey,
-    type TetamoProperty,
+  fetchPropertyByPathKey,
+  type TetamoProperty,
 } from "../../services/properties";
 
 type Language = "en" | "id";
@@ -269,6 +273,45 @@ Is this property still available?`;
   const openVideo = () => {
     if (!property?.videoUrl) return;
     Linking.openURL(property.videoUrl);
+  };
+
+  const openReportListing = () => {
+    if (!property) return;
+
+    router.push(
+      `/report/listing?property_id=${encodeURIComponent(
+        property.id || ""
+      )}&listing_code=${encodeURIComponent(
+        property.kode || ""
+      )}&title=${encodeURIComponent(title || "")}&location=${encodeURIComponent(
+        property.location || ""
+      )}` as any
+    );
+  };
+
+  const openReportUser = () => {
+    if (!property) return;
+
+    const contactUserId =
+      String(
+        (property as any).contactUserId ||
+          (property as any).contact_user_id ||
+          (property as any).ownerId ||
+          (property as any).owner_id ||
+          (property as any).agentId ||
+          (property as any).agent_id ||
+          ""
+      ) || "";
+
+    router.push(
+      `/report/user?reported_user_id=${encodeURIComponent(
+        contactUserId
+      )}&name=${encodeURIComponent(
+        property.contactName || "Tetamo"
+      )}&role=${encodeURIComponent(
+        property.contactRole || property.contactAgency || "User"
+      )}&listing_code=${encodeURIComponent(property.kode || "")}` as any
+    );
   };
 
   const submitSchedule = () => {
@@ -586,6 +629,12 @@ Is this property still available?`;
                 <Text style={styles.contactWhatsappText}>WhatsApp</Text>
               </Pressable>
             </View>
+
+            <SafetyReportsPanel
+              language={language}
+              onReportListing={openReportListing}
+              onReportUser={openReportUser}
+            />
           </ScrollView>
 
           <Modal
@@ -785,6 +834,78 @@ function DetailChipCard({ chip }: { chip: DetailChip }) {
       <Text style={styles.detailValue} numberOfLines={1}>
         {chip.value}
       </Text>
+    </View>
+  );
+}
+
+function SafetyReportsPanel({
+  language,
+  onReportListing,
+  onReportUser,
+}: {
+  language: Language;
+  onReportListing: () => void;
+  onReportUser: () => void;
+}) {
+  return (
+    <View style={styles.safetyPanel}>
+      <View style={styles.safetyHeaderRow}>
+        <View style={styles.safetyIcon}>
+          <ShieldAlert color="#e6c15c" size={22} />
+        </View>
+
+        <View style={styles.safetyTextBox}>
+          <Text style={styles.safetyTitle}>
+            {language === "id" ? "Keamanan & Laporan" : "Safety & Reports"}
+          </Text>
+
+          <Text style={styles.safetySub}>
+            {language === "id"
+              ? "Laporkan listing atau pengguna yang mencurigakan."
+              : "Report suspicious listings or user activity."}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.safetyActionRow}>
+        <Pressable style={styles.safetyButton} onPress={onReportListing}>
+          <Flag color="#e6c15c" size={16} />
+
+          <View style={styles.safetyButtonTextBox}>
+            <Text style={styles.safetyButtonTitle}>
+              {language === "id" ? "Laporkan listing" : "Report listing"}
+            </Text>
+
+            <Text style={styles.safetyButtonSub}>
+              {language === "id" ? "Listing palsu/detail salah" : "Fake or wrong details"}
+            </Text>
+          </View>
+        </Pressable>
+
+        <Pressable style={styles.safetyButton} onPress={onReportUser}>
+          <UserRound color="#e6c15c" size={16} />
+
+          <View style={styles.safetyButtonTextBox}>
+            <Text style={styles.safetyButtonTitle}>
+              {language === "id" ? "Laporkan pengguna" : "Report user"}
+            </Text>
+
+            <Text style={styles.safetyButtonSub}>
+              {language === "id" ? "Agen/user mencurigakan" : "Suspicious user or agent"}
+            </Text>
+          </View>
+        </Pressable>
+      </View>
+
+      <View style={styles.safetyNote}>
+        <AlertTriangle color="#e6c15c" size={14} />
+
+        <Text style={styles.safetyNoteText}>
+          {language === "id"
+            ? "Tetamo akan meninjau laporan untuk menjaga marketplace tetap aman."
+            : "Tetamo reviews reports to help keep the marketplace safe."}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -1265,19 +1386,19 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   detailsGrid: {
-  flexDirection: "row",
-  flexWrap: "wrap",
-  justifyContent: "flex-start",
-  columnGap: 10,
-  rowGap: 18,
-},
-detailChip: {
-  width: 63,
-  minHeight: 72,
-  alignItems: "center",
-  justifyContent: "flex-start",
-  backgroundColor: "transparent",
-},
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+    columnGap: 10,
+    rowGap: 18,
+  },
+  detailChip: {
+    width: 63,
+    minHeight: 72,
+    alignItems: "center",
+    justifyContent: "flex-start",
+    backgroundColor: "transparent",
+  },
   detailIcon: {
     width: 44,
     height: 44,
@@ -1474,6 +1595,92 @@ detailChip: {
     color: "#ffffff",
     fontSize: 10,
     fontWeight: "900",
+  },
+  safetyPanel: {
+    marginHorizontal: 18,
+    marginTop: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#705d2c",
+    backgroundColor: "#12100a",
+    padding: 15,
+  },
+  safetyHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  safetyIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#705d2c",
+    backgroundColor: "#050505",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  safetyTextBox: {
+    flex: 1,
+  },
+  safetyTitle: {
+    color: "#e6c15c",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  safetySub: {
+    color: "#d8d8d8",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  safetyActionRow: {
+    gap: 10,
+    marginTop: 14,
+  },
+  safetyButton: {
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.28)",
+    backgroundColor: "#101010",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  safetyButtonTextBox: {
+    flex: 1,
+  },
+  safetyButtonTitle: {
+    color: "#ffffff",
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+  safetyButtonSub: {
+    color: "#a9a9a9",
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  safetyNote: {
+    borderRadius: 15,
+    backgroundColor: "rgba(230,193,92,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.18)",
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 12,
+  },
+  safetyNoteText: {
+    color: "#cfcfcf",
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontWeight: "700",
+    flex: 1,
   },
   modalBackdrop: {
     flex: 1,

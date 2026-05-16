@@ -2,19 +2,21 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
     AlertTriangle,
-    ArrowLeft,
     CheckCircle2,
-    Flag,
+    ChevronLeft,
+    FileWarning,
     Home,
-    Languages,
+    Mail,
+    MapPin,
+    MessageSquare,
     Send,
     ShieldAlert,
-    XCircle,
 } from "lucide-react-native";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
+    KeyboardAvoidingView,
+    Linking,
+    Platform,
     Pressable,
     SafeAreaView,
     ScrollView,
@@ -25,360 +27,314 @@ import {
 } from "react-native";
 import { supabase } from "../../lib/supabase";
 
-type Language = "en" | "id";
+const SCORPIO_GOLD = "#e6c15c";
+const SUPPORT_EMAIL = "inquiry@tetamo.com";
 
-type ReasonKey =
-  | "fake_listing"
-  | "wrong_information"
-  | "suspicious_owner_agent"
-  | "scam_fraud"
-  | "duplicate_listing"
-  | "offensive_content"
-  | "other";
-
-function readParam(value: unknown) {
-  if (Array.isArray(value)) return String(value[0] || "");
-  return String(value || "");
-}
+const reportReasons = [
+  "Fake listing",
+  "Wrong price or details",
+  "Property already sold or rented",
+  "Suspicious listing",
+  "Inappropriate content",
+  "Safety concern",
+  "Other problem",
+];
 
 export default function ReportListingScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  const [language, setLanguage] = useState<Language>("en");
-  const [reason, setReason] = useState<ReasonKey>("fake_listing");
+  const propertyId = safeParam(params.property_id || params.propertyId);
+  const listingCode = safeParam(params.listing_code || params.code);
+  const propertyTitle = safeParam(params.title || params.property_title);
+  const propertyLocation = safeParam(params.location);
+
+  const [selectedReason, setSelectedReason] = useState(reportReasons[0]);
   const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [noticeType, setNoticeType] = useState<"success" | "error" | "">("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingUser, setIsCheckingUser] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [errorText, setErrorText] = useState("");
 
-  const isId = language === "id";
+  const listingLabel = useMemo(() => {
+    if (propertyTitle) return propertyTitle;
+    if (listingCode) return `Listing ${listingCode}`;
+    return "Selected property listing";
+  }, [listingCode, propertyTitle]);
 
-  const propertyId = readParam(params.property_id || params.id);
-  const listingCode = readParam(params.kode || params.code);
-  const listingTitle = readParam(params.title);
-  const reportedUserId = readParam(params.reported_user_id || params.user_id);
+  useEffect(() => {
+    let isMounted = true;
 
-  const ui = useMemo(() => {
-    if (isId) {
-      return {
-        back: "Kembali",
-        badge: "REPORT",
-        title: "Laporkan Listing",
-        subtitle:
-          "Gunakan halaman ini untuk melaporkan listing yang terlihat palsu, salah, mencurigakan, atau melanggar aturan Tetamo.",
-        listingInfo: "Informasi Listing",
-        listingCode: "Kode Listing",
-        listingTitle: "Judul Listing",
-        reasonTitle: "Pilih Alasan",
-        messageTitle: "Detail Tambahan",
-        messagePlaceholder:
-          "Jelaskan masalahnya. Contoh: foto tidak sesuai, harga mencurigakan, nomor tidak bisa dihubungi, atau listing terlihat palsu.",
-        submit: "Kirim Laporan",
-        submitting: "Mengirim Laporan...",
-        success:
-          "Laporan berhasil dikirim. Tim Tetamo akan meninjau listing ini.",
-        failed:
-          "Gagal mengirim laporan. Silakan coba lagi atau hubungi support.",
-        loginRequired: "Silakan login terlebih dahulu untuk mengirim laporan.",
-        importantTitle: "Catatan",
-        importantText:
-          "Laporan Anda membantu Tetamo menjaga marketplace tetap aman, transparan, dan terpercaya.",
-        reasons: {
-          fake_listing: "Listing palsu",
-          wrong_information: "Informasi salah",
-          suspicious_owner_agent: "Owner / agent mencurigakan",
-          scam_fraud: "Potensi scam / penipuan",
-          duplicate_listing: "Listing duplikat",
-          offensive_content: "Konten tidak pantas",
-          other: "Lainnya",
-        },
-      };
-    }
-
-    return {
-      back: "Back",
-      badge: "REPORT",
-      title: "Report Listing",
-      subtitle:
-        "Use this page to report listings that look fake, incorrect, suspicious, or against Tetamo rules.",
-      listingInfo: "Listing Information",
-      listingCode: "Listing Code",
-      listingTitle: "Listing Title",
-      reasonTitle: "Choose Reason",
-      messageTitle: "Additional Details",
-      messagePlaceholder:
-        "Explain the issue. Example: photos do not match, price looks suspicious, contact number is unreachable, or the listing looks fake.",
-      submit: "Submit Report",
-      submitting: "Submitting Report...",
-      success: "Report submitted. The Tetamo team will review this listing.",
-      failed: "Failed to submit report. Please try again or contact support.",
-      loginRequired: "Please log in first to submit a report.",
-      importantTitle: "Note",
-      importantText:
-        "Your report helps Tetamo keep the marketplace safe, transparent, and trusted.",
-      reasons: {
-        fake_listing: "Fake listing",
-        wrong_information: "Wrong information",
-        suspicious_owner_agent: "Suspicious owner / agent",
-        scam_fraud: "Scam / fraud concern",
-        duplicate_listing: "Duplicate listing",
-        offensive_content: "Offensive content",
-        other: "Other",
-      },
-    };
-  }, [isId]);
-
-  const reasons = useMemo(
-    () => [
-      "fake_listing",
-      "wrong_information",
-      "suspicious_owner_agent",
-      "scam_fraud",
-      "duplicate_listing",
-      "offensive_content",
-      "other",
-    ] as ReasonKey[],
-    []
-  );
-
-  async function submitReport() {
-    try {
-      setSubmitting(true);
-      setNotice("");
-      setNoticeType("");
-
+    async function checkUser() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (!user?.id) {
-        setSubmitting(false);
-        Alert.alert(ui.loginRequired);
-        return;
-      }
+      if (!isMounted) return;
 
-      const selectedReason = ui.reasons[reason];
-
-      const { error } = await supabase.from("user_reports").insert({
-        reporter_user_id: user.id,
-        reported_user_id: reportedUserId || null,
-        property_id: propertyId || null,
-        listing_code: listingCode || null,
-        report_type: "listing",
-        reason: selectedReason,
-        message: message.trim() || null,
-        status: "pending",
-        priority:
-          reason === "scam_fraud" || reason === "fake_listing"
-            ? "high"
-            : "normal",
-        source: "tetamo-mobile",
-        metadata: {
-          app: "tetamo-mobile",
-          language,
-          reason_key: reason,
-          listing_title: listingTitle || null,
-          params,
-        },
-      });
-
-      if (error) {
-        setNoticeType("error");
-        setNotice(error.message || ui.failed);
-        setSubmitting(false);
-        return;
-      }
-
-      setNoticeType("success");
-      setNotice(ui.success);
-      setMessage("");
-      setSubmitting(false);
-    } catch (error: any) {
-      setNoticeType("error");
-      setNotice(error?.message || ui.failed);
-      setSubmitting(false);
+      setIsLoggedIn(!!user?.id);
+      setIsCheckingUser(false);
     }
+
+    void checkUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const openSupportEmail = () => {
+    const subject = encodeURIComponent("Tetamo Listing Report");
+    const body = encodeURIComponent(
+      `Hello Tetamo,\n\nI would like to report a listing.\n\nListing: ${listingLabel}\nCode: ${
+        listingCode || "-"
+      }\nLocation: ${propertyLocation || "-"}\nReason: ${
+        selectedReason || "-"
+      }\n\nDetails:\n${message || ""}`
+    );
+
+    void Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`);
+  };
+
+  const submitReport = async () => {
+    setErrorText("");
+
+    if (!selectedReason) {
+      setErrorText("Please choose a reason for the report.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user?.id) {
+      setIsSubmitting(false);
+      setIsLoggedIn(false);
+      setErrorText("Please sign in first so Tetamo can review your report safely.");
+      return;
+    }
+
+    const { error } = await supabase.from("user_reports").insert({
+      reporter_user_id: user.id,
+      property_id: isUuid(propertyId) ? propertyId : null,
+      listing_code: listingCode || null,
+      report_type: "listing",
+      reason: selectedReason,
+      message: message.trim() || null,
+      source: "tetamo-mobile",
+      metadata: {
+        property_title: propertyTitle || null,
+        property_location: propertyLocation || null,
+        submitted_from: "mobile_app",
+      },
+    });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      setErrorText("We could not submit your report. Please try again or contact Tetamo support.");
+      return;
+    }
+
+    setSubmitted(true);
+  };
+
+  if (submitted) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+
+        <View style={styles.successWrap}>
+          <View style={styles.successIcon}>
+            <CheckCircle2 color="#111111" size={38} />
+          </View>
+
+          <Text style={styles.successTitle}>Report submitted</Text>
+
+          <Text style={styles.successText}>
+            Thank you for helping keep Tetamo safe. Our team will review this listing.
+          </Text>
+
+          <Pressable style={styles.primaryButton} onPress={() => router.back()}>
+            <Text style={styles.primaryButtonText}>Done</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
 
-      <View style={styles.topBar}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft color="#ffffff" size={15} />
-          <Text style={styles.backText}>{ui.back}</Text>
-        </Pressable>
-
-        <View style={styles.langToggle}>
-          <Languages color="#e6c15c" size={14} />
-
-          {(["en", "id"] as Language[]).map((item) => (
-            <Pressable
-              key={item}
-              style={[
-                styles.langButton,
-                language === item && styles.langButtonActive,
-              ]}
-              onPress={() => setLanguage(item)}
-            >
-              <Text
-                style={[
-                  styles.langText,
-                  language === item && styles.langTextActive,
-                ]}
-              >
-                {item.toUpperCase()}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        style={styles.keyboard}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={styles.heroCard}>
-          <View style={styles.heroIcon}>
-            <Flag color="#111111" size={25} />
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Pressable style={styles.backButton} onPress={() => router.back()}>
+              <ChevronLeft color="#ffffff" size={22} />
+            </Pressable>
+
+            <View style={styles.headerTextBox}>
+              <Text style={styles.headerTitle}>Report Listing</Text>
+              <Text style={styles.headerSub}>Help us keep Tetamo safe and trusted.</Text>
+            </View>
           </View>
 
-          <Text style={styles.badge}>{ui.badge}</Text>
-          <Text style={styles.title}>{ui.title}</Text>
-          <Text style={styles.subtitle}>{ui.subtitle}</Text>
-        </View>
+          <View style={styles.heroCard}>
+            <View style={styles.heroIcon}>
+              <FileWarning color={SCORPIO_GOLD} size={28} />
+            </View>
 
-        <View style={styles.warningCard}>
-          <AlertTriangle color="#e6c15c" size={20} />
-          <View style={styles.warningTextBox}>
-            <Text style={styles.warningTitle}>{ui.importantTitle}</Text>
-            <Text style={styles.warningText}>{ui.importantText}</Text>
+            <View style={styles.heroTextBox}>
+              <Text style={styles.heroTitle}>Tell us what is wrong</Text>
+              <Text style={styles.heroText}>
+                Reports are reviewed by Tetamo to protect buyers, renters, owners, and agents.
+              </Text>
+            </View>
           </View>
-        </View>
 
-        <View style={styles.sectionCard}>
-          <SectionHeader
-            icon={<Home color="#e6c15c" size={20} />}
-            title={ui.listingInfo}
-          />
+          <View style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <Home color={SCORPIO_GOLD} size={16} />
+              <Text style={styles.infoTitle} numberOfLines={2}>
+                {listingLabel}
+              </Text>
+            </View>
 
-          <InfoRow label={ui.listingCode} value={listingCode || "-"} />
-          <InfoRow label={ui.listingTitle} value={listingTitle || "-"} />
-        </View>
-
-        <View style={styles.sectionCard}>
-          <SectionHeader
-            icon={<ShieldAlert color="#e6c15c" size={20} />}
-            title={ui.reasonTitle}
-          />
-
-          <View style={styles.reasonGrid}>
-            {reasons.map((item) => (
-              <Pressable
-                key={item}
-                style={[
-                  styles.reasonPill,
-                  reason === item && styles.reasonPillActive,
-                ]}
-                onPress={() => setReason(item)}
-              >
-                <Text
-                  style={[
-                    styles.reasonText,
-                    reason === item && styles.reasonTextActive,
-                  ]}
-                >
-                  {ui.reasons[item]}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.sectionCard}>
-          <SectionHeader
-            icon={<Flag color="#e6c15c" size={20} />}
-            title={ui.messageTitle}
-          />
-
-          <TextInput
-            value={message}
-            onChangeText={setMessage}
-            placeholder={ui.messagePlaceholder}
-            placeholderTextColor="#777777"
-            multiline
-            textAlignVertical="top"
-            style={styles.messageInput}
-          />
-        </View>
-
-        {notice ? (
-          <View
-            style={[
-              styles.noticeBox,
-              noticeType === "success"
-                ? styles.noticeBoxSuccess
-                : styles.noticeBoxError,
-            ]}
-          >
-            {noticeType === "success" ? (
-              <CheckCircle2 color="#22c55e" size={18} />
-            ) : (
-              <XCircle color="#fecaca" size={18} />
+            {!!listingCode && (
+              <Text style={styles.infoSub}>Listing code: {listingCode}</Text>
             )}
 
-            <Text
-              style={[
-                styles.noticeText,
-                noticeType === "success"
-                  ? styles.noticeTextSuccess
-                  : styles.noticeTextError,
-              ]}
-            >
-              {notice}
+            {!!propertyLocation && (
+              <View style={styles.locationRow}>
+                <MapPin color="#bdbdbd" size={13} />
+                <Text style={styles.locationText} numberOfLines={2}>
+                  {propertyLocation}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {isCheckingUser ? (
+            <View style={styles.noticeCard}>
+              <Text style={styles.noticeText}>Checking your account...</Text>
+            </View>
+          ) : !isLoggedIn ? (
+            <View style={styles.noticeCard}>
+              <View style={styles.noticeIcon}>
+                <ShieldAlert color={SCORPIO_GOLD} size={18} />
+              </View>
+
+              <Text style={styles.noticeTitle}>Sign in required</Text>
+              <Text style={styles.noticeText}>
+                Please sign in to submit a report. This helps Tetamo review reports safely.
+              </Text>
+
+              <View style={styles.noticeButtons}>
+                <Pressable
+                  style={styles.noticeButtonGold}
+                  onPress={() => router.push("/login" as any)}
+                >
+                  <Text style={styles.noticeButtonGoldText}>Sign In</Text>
+                </Pressable>
+
+                <Pressable style={styles.noticeButtonDark} onPress={openSupportEmail}>
+                  <Mail color={SCORPIO_GOLD} size={14} />
+                  <Text style={styles.noticeButtonDarkText}>Email Tetamo</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+
+          <Text style={styles.sectionLabel}>Reason</Text>
+
+          <View style={styles.reasonWrap}>
+            {reportReasons.map((reason) => {
+              const active = selectedReason === reason;
+
+              return (
+                <Pressable
+                  key={reason}
+                  style={[styles.reasonChip, active && styles.reasonChipActive]}
+                  onPress={() => setSelectedReason(reason)}
+                >
+                  <Text
+                    style={[
+                      styles.reasonChipText,
+                      active && styles.reasonChipTextActive,
+                    ]}
+                  >
+                    {reason}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.sectionLabel}>Additional details</Text>
+
+          <View style={styles.messageBox}>
+            <MessageSquare color={SCORPIO_GOLD} size={18} />
+
+            <TextInput
+              value={message}
+              onChangeText={setMessage}
+              placeholder="Tell us more about the issue..."
+              placeholderTextColor="#7d7d7d"
+              style={styles.messageInput}
+              multiline
+              textAlignVertical="top"
+              maxLength={1000}
+            />
+          </View>
+
+          <View style={styles.safeNote}>
+            <AlertTriangle color={SCORPIO_GOLD} size={16} />
+            <Text style={styles.safeNoteText}>
+              Please do not include sensitive personal information unless it is needed for the report.
             </Text>
           </View>
-        ) : null}
 
-        <Pressable
-          style={[styles.submitButton, submitting && styles.disabledButton]}
-          disabled={submitting}
-          onPress={() => void submitReport()}
-        >
-          {submitting ? (
-            <ActivityIndicator color="#111111" />
-          ) : (
+          {!!errorText && <Text style={styles.errorText}>{errorText}</Text>}
+
+          <Pressable
+            style={[
+              styles.submitButton,
+              (!isLoggedIn || isSubmitting) && styles.submitButtonDisabled,
+            ]}
+            onPress={submitReport}
+            disabled={!isLoggedIn || isSubmitting}
+          >
             <Send color="#111111" size={17} />
-          )}
-
-          <Text style={styles.submitButtonText}>
-            {submitting ? ui.submitting : ui.submit}
-          </Text>
-        </Pressable>
-      </ScrollView>
+            <Text style={styles.submitButtonText}>
+              {isSubmitting ? "Submitting..." : "Submit Report"}
+            </Text>
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-function SectionHeader({ icon, title }: { icon: ReactNode; title: string }) {
-  return (
-    <View style={styles.sectionHeader}>
-      <View style={styles.sectionIcon}>{icon}</View>
-      <Text style={styles.sectionTitle}>{title}</Text>
-    </View>
-  );
+function safeParam(value: unknown) {
+  if (Array.isArray(value)) return String(value[0] || "").trim();
+  return String(value || "").trim();
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
-    </View>
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
   );
 }
 
@@ -387,261 +343,321 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#050505",
   },
-  topBar: {
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 10,
-    backgroundColor: "#050505",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  backButton: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#333333",
-    backgroundColor: "#101010",
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  backText: {
-    color: "#ffffff",
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  langToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#5b4a24",
-    overflow: "hidden",
-    paddingLeft: 8,
-  },
-  langButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  langButtonActive: {
-    backgroundColor: "#e6c15c",
-  },
-  langText: {
-    color: "#e6c15c",
-    fontSize: 9.5,
-    fontWeight: "900",
-  },
-  langTextActive: {
-    color: "#111111",
+  keyboard: {
+    flex: 1,
   },
   scroll: {
     flex: 1,
-    backgroundColor: "#050505",
   },
   content: {
     paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 38,
+    paddingTop: 14,
+    paddingBottom: 36,
   },
-  heroCard: {
-    borderRadius: 28,
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 18,
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    padding: 18,
-    marginBottom: 13,
-  },
-  heroIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 19,
-    backgroundColor: "#e6c15c",
+    borderColor: "#303030",
+    backgroundColor: "#101010",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 13,
   },
-  badge: {
-    color: "#e6c15c",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.2,
+  headerTextBox: {
+    flex: 1,
   },
-  title: {
+  headerTitle: {
     color: "#ffffff",
-    fontSize: 27,
-    lineHeight: 33,
+    fontSize: 22,
     fontWeight: "900",
-    letterSpacing: -0.6,
-    marginTop: 6,
   },
-  subtitle: {
-    color: "#f5e6b7",
-    fontSize: 12.3,
-    lineHeight: 19,
+  headerSub: {
+    color: "#bdbdbd",
+    fontSize: 12,
+    marginTop: 2,
     fontWeight: "700",
-    marginTop: 8,
   },
-  warningCard: {
-    borderRadius: 22,
+  heroCard: {
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
+    backgroundColor: "#12100a",
+    padding: 16,
+    flexDirection: "row",
+    gap: 13,
+    marginBottom: 14,
+  },
+  heroIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#705d2c",
+    backgroundColor: "#090909",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroTextBox: {
+    flex: 1,
+  },
+  heroTitle: {
+    color: SCORPIO_GOLD,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  heroText: {
+    color: "#e7e7e7",
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginTop: 5,
+    fontWeight: "700",
+  },
+  infoCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#303030",
+    backgroundColor: "#101010",
+    padding: 14,
+    marginBottom: 16,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  infoTitle: {
+    color: "#ffffff",
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "900",
+    flex: 1,
+  },
+  infoSub: {
+    color: SCORPIO_GOLD,
+    fontSize: 11,
+    fontWeight: "800",
+    marginTop: 8,
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 5,
+    marginTop: 8,
+  },
+  locationText: {
+    color: "#bdbdbd",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "700",
+    flex: 1,
+  },
+  noticeCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#705d2c",
+    backgroundColor: "#12100a",
+    padding: 14,
+    marginBottom: 16,
+  },
+  noticeIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: "#090909",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  noticeTitle: {
+    color: SCORPIO_GOLD,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  noticeText: {
+    color: "#d8d8d8",
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginTop: 5,
+    fontWeight: "700",
+  },
+  noticeButtons: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  noticeButtonGold: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 999,
+    backgroundColor: SCORPIO_GOLD,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  noticeButtonGoldText: {
+    color: "#111111",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  noticeButtonDark: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.35)",
+    backgroundColor: "#101010",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  noticeButtonDarkText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  sectionLabel: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900",
+    marginBottom: 10,
+  },
+  reasonWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 18,
+  },
+  reasonChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#303030",
+    backgroundColor: "#101010",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  reasonChipActive: {
+    borderColor: SCORPIO_GOLD,
+    backgroundColor: SCORPIO_GOLD,
+  },
+  reasonChipText: {
+    color: "#ffffff",
+    fontSize: 11.5,
+    fontWeight: "800",
+  },
+  reasonChipTextActive: {
+    color: "#111111",
+    fontWeight: "900",
+  },
+  messageBox: {
+    minHeight: 140,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#303030",
+    backgroundColor: "#101010",
     padding: 13,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
-    marginBottom: 13,
-  },
-  warningTextBox: {
-    flex: 1,
-  },
-  warningTitle: {
-    color: "#ffffff",
-    fontSize: 12.8,
-    fontWeight: "900",
-  },
-  warningText: {
-    color: "#f5e6b7",
-    fontSize: 11.4,
-    lineHeight: 17,
-    fontWeight: "700",
-    marginTop: 4,
-  },
-  sectionCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 15,
-    marginBottom: 13,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    marginBottom: 13,
-  },
-  sectionIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sectionTitle: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "900",
-    flex: 1,
-  },
-  infoRow: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#252525",
-    backgroundColor: "#050505",
-    padding: 12,
-    marginBottom: 9,
-  },
-  infoLabel: {
-    color: "#a9a9a9",
-    fontSize: 10.8,
-    fontWeight: "800",
-  },
-  infoValue: {
-    color: "#ffffff",
-    fontSize: 12.5,
-    lineHeight: 17,
-    fontWeight: "900",
-    marginTop: 4,
-  },
-  reasonGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  reasonPill: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#050505",
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-  },
-  reasonPillActive: {
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-  },
-  reasonText: {
-    color: "#d6d6d6",
-    fontSize: 10.8,
-    fontWeight: "900",
-  },
-  reasonTextActive: {
-    color: "#e6c15c",
+    marginBottom: 12,
   },
   messageInput: {
-    minHeight: 124,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#050505",
+    flex: 1,
+    minHeight: 112,
     color: "#ffffff",
-    fontSize: 12.5,
+    fontSize: 13,
     lineHeight: 18,
-    fontWeight: "700",
-    padding: 12,
+    padding: 0,
   },
-  noticeBox: {
-    borderRadius: 18,
+  safeNote: {
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 12,
-    marginBottom: 13,
+    borderColor: "rgba(230,193,92,0.22)",
+    backgroundColor: "rgba(230,193,92,0.08)",
+    padding: 11,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
+    marginBottom: 12,
   },
-  noticeBoxSuccess: {
-    borderColor: "#166534",
-    backgroundColor: "#052e16",
-  },
-  noticeBoxError: {
-    borderColor: "#7f1d1d",
-    backgroundColor: "#2a0d0d",
-  },
-  noticeText: {
+  safeNoteText: {
+    color: "#d8d8d8",
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: "700",
     flex: 1,
-    fontSize: 11.8,
-    lineHeight: 17,
+  },
+  errorText: {
+    color: "#ff7b7b",
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: "800",
-  },
-  noticeTextSuccess: {
-    color: "#bbf7d0",
-  },
-  noticeTextError: {
-    color: "#fecaca",
+    marginBottom: 12,
   },
   submitButton: {
-    minHeight: 50,
-    borderRadius: 17,
-    backgroundColor: "#e6c15c",
+    minHeight: 52,
+    borderRadius: 18,
+    backgroundColor: SCORPIO_GOLD,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingHorizontal: 14,
+  },
+  submitButtonDisabled: {
+    opacity: 0.45,
   },
   submitButtonText: {
     color: "#111111",
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "900",
   },
-  disabledButton: {
-    opacity: 0.55,
+  successWrap: {
+    flex: 1,
+    paddingHorizontal: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  successIcon: {
+    width: 82,
+    height: 82,
+    borderRadius: 28,
+    backgroundColor: SCORPIO_GOLD,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
+  },
+  successTitle: {
+    color: "#ffffff",
+    fontSize: 24,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  successText: {
+    color: "#cfcfcf",
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+    marginTop: 8,
+    marginBottom: 24,
+    fontWeight: "700",
+  },
+  primaryButton: {
+    minHeight: 50,
+    borderRadius: 18,
+    backgroundColor: SCORPIO_GOLD,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 36,
+  },
+  primaryButtonText: {
+    color: "#111111",
+    fontSize: 14,
+    fontWeight: "900",
   },
 });
