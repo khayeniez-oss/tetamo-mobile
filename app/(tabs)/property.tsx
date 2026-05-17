@@ -71,7 +71,7 @@ const SCORPIO_GOLD = "#e6c15c";
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=1400&auto=format&fit=crop";
 
-const TETAMO_FALLBACK_WHATSAPP = "628133947717";
+const TETAMO_FALLBACK_WHATSAPP = process.env.EXPO_PUBLIC_TETAMO_FALLBACK_WHATSAPP || "";
 
 const currencyRates: Record<Currency, number> = {
   IDR: 1,

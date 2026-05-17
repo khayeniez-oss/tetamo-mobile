@@ -63,7 +63,7 @@ type DetailChip = {
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=1400&auto=format&fit=crop";
 
-const TETAMO_FALLBACK_WHATSAPP = "628133947717";
+const TETAMO_FALLBACK_WHATSAPP = process.env.EXPO_PUBLIC_TETAMO_FALLBACK_WHATSAPP || "";
 
 export default function MobilePropertyDetailScreen() {
   const router = useRouter();
