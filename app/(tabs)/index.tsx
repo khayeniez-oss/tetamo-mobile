@@ -59,7 +59,7 @@ type Listing = TetamoProperty;
 const tetamoLogo = require("../../assets/images/tetamo-logo.png");
 
 const SCORPIO_GOLD = "#e6c15c";
-const TETAMO_FALLBACK_WHATSAPP = "628133947717";
+const TETAMO_FALLBACK_WHATSAPP = process.env.EXPO_PUBLIC_TETAMO_FALLBACK_WHATSAPP || "";
 
 const HERO_PROPERTY_CODES = ["TTM TBB 81", "TTM0 - UB", "TTM TNH 83"];
 
