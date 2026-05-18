@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   SafeAreaView,
@@ -112,6 +113,43 @@ function createLocalMessage(
     suggested_action_label: null,
     created_at: new Date().toISOString(),
   };
+}
+
+function MessageTextWithLinks({
+  value,
+  language,
+  style,
+}: {
+  value: string;
+  language: Language;
+  style: any;
+}) {
+  const displayText = getDisplayMessageText(value, language);
+  const parts = displayText.split(/(https?:\/\/[^\s]+)/g);
+
+  return (
+    <Text style={style}>
+      {parts.map((part, index) => {
+        const isUrl = /^https?:\/\/[^\s]+$/.test(part);
+
+        if (!isUrl) {
+          return part;
+        }
+
+        return (
+          <Text
+            key={`url-${index}`}
+            style={styles.messageLink}
+            onPress={() => {
+              void Linking.openURL(part);
+            }}
+          >
+            {part}
+          </Text>
+        );
+      })}
+    </Text>
+  );
 }
 
 export default function ScorpioAssistScreen() {
@@ -826,14 +864,14 @@ export default function ScorpioAssistScreen() {
                       </View>
                     ) : null}
 
-                    <Text
+                    <MessageTextWithLinks
+                      value={message.message_text}
+                      language={language}
                       style={[
                         styles.messageText,
                         isUser ? styles.userMessageText : styles.botMessageText,
                       ]}
-                    >
-                      {getDisplayMessageText(message.message_text, language)}
-                    </Text>
+                    />
                   </View>
 
                   <Text
@@ -1270,6 +1308,11 @@ const styles = StyleSheet.create({
   },
   userMessageText: {
     color: "#ffffff",
+  },
+  messageLink: {
+    color: "#e6c15c",
+    textDecorationLine: "underline",
+    fontWeight: "900",
   },
   botMessageText: {
     color: "#ffffff",
