@@ -2,26 +2,26 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    ArrowLeft,
-    Headphones,
-    LogIn,
-    Send,
-    Sparkles,
-    UserPlus,
-    XCircle,
+  ArrowLeft,
+  Headphones,
+  LogIn,
+  Send,
+  Sparkles,
+  UserPlus,
+  XCircle,
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
@@ -63,10 +63,67 @@ const CONVERSATION_SELECT =
 const MESSAGE_SELECT =
   "id, conversation_id, sender_type, message_text, ai_status, suggested_action, suggested_action_label, created_at";
 
+function getDisplayMessageText(value: string, language: Language) {
+  const raw = String(value || "").trim();
+
+  if (!raw) return "";
+
+  try {
+    const parsed = JSON.parse(raw);
+
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof parsed[language] === "string" &&
+      parsed[language].trim()
+    ) {
+      return parsed[language].trim();
+    }
+
+    const fallbackLanguage: Language = language === "id" ? "en" : "id";
+
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof parsed[fallbackLanguage] === "string" &&
+      parsed[fallbackLanguage].trim()
+    ) {
+      return parsed[fallbackLanguage].trim();
+    }
+  } catch {
+    const lower = raw.toLowerCase();
+
+    if (
+      lower.includes("tetamo currently accepts qris") ||
+      lower.includes("tetamo saat ini menerima pembayaran melalui qris")
+    ) {
+      return language === "id"
+        ? `Tetamo saat ini menerima pembayaran melalui QRIS dan debit/kredit card.
+
+QRIS cocok untuk pengguna di Indonesia karena biasanya bisa dibayar melalui aplikasi bank dan e-wallet yang mendukung QRIS, termasuk pilihan populer seperti BRI, BNI, BCA, Mandiri, GoPay, OVO, DANA, dan ShopeePay.
+
+Debit dan kredit card juga tersedia.
+
+Setelah Anda memilih paket, Tetamo akan mengarahkan Anda ke halaman pembayaran.`
+        : `Tetamo currently accepts QRIS and debit/credit card payments.
+
+QRIS is suitable for users in Indonesia because it can usually be paid through QRIS-supported Indonesian bank apps and e-wallets, including popular options such as BRI, BNI, BCA, Mandiri, GoPay, OVO, DANA, and ShopeePay.
+
+Debit and credit card payment is also available.
+
+After you choose a package, Tetamo will guide you to the payment page.`;
+    }
+
+    return raw;
+  }
+
+  return raw;
+}
+
 function createLocalMessage(
   messageText: string,
   senderType: "user" | "ai" | "admin",
-  conversationId = "guest-local"
+  conversationId = "guest-local",
 ): SupportMessage {
   return {
     id: `${senderType}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -86,8 +143,9 @@ export default function ScorpioAssistScreen() {
 
   const [language, setLanguage] = useState<Language>("en");
   const [userId, setUserId] = useState<string | null>(null);
-  const [conversation, setConversation] =
-    useState<SupportConversation | null>(null);
+  const [conversation, setConversation] = useState<SupportConversation | null>(
+    null,
+  );
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [input, setInput] = useState("");
   const [guestSessionId, setGuestSessionId] = useState<string | null>(null);
@@ -108,12 +166,12 @@ export default function ScorpioAssistScreen() {
 
   const conversationSource = useMemo(
     () => `mobile_chat_${language}`,
-    [language]
+    [language],
   );
 
   const guestConversationSource = useMemo(
     () => `mobile_chat_guest_${language}`,
-    [language]
+    [language],
   );
 
   const ui = useMemo(() => {
@@ -338,7 +396,7 @@ export default function ScorpioAssistScreen() {
 
       return null;
     },
-    []
+    [],
   );
 
   const loadExistingConversation = useCallback(async () => {
@@ -364,7 +422,7 @@ export default function ScorpioAssistScreen() {
       if (existing.source !== conversationSource) {
         const synced = await syncConversationSource(
           existing.id,
-          conversationSource
+          conversationSource,
         );
 
         if (synced) {
@@ -375,12 +433,7 @@ export default function ScorpioAssistScreen() {
       setConversation(existing);
       await refreshMessages(existing.id);
     }
-  }, [
-    conversationSource,
-    refreshMessages,
-    syncConversationSource,
-    userId,
-  ]);
+  }, [conversationSource, refreshMessages, syncConversationSource, userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -403,10 +456,13 @@ export default function ScorpioAssistScreen() {
 
   async function persistGuestState(
     nextGuestSessionId: string,
-    nextMessages: SupportMessage[]
+    nextMessages: SupportMessage[],
   ) {
     await AsyncStorage.setItem(GUEST_SESSION_KEY, nextGuestSessionId);
-    await AsyncStorage.setItem(GUEST_MESSAGES_KEY, JSON.stringify(nextMessages));
+    await AsyncStorage.setItem(
+      GUEST_MESSAGES_KEY,
+      JSON.stringify(nextMessages),
+    );
   }
 
   async function initConversation() {
@@ -429,10 +485,13 @@ export default function ScorpioAssistScreen() {
 
       let activeConversation = existing as SupportConversation | null;
 
-      if (activeConversation?.id && activeConversation.source !== conversationSource) {
+      if (
+        activeConversation?.id &&
+        activeConversation.source !== conversationSource
+      ) {
         const synced = await syncConversationSource(
           activeConversation.id,
-          conversationSource
+          conversationSource,
         );
 
         if (synced) {
@@ -500,7 +559,7 @@ export default function ScorpioAssistScreen() {
         "scorpio-assist-guest",
         {
           body,
-        }
+        },
       );
 
       if (error) throw error;
@@ -553,7 +612,7 @@ export default function ScorpioAssistScreen() {
     if (activeConversation.source !== conversationSource) {
       const synced = await syncConversationSource(
         activeConversation.id,
-        conversationSource
+        conversationSource,
       );
 
       if (synced) {
@@ -566,7 +625,7 @@ export default function ScorpioAssistScreen() {
     const optimisticUserMessage = createLocalMessage(
       trimmed,
       "user",
-      activeConversation.id
+      activeConversation.id,
     );
 
     setMessages((prev) => [...prev, optimisticUserMessage]);
@@ -614,7 +673,7 @@ export default function ScorpioAssistScreen() {
     if (activeConversation.source !== conversationSource) {
       const synced = await syncConversationSource(
         activeConversation.id,
-        conversationSource
+        conversationSource,
       );
 
       if (synced) {
@@ -796,7 +855,7 @@ export default function ScorpioAssistScreen() {
                         isUser ? styles.userMessageText : styles.botMessageText,
                       ]}
                     >
-                      {message.message_text}
+                      {getDisplayMessageText(message.message_text, language)}
                     </Text>
                   </View>
 
@@ -942,9 +1001,7 @@ export default function ScorpioAssistScreen() {
 
           {authPrompt ? (
             <View style={styles.authPromptCard}>
-              <Text style={styles.authPromptTitle}>
-                {ui.handoffLoginTitle}
-              </Text>
+              <Text style={styles.authPromptTitle}>{ui.handoffLoginTitle}</Text>
               <Text style={styles.authPromptDesc}>{ui.handoffLoginDesc}</Text>
 
               <View style={styles.authPromptButtons}>
