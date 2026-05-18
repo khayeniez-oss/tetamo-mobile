@@ -91,29 +91,6 @@ function getDisplayMessageText(value: string, language: Language) {
       return parsed[fallbackLanguage].trim();
     }
   } catch {
-    const lower = raw.toLowerCase();
-
-    if (
-      lower.includes("tetamo currently accepts qris") ||
-      lower.includes("tetamo saat ini menerima pembayaran melalui qris")
-    ) {
-      return language === "id"
-        ? `Tetamo saat ini menerima pembayaran melalui QRIS dan debit/kredit card.
-
-QRIS cocok untuk pengguna di Indonesia karena biasanya bisa dibayar melalui aplikasi bank dan e-wallet yang mendukung QRIS, termasuk pilihan populer seperti BRI, BNI, BCA, Mandiri, GoPay, OVO, DANA, dan ShopeePay.
-
-Debit dan kredit card juga tersedia.
-
-Setelah Anda memilih paket, Tetamo akan mengarahkan Anda ke halaman pembayaran.`
-        : `Tetamo currently accepts QRIS and debit/credit card payments.
-
-QRIS is suitable for users in Indonesia because it can usually be paid through QRIS-supported Indonesian bank apps and e-wallets, including popular options such as BRI, BNI, BCA, Mandiri, GoPay, OVO, DANA, and ShopeePay.
-
-Debit and credit card payment is also available.
-
-After you choose a package, Tetamo will guide you to the payment page.`;
-    }
-
     return raw;
   }
 
