@@ -8,7 +8,7 @@ import {
     Send,
     Sparkles,
     UserPlus,
-    XCircle
+    XCircle,
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -21,7 +21,7 @@ import {
     StyleSheet,
     Text,
     TextInput,
-    View
+    View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
@@ -56,6 +56,12 @@ type AiFeedbackChoice = "yes" | "no";
 
 const GUEST_SESSION_KEY = "scorpio_assist_guest_session_id";
 const GUEST_MESSAGES_KEY = "scorpio_assist_guest_messages";
+
+const CONVERSATION_SELECT =
+  "id, user_id, guest_session_id, source, status, handoff_requested, handoff_status, created_at, updated_at, last_message_at";
+
+const MESSAGE_SELECT =
+  "id, conversation_id, sender_type, message_text, ai_status, suggested_action, suggested_action_label, created_at";
 
 function createLocalMessage(
   messageText: string,
@@ -100,20 +106,30 @@ export default function ScorpioAssistScreen() {
   const isId = language === "id";
   const waitingForAgent = conversation?.handoff_status === "waiting_agent";
 
+  const conversationSource = useMemo(
+    () => `mobile_chat_${language}`,
+    [language]
+  );
+
+  const guestConversationSource = useMemo(
+    () => `mobile_chat_guest_${language}`,
+    [language]
+  );
+
   const ui = useMemo(() => {
     if (isId) {
       return {
         back: "Kembali",
         title: "Scorpio Assist",
-        subtitle: "AI support untuk Tetamo",
+        subtitle: "AI support & sales assistant Tetamo",
         description:
-          "Tanya tentang listing properti, paket, proses signup, pembayaran, dan cara kerja Tetamo.",
+          "Tanya tentang buyer/renter, owner, agent, developer, paket, QRIS/debit/kredit, listing, signup, dan cara kerja Tetamo.",
         supportHoursTitle: "Jam support Tetamo Agent",
         supportHours: "Senin - Jumat, 9:00 pagi - 6:00 sore.",
         waitingAgent: "Menunggu Tetamo Agent bergabung...",
         loadingChat: "Memuat chat...",
         emptyIntro:
-          "Halo, saya Scorpio Assist. Anda bisa tanya tentang cara pasang properti, paket, proses signup, pembayaran, atau cara kerja Tetamo.",
+          "Halo, saya Scorpio Assist. Saya bisa bantu buyer/renter, owner, agent, developer, dan guest tentang listing, paket, QRIS/debit/kredit, signup, pembayaran, dan marketplace Tetamo.",
         tryAsk: "Coba tanya",
         inputPlaceholder: "Tulis pertanyaan Anda...",
         handoff: "Chat dengan Tetamo Agent",
@@ -126,7 +142,7 @@ export default function ScorpioAssistScreen() {
         yesHelped: "Ya, membantu",
         noNeedMore: "Belum, butuh bantuan",
         helpedText:
-          "Senang bisa membantu. Anda bisa tanya lagi kapan saja tentang listing, paket, signup, pembayaran, atau marketplace Tetamo.",
+          "Senang bisa membantu. Anda bisa tanya lagi kapan saja tentang listing, paket, signup, pembayaran QRIS/debit/kredit, atau marketplace Tetamo.",
         notClearText:
           "Maaf kalau jawabannya belum jelas. Silakan tulis bagian yang masih membingungkan, atau lanjut chat dengan Tetamo Agent.",
         footerNote:
@@ -143,15 +159,15 @@ export default function ScorpioAssistScreen() {
     return {
       back: "Back",
       title: "Scorpio Assist",
-      subtitle: "AI support for Tetamo",
+      subtitle: "Tetamo AI support & sales assistant",
       description:
-        "Ask about property listing, packages, signup flow, payment, and how Tetamo works.",
+        "Ask about buyers/renters, owners, agents, developers, packages, QRIS/debit/credit payment, listings, signup, and how Tetamo works.",
       supportHoursTitle: "Tetamo Agent support hours",
       supportHours: "Monday - Friday, 9:00 AM - 6:00 PM.",
       waitingAgent: "Waiting for Tetamo Agent to join...",
       loadingChat: "Loading chat...",
       emptyIntro:
-        "Hi, I’m Scorpio Assist. You can ask me about listing property, packages, signup flow, payment, or how Tetamo works.",
+        "Hi, I’m Scorpio Assist. I can help buyers/renters, owners, agents, developers, and guests with listings, packages, QRIS/debit/credit payment, signup, payment, and the Tetamo marketplace.",
       tryAsk: "Try asking",
       inputPlaceholder: "Write your question...",
       handoff: "Chat with Tetamo Agent",
@@ -164,7 +180,7 @@ export default function ScorpioAssistScreen() {
       yesHelped: "Yes, it helped",
       noNeedMore: "No, I need more help",
       helpedText:
-        "Glad I could help. You can ask me anytime about Tetamo listing, packages, signup, payment, or marketplace.",
+        "Glad I could help. You can ask me anytime about Tetamo listings, packages, signup, QRIS/debit/credit payment, or marketplace.",
       notClearText:
         "Sorry if the answer was not clear yet. Please tell me what part is still confusing, or continue with a Tetamo Agent.",
       footerNote:
@@ -181,18 +197,20 @@ export default function ScorpioAssistScreen() {
   const starterQuestions = useMemo(() => {
     if (isId) {
       return [
-        "Bagaimana cara pasang properti di Tetamo?",
-        "Apa perbedaan owner dan agent?",
-        "Bagaimana paket agent di Tetamo?",
-        "Bagaimana cara bayar listing?",
+        "Saya buyer/renter, cara cari dan hubungi listing?",
+        "Bagaimana cara pasang listing sebagai owner?",
+        "Berapa harga paket agent Tetamo?",
+        "Bisa bayar pakai QRIS, debit, atau kredit?",
+        "Saya developer, bagaimana kerja sama dengan Tetamo?",
       ];
     }
 
     return [
-      "How do I list my property on Tetamo?",
-      "What is the difference between owner and agent?",
-      "How do Tetamo agent packages work?",
-      "How do I pay for a listing?",
+      "I’m a buyer/renter. How do I find and contact listings?",
+      "How do I list my property as an owner?",
+      "What are Tetamo agent package prices?",
+      "Can I pay with QRIS, debit, or credit card?",
+      "I’m a developer. How can I work with Tetamo?",
     ];
   }, [isId]);
 
@@ -263,9 +281,7 @@ export default function ScorpioAssistScreen() {
   const refreshConversation = useCallback(async (conversationId: string) => {
     const { data, error } = await supabase
       .from("support_conversations")
-      .select(
-        "id, user_id, guest_session_id, source, status, handoff_requested, handoff_status, created_at, updated_at, last_message_at"
-      )
+      .select(CONVERSATION_SELECT)
       .eq("id", conversationId)
       .maybeSingle();
 
@@ -284,9 +300,7 @@ export default function ScorpioAssistScreen() {
 
     const { data, error } = await supabase
       .from("support_messages")
-      .select(
-        "id, conversation_id, sender_type, message_text, ai_status, suggested_action, suggested_action_label, created_at"
-      )
+      .select(MESSAGE_SELECT)
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
 
@@ -300,14 +314,39 @@ export default function ScorpioAssistScreen() {
     setLoadingMessages(false);
   }, []);
 
+  const syncConversationSource = useCallback(
+    async (conversationId: string, nextSource: string) => {
+      const { data, error } = await supabase
+        .from("support_conversations")
+        .update({
+          source: nextSource,
+        })
+        .eq("id", conversationId)
+        .select(CONVERSATION_SELECT)
+        .maybeSingle();
+
+      if (error) {
+        console.log("Failed to sync conversation source:", error);
+        return null;
+      }
+
+      if (data) {
+        const updated = data as SupportConversation;
+        setConversation(updated);
+        return updated;
+      }
+
+      return null;
+    },
+    []
+  );
+
   const loadExistingConversation = useCallback(async () => {
     if (!userId) return;
 
     const { data, error } = await supabase
       .from("support_conversations")
-      .select(
-        "id, user_id, guest_session_id, source, status, handoff_requested, handoff_status, created_at, updated_at, last_message_at"
-      )
+      .select(CONVERSATION_SELECT)
       .eq("user_id", userId)
       .eq("status", "open")
       .order("updated_at", { ascending: false })
@@ -320,11 +359,28 @@ export default function ScorpioAssistScreen() {
     }
 
     if (data) {
-      const existing = data as SupportConversation;
+      let existing = data as SupportConversation;
+
+      if (existing.source !== conversationSource) {
+        const synced = await syncConversationSource(
+          existing.id,
+          conversationSource
+        );
+
+        if (synced) {
+          existing = synced;
+        }
+      }
+
       setConversation(existing);
       await refreshMessages(existing.id);
     }
-  }, [refreshMessages, userId]);
+  }, [
+    conversationSource,
+    refreshMessages,
+    syncConversationSource,
+    userId,
+  ]);
 
   useEffect(() => {
     if (!userId) return;
@@ -362,9 +418,7 @@ export default function ScorpioAssistScreen() {
     try {
       const { data: existing, error: existingError } = await supabase
         .from("support_conversations")
-        .select(
-          "id, user_id, guest_session_id, source, status, handoff_requested, handoff_status, created_at, updated_at, last_message_at"
-        )
+        .select(CONVERSATION_SELECT)
         .eq("user_id", userId)
         .eq("status", "open")
         .order("updated_at", { ascending: false })
@@ -375,19 +429,28 @@ export default function ScorpioAssistScreen() {
 
       let activeConversation = existing as SupportConversation | null;
 
+      if (activeConversation?.id && activeConversation.source !== conversationSource) {
+        const synced = await syncConversationSource(
+          activeConversation.id,
+          conversationSource
+        );
+
+        if (synced) {
+          activeConversation = synced;
+        }
+      }
+
       if (!activeConversation) {
         const { data: created, error: createError } = await supabase
           .from("support_conversations")
           .insert({
             user_id: userId,
-            source: "mobile_chat",
+            source: conversationSource,
             status: "open",
             handoff_requested: false,
             handoff_status: "ai_active",
           })
-          .select(
-            "id, user_id, guest_session_id, source, status, handoff_requested, handoff_status, created_at, updated_at, last_message_at"
-          )
+          .select(CONVERSATION_SELECT)
           .maybeSingle();
 
         if (createError) throw createError;
@@ -425,6 +488,8 @@ export default function ScorpioAssistScreen() {
     try {
       const body: Record<string, string> = {
         message_text: messageText,
+        language,
+        source: guestConversationSource,
       };
 
       if (guestSessionId) {
@@ -485,6 +550,17 @@ export default function ScorpioAssistScreen() {
 
     if (!activeConversation) return;
 
+    if (activeConversation.source !== conversationSource) {
+      const synced = await syncConversationSource(
+        activeConversation.id,
+        conversationSource
+      );
+
+      if (synced) {
+        activeConversation = synced;
+      }
+    }
+
     setSending(true);
 
     const optimisticUserMessage = createLocalMessage(
@@ -534,6 +610,17 @@ export default function ScorpioAssistScreen() {
     }
 
     if (!activeConversation) return;
+
+    if (activeConversation.source !== conversationSource) {
+      const synced = await syncConversationSource(
+        activeConversation.id,
+        conversationSource
+      );
+
+      if (synced) {
+        activeConversation = synced;
+      }
+    }
 
     setHandoffLoading(true);
 
