@@ -1,44 +1,155 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    AlertTriangle,
-    CheckCircle2,
-    ChevronLeft,
-    FileWarning,
-    Home,
-    Mail,
-    MapPin,
-    MessageSquare,
-    Send,
-    ShieldAlert,
+  AlertTriangle,
+  CheckCircle2,
+  ChevronLeft,
+  FileWarning,
+  Home,
+  Mail,
+  MapPin,
+  MessageSquare,
+  Send,
+  ShieldAlert,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Linking,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
+
+type Language = "en" | "id";
 
 const SCORPIO_GOLD = "#e6c15c";
 const SUPPORT_EMAIL = "inquiry@tetamo.com";
 
 const reportReasons = [
-  "Fake listing",
-  "Wrong price or details",
-  "Property already sold or rented",
-  "Suspicious listing",
-  "Inappropriate content",
-  "Safety concern",
-  "Other problem",
+  {
+    key: "fake_listing",
+    en: "Fake listing",
+    id: "Listing palsu",
+  },
+  {
+    key: "wrong_details",
+    en: "Wrong price or details",
+    id: "Harga atau detail salah",
+  },
+  {
+    key: "sold_or_rented",
+    en: "Property already sold or rented",
+    id: "Properti sudah terjual atau tersewa",
+  },
+  {
+    key: "suspicious_listing",
+    en: "Suspicious listing",
+    id: "Listing mencurigakan",
+  },
+  {
+    key: "inappropriate_content",
+    en: "Inappropriate content",
+    id: "Konten tidak pantas",
+  },
+  {
+    key: "safety_concern",
+    en: "Safety concern",
+    id: "Masalah keamanan",
+  },
+  {
+    key: "other_problem",
+    en: "Other problem",
+    id: "Masalah lainnya",
+  },
 ];
+
+const copy = {
+  en: {
+    reportSubmitted: "Report submitted",
+    reportSuccess:
+      "Thank you for helping keep Tetamo safe. Our team will review this listing.",
+    done: "Done",
+    headerTitle: "Report Listing",
+    headerSub: "Help us keep Tetamo safe and trusted.",
+    heroTitle: "Tell us what is wrong",
+    heroText:
+      "Reports are reviewed by Tetamo to protect buyers, renters, owners, and agents.",
+    selectedListing: "Selected property listing",
+    listingPrefix: "Listing",
+    listingCode: "Listing code",
+    checkingAccount: "Checking your account...",
+    signInRequired: "Sign in required",
+    signInRequiredText:
+      "Please sign in to submit a report. This helps Tetamo review reports safely.",
+    signIn: "Sign In",
+    emailTetamo: "Email Tetamo",
+    reason: "Reason",
+    additionalDetails: "Additional details",
+    messagePlaceholder: "Tell us more about the issue...",
+    safeNote:
+      "Please do not include sensitive personal information unless it is needed for the report.",
+    chooseReason: "Please choose a reason for the report.",
+    signInFirst:
+      "Please sign in first so Tetamo can review your report safely.",
+    submitFailed:
+      "We could not submit your report. Please try again or contact Tetamo support.",
+    submitting: "Submitting...",
+    submitReport: "Submit Report",
+    emailSubject: "Tetamo Listing Report",
+    emailBodyIntro: "Hello Tetamo,\n\nI would like to report a listing.",
+    emailListing: "Listing",
+    emailCode: "Code",
+    emailLocation: "Location",
+    emailReason: "Reason",
+    emailDetails: "Details",
+  },
+  id: {
+    reportSubmitted: "Laporan terkirim",
+    reportSuccess:
+      "Terima kasih sudah membantu menjaga Tetamo tetap aman. Tim kami akan meninjau listing ini.",
+    done: "Selesai",
+    headerTitle: "Laporkan Listing",
+    headerSub: "Bantu kami menjaga Tetamo tetap aman dan terpercaya.",
+    heroTitle: "Beri tahu kami masalahnya",
+    heroText:
+      "Laporan akan ditinjau oleh Tetamo untuk melindungi pembeli, penyewa, pemilik, dan agen.",
+    selectedListing: "Listing properti yang dipilih",
+    listingPrefix: "Listing",
+    listingCode: "Kode listing",
+    checkingAccount: "Memeriksa akun Anda...",
+    signInRequired: "Login diperlukan",
+    signInRequiredText:
+      "Silakan login untuk mengirim laporan. Ini membantu Tetamo meninjau laporan dengan aman.",
+    signIn: "Masuk",
+    emailTetamo: "Email Tetamo",
+    reason: "Alasan",
+    additionalDetails: "Detail tambahan",
+    messagePlaceholder: "Ceritakan lebih lanjut tentang masalah ini...",
+    safeNote:
+      "Mohon jangan memasukkan informasi pribadi sensitif kecuali diperlukan untuk laporan.",
+    chooseReason: "Silakan pilih alasan laporan.",
+    signInFirst:
+      "Silakan login terlebih dahulu agar Tetamo dapat meninjau laporan Anda dengan aman.",
+    submitFailed:
+      "Laporan belum bisa dikirim. Silakan coba lagi atau hubungi support Tetamo.",
+    submitting: "Mengirim...",
+    submitReport: "Kirim Laporan",
+    emailSubject: "Laporan Listing Tetamo",
+    emailBodyIntro: "Halo Tetamo,\n\nSaya ingin melaporkan sebuah listing.",
+    emailListing: "Listing",
+    emailCode: "Kode",
+    emailLocation: "Lokasi",
+    emailReason: "Alasan",
+    emailDetails: "Detail",
+  },
+};
 
 export default function ReportListingScreen() {
   const router = useRouter();
@@ -49,7 +160,10 @@ export default function ReportListingScreen() {
   const propertyTitle = safeParam(params.title || params.property_title);
   const propertyLocation = safeParam(params.location);
 
-  const [selectedReason, setSelectedReason] = useState(reportReasons[0]);
+  const [language, setLanguage] = useState<Language>("en");
+  const [selectedReasonKey, setSelectedReasonKey] = useState(
+    reportReasons[0].key,
+  );
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingUser, setIsCheckingUser] = useState(true);
@@ -57,11 +171,20 @@ export default function ReportListingScreen() {
   const [submitted, setSubmitted] = useState(false);
   const [errorText, setErrorText] = useState("");
 
+  const t = copy[language];
+
+  const selectedReason =
+    reportReasons.find((reason) => reason.key === selectedReasonKey) ||
+    reportReasons[0];
+
+  const selectedReasonLabel =
+    language === "id" ? selectedReason.id : selectedReason.en;
+
   const listingLabel = useMemo(() => {
     if (propertyTitle) return propertyTitle;
-    if (listingCode) return `Listing ${listingCode}`;
-    return "Selected property listing";
-  }, [listingCode, propertyTitle]);
+    if (listingCode) return `${copy[language].listingPrefix} ${listingCode}`;
+    return copy[language].selectedListing;
+  }, [language, listingCode, propertyTitle]);
 
   useEffect(() => {
     let isMounted = true;
@@ -85,62 +208,69 @@ export default function ReportListingScreen() {
   }, []);
 
   const openSupportEmail = () => {
-    const subject = encodeURIComponent("Tetamo Listing Report");
+    const subject = encodeURIComponent(t.emailSubject);
     const body = encodeURIComponent(
-      `Hello Tetamo,\n\nI would like to report a listing.\n\nListing: ${listingLabel}\nCode: ${
+      `${t.emailBodyIntro}\n\n${t.emailListing}: ${listingLabel}\n${t.emailCode}: ${
         listingCode || "-"
-      }\nLocation: ${propertyLocation || "-"}\nReason: ${
-        selectedReason || "-"
-      }\n\nDetails:\n${message || ""}`
+      }\n${t.emailLocation}: ${propertyLocation || "-"}\n${t.emailReason}: ${
+        selectedReasonLabel || "-"
+      }\n\n${t.emailDetails}:\n${message || ""}`,
     );
 
-    void Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`);
+    void Linking.openURL(
+      `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`,
+    );
   };
 
   const submitReport = async () => {
     setErrorText("");
 
-    if (!selectedReason) {
-      setErrorText("Please choose a reason for the report.");
+    if (!selectedReasonKey) {
+      setErrorText(t.chooseReason);
       return;
     }
 
     setIsSubmitting(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    if (!user?.id) {
+      if (!user?.id) {
+        setIsLoggedIn(false);
+        setErrorText(t.signInFirst);
+        return;
+      }
+
+      const { error } = await supabase.from("user_reports").insert({
+        reporter_user_id: user.id,
+        property_id: isUuid(propertyId) ? propertyId : null,
+        listing_code: listingCode || null,
+        report_type: "listing",
+        reason: selectedReason.en,
+        message: message.trim() || null,
+        source: "tetamo-mobile",
+        metadata: {
+          reason_key: selectedReason.key,
+          reason_label_en: selectedReason.en,
+          reason_label_id: selectedReason.id,
+          property_title: propertyTitle || null,
+          property_location: propertyLocation || null,
+          submitted_from: "mobile_app",
+          language,
+        },
+      });
+
+      if (error) {
+        setErrorText(t.submitFailed);
+        return;
+      }
+
+      setSubmitted(true);
+    } finally {
       setIsSubmitting(false);
-      setIsLoggedIn(false);
-      setErrorText("Please sign in first so Tetamo can review your report safely.");
-      return;
     }
-
-    const { error } = await supabase.from("user_reports").insert({
-      reporter_user_id: user.id,
-      property_id: isUuid(propertyId) ? propertyId : null,
-      listing_code: listingCode || null,
-      report_type: "listing",
-      reason: selectedReason,
-      message: message.trim() || null,
-      source: "tetamo-mobile",
-      metadata: {
-        property_title: propertyTitle || null,
-        property_location: propertyLocation || null,
-        submitted_from: "mobile_app",
-      },
-    });
-
-    setIsSubmitting(false);
-
-    if (error) {
-      setErrorText("We could not submit your report. Please try again or contact Tetamo support.");
-      return;
-    }
-
-    setSubmitted(true);
   };
 
   if (submitted) {
@@ -153,14 +283,12 @@ export default function ReportListingScreen() {
             <CheckCircle2 color="#111111" size={38} />
           </View>
 
-          <Text style={styles.successTitle}>Report submitted</Text>
+          <Text style={styles.successTitle}>{t.reportSubmitted}</Text>
 
-          <Text style={styles.successText}>
-            Thank you for helping keep Tetamo safe. Our team will review this listing.
-          </Text>
+          <Text style={styles.successText}>{t.reportSuccess}</Text>
 
           <Pressable style={styles.primaryButton} onPress={() => router.back()}>
-            <Text style={styles.primaryButtonText}>Done</Text>
+            <Text style={styles.primaryButtonText}>{t.done}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -186,8 +314,33 @@ export default function ReportListingScreen() {
             </Pressable>
 
             <View style={styles.headerTextBox}>
-              <Text style={styles.headerTitle}>Report Listing</Text>
-              <Text style={styles.headerSub}>Help us keep Tetamo safe and trusted.</Text>
+              <Text style={styles.headerTitle}>{t.headerTitle}</Text>
+              <Text style={styles.headerSub}>{t.headerSub}</Text>
+            </View>
+
+            <View style={styles.langToggle}>
+              {(["en", "id"] as Language[]).map((item) => (
+                <Pressable
+                  key={item}
+                  style={[
+                    styles.langButton,
+                    language === item && styles.langButtonActive,
+                  ]}
+                  onPress={() => {
+                    setErrorText("");
+                    setLanguage(item);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.langText,
+                      language === item && styles.langTextActive,
+                    ]}
+                  >
+                    {item.toUpperCase()}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
           </View>
 
@@ -197,10 +350,8 @@ export default function ReportListingScreen() {
             </View>
 
             <View style={styles.heroTextBox}>
-              <Text style={styles.heroTitle}>Tell us what is wrong</Text>
-              <Text style={styles.heroText}>
-                Reports are reviewed by Tetamo to protect buyers, renters, owners, and agents.
-              </Text>
+              <Text style={styles.heroTitle}>{t.heroTitle}</Text>
+              <Text style={styles.heroText}>{t.heroText}</Text>
             </View>
           </View>
 
@@ -213,7 +364,9 @@ export default function ReportListingScreen() {
             </View>
 
             {!!listingCode && (
-              <Text style={styles.infoSub}>Listing code: {listingCode}</Text>
+              <Text style={styles.infoSub}>
+                {t.listingCode}: {listingCode}
+              </Text>
             )}
 
             {!!propertyLocation && (
@@ -228,7 +381,7 @@ export default function ReportListingScreen() {
 
           {isCheckingUser ? (
             <View style={styles.noticeCard}>
-              <Text style={styles.noticeText}>Checking your account...</Text>
+              <Text style={styles.noticeText}>{t.checkingAccount}</Text>
             </View>
           ) : !isLoggedIn ? (
             <View style={styles.noticeCard}>
@@ -236,38 +389,45 @@ export default function ReportListingScreen() {
                 <ShieldAlert color={SCORPIO_GOLD} size={18} />
               </View>
 
-              <Text style={styles.noticeTitle}>Sign in required</Text>
-              <Text style={styles.noticeText}>
-                Please sign in to submit a report. This helps Tetamo review reports safely.
-              </Text>
+              <Text style={styles.noticeTitle}>{t.signInRequired}</Text>
+              <Text style={styles.noticeText}>{t.signInRequiredText}</Text>
 
               <View style={styles.noticeButtons}>
                 <Pressable
                   style={styles.noticeButtonGold}
                   onPress={() => router.push("/login" as any)}
                 >
-                  <Text style={styles.noticeButtonGoldText}>Sign In</Text>
+                  <Text style={styles.noticeButtonGoldText}>{t.signIn}</Text>
                 </Pressable>
 
-                <Pressable style={styles.noticeButtonDark} onPress={openSupportEmail}>
+                <Pressable
+                  style={styles.noticeButtonDark}
+                  onPress={openSupportEmail}
+                >
                   <Mail color={SCORPIO_GOLD} size={14} />
-                  <Text style={styles.noticeButtonDarkText}>Email Tetamo</Text>
+                  <Text style={styles.noticeButtonDarkText}>
+                    {t.emailTetamo}
+                  </Text>
                 </Pressable>
               </View>
             </View>
           ) : null}
 
-          <Text style={styles.sectionLabel}>Reason</Text>
+          <Text style={styles.sectionLabel}>{t.reason}</Text>
 
           <View style={styles.reasonWrap}>
             {reportReasons.map((reason) => {
-              const active = selectedReason === reason;
+              const active = selectedReasonKey === reason.key;
+              const label = language === "id" ? reason.id : reason.en;
 
               return (
                 <Pressable
-                  key={reason}
+                  key={reason.key}
                   style={[styles.reasonChip, active && styles.reasonChipActive]}
-                  onPress={() => setSelectedReason(reason)}
+                  onPress={() => {
+                    setErrorText("");
+                    setSelectedReasonKey(reason.key);
+                  }}
                 >
                   <Text
                     style={[
@@ -275,22 +435,25 @@ export default function ReportListingScreen() {
                       active && styles.reasonChipTextActive,
                     ]}
                   >
-                    {reason}
+                    {label}
                   </Text>
                 </Pressable>
               );
             })}
           </View>
 
-          <Text style={styles.sectionLabel}>Additional details</Text>
+          <Text style={styles.sectionLabel}>{t.additionalDetails}</Text>
 
           <View style={styles.messageBox}>
             <MessageSquare color={SCORPIO_GOLD} size={18} />
 
             <TextInput
               value={message}
-              onChangeText={setMessage}
-              placeholder="Tell us more about the issue..."
+              onChangeText={(value) => {
+                setErrorText("");
+                setMessage(value);
+              }}
+              placeholder={t.messagePlaceholder}
               placeholderTextColor="#7d7d7d"
               style={styles.messageInput}
               multiline
@@ -301,9 +464,7 @@ export default function ReportListingScreen() {
 
           <View style={styles.safeNote}>
             <AlertTriangle color={SCORPIO_GOLD} size={16} />
-            <Text style={styles.safeNoteText}>
-              Please do not include sensitive personal information unless it is needed for the report.
-            </Text>
+            <Text style={styles.safeNoteText}>{t.safeNote}</Text>
           </View>
 
           {!!errorText && <Text style={styles.errorText}>{errorText}</Text>}
@@ -318,7 +479,7 @@ export default function ReportListingScreen() {
           >
             <Send color="#111111" size={17} />
             <Text style={styles.submitButtonText}>
-              {isSubmitting ? "Submitting..." : "Submit Report"}
+              {isSubmitting ? t.submitting : t.submitReport}
             </Text>
           </Pressable>
         </ScrollView>
@@ -334,7 +495,7 @@ function safeParam(value: unknown) {
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
+    value,
   );
 }
 
@@ -383,6 +544,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
     fontWeight: "700",
+  },
+  langToggle: {
+    flexDirection: "row",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#5b4a24",
+    overflow: "hidden",
+  },
+  langButton: {
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  langButtonActive: {
+    backgroundColor: SCORPIO_GOLD,
+  },
+  langText: {
+    color: SCORPIO_GOLD,
+    fontSize: 9.5,
+    fontWeight: "900",
+  },
+  langTextActive: {
+    color: "#111111",
   },
   heroCard: {
     borderRadius: 24,
