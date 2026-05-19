@@ -2,6 +2,8 @@ import { supabase } from "../lib/supabase";
 
 export type TetamoProperty = {
   id: string;
+  userId?: string;
+  source?: string;
   kode?: string;
   slug?: string;
 
@@ -111,6 +113,8 @@ type PropertyEngagementRow = {
 
 const PROPERTY_SELECT = `
   id,
+  user_id,
+  source,
   slug,
   kode,
   status,
@@ -203,7 +207,7 @@ function normalizeKode(value: unknown): string {
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
+    value,
   );
 }
 
@@ -356,7 +360,7 @@ function getPrice(property: PropertyRow): number {
 function normalizeProperty(
   property: PropertyRow,
   imagesByPropertyId: Record<string, PropertyImageRow[]>,
-  engagementByPropertyId: Record<string, PropertyEngagementRow>
+  engagementByPropertyId: Record<string, PropertyEngagementRow>,
 ): TetamoProperty {
   const propertyId = String(property.id);
 
@@ -368,11 +372,12 @@ function normalizeProperty(
     : imageUrls;
 
   const finalImage = finalImages[0] || FALLBACK_IMAGE;
-
   const engagement = engagementByPropertyId[propertyId];
 
   return {
     id: propertyId,
+    userId: property.user_id || undefined,
+    source: property.source || undefined,
     kode: property.kode || undefined,
     slug: property.slug || property.kode || undefined,
 
@@ -501,14 +506,14 @@ async function fetchPropertyEngagement(propertyIds: string[]) {
   const { data, error } = await supabase
     .from("property_engagement_summary")
     .select(
-      "property_id, save_count, like_count, rating_count, avg_rating, share_count"
+      "property_id, save_count, like_count, rating_count, avg_rating, share_count",
     )
     .in("property_id", propertyIds);
 
   if (error) {
     console.error(
       "Tetamo mobile property_engagement_summary fetch error:",
-      error.message
+      error.message,
     );
     return [];
   }
@@ -530,7 +535,7 @@ async function attachImagesEngagementAndNormalize(properties: PropertyRow[]) {
   const engagementByPropertyId = groupEngagementByPropertyId(engagement);
 
   return properties.map((property) =>
-    normalizeProperty(property, imagesByPropertyId, engagementByPropertyId)
+    normalizeProperty(property, imagesByPropertyId, engagementByPropertyId),
   );
 }
 
@@ -592,7 +597,7 @@ export async function fetchPropertyByPathKey(pathKey: string) {
       .from("properties")
       .select(PROPERTY_SELECT)
       .eq("slug", key)
-      .maybeSingle() as any
+      .maybeSingle() as any,
   );
 
   if (isUuid(key)) {
@@ -601,7 +606,7 @@ export async function fetchPropertyByPathKey(pathKey: string) {
         .from("properties")
         .select(PROPERTY_SELECT)
         .eq("id", key)
-        .maybeSingle() as any
+        .maybeSingle() as any,
     );
   }
 
@@ -614,7 +619,7 @@ export async function fetchPropertyByPathKey(pathKey: string) {
         .select(PROPERTY_SELECT)
         .in("kode", kodeVariants)
         .limit(1)
-        .maybeSingle() as any
+        .maybeSingle() as any,
     );
   }
 
@@ -622,7 +627,10 @@ export async function fetchPropertyByPathKey(pathKey: string) {
     const { data, error } = await query;
 
     if (error) {
-      console.error("Tetamo mobile property detail fetch error:", error.message);
+      console.error(
+        "Tetamo mobile property detail fetch error:",
+        error.message,
+      );
       continue;
     }
 

@@ -7,6 +7,7 @@ import {
   BedDouble,
   CalendarDays,
   CarFront,
+  CheckCircle2,
   Clock,
   Droplets,
   Eye,
@@ -47,6 +48,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { supabase } from "../../lib/supabase";
 import {
   fetchPropertyByPathKey,
   type TetamoProperty,
@@ -60,10 +62,19 @@ type DetailChip = {
   icon: ReactNode;
 };
 
+type ViewingDateOption = {
+  label: string;
+  sublabel: string;
+  value: string;
+};
+
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=1400&auto=format&fit=crop";
 
-const TETAMO_FALLBACK_WHATSAPP = process.env.EXPO_PUBLIC_TETAMO_FALLBACK_WHATSAPP || "";
+const TETAMO_FALLBACK_WHATSAPP =
+  process.env.EXPO_PUBLIC_TETAMO_FALLBACK_WHATSAPP || "";
+
+const VIEWING_TIME_OPTIONS = ["10:00", "11:00", "13:00", "15:00", "17:00"];
 
 export default function MobilePropertyDetailScreen() {
   const router = useRouter();
@@ -78,6 +89,7 @@ export default function MobilePropertyDetailScreen() {
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
+  const [submittingSchedule, setSubmittingSchedule] = useState(false);
 
   const pathKey = useMemo(() => {
     const value = params.id;
@@ -130,6 +142,11 @@ export default function MobilePropertyDetailScreen() {
     }
   }, [showSchedule]);
 
+  const viewingDateOptions = useMemo(
+    () => getViewingDateOptions(language),
+    [language],
+  );
+
   const title = property
     ? language === "en"
       ? property.titleEn
@@ -180,7 +197,9 @@ export default function MobilePropertyDetailScreen() {
     addChip(chips, {
       key: "land",
       value: property.landSize
-        ? `${formatNumber(property.landSize)} ${formatLandUnit(property.landUnit)}`
+        ? `${formatNumber(property.landSize)} ${formatLandUnit(
+            property.landUnit,
+          )}`
         : "",
       icon: <Square color="#ffffff" size={20} />,
     });
@@ -267,7 +286,9 @@ Price: ${price}
 
 Is this property still available?`;
 
-    Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+    Linking.openURL(
+      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+    );
   };
 
   const openVideo = () => {
@@ -280,12 +301,12 @@ Is this property still available?`;
 
     router.push(
       `/report/listing?property_id=${encodeURIComponent(
-        property.id || ""
+        property.id || "",
       )}&listing_code=${encodeURIComponent(
-        property.kode || ""
+        property.kode || "",
       )}&title=${encodeURIComponent(title || "")}&location=${encodeURIComponent(
-        property.location || ""
-      )}` as any
+        property.location || "",
+      )}` as any,
     );
   };
 
@@ -294,38 +315,149 @@ Is this property still available?`;
 
     const contactUserId =
       String(
-        (property as any).contactUserId ||
+        property.contactUserId ||
           (property as any).contact_user_id ||
           (property as any).ownerId ||
           (property as any).owner_id ||
           (property as any).agentId ||
           (property as any).agent_id ||
-          ""
+          property.userId ||
+          "",
       ) || "";
 
     router.push(
       `/report/user?reported_user_id=${encodeURIComponent(
-        contactUserId
+        contactUserId,
       )}&name=${encodeURIComponent(
-        property.contactName || "Tetamo"
+        property.contactName || "Tetamo",
       )}&role=${encodeURIComponent(
-        property.contactRole || property.contactAgency || "User"
-      )}&listing_code=${encodeURIComponent(property.kode || "")}` as any
+        property.contactRole || property.contactAgency || "User",
+      )}&listing_code=${encodeURIComponent(property.kode || "")}` as any,
     );
   };
 
-  const submitSchedule = () => {
+  async function submitSchedule() {
     if (!property) return;
 
-    Alert.alert(
-      language === "id" ? "Viewing Request" : "Viewing Request",
-      language === "id"
-        ? `Permintaan jadwal viewing siap dikirim.\n\n${title}\n${selectedDate || "-"} ${selectedTime || ""}`
-        : `Viewing request is ready to submit.\n\n${title}\n${selectedDate || "-"} ${selectedTime || ""}`
-    );
+    if (!selectedDate || !selectedTime) {
+      Alert.alert(
+        language === "id" ? "Lengkapi jadwal" : "Complete schedule",
+        language === "id"
+          ? "Silakan pilih tanggal dan waktu viewing terlebih dahulu."
+          : "Please choose a viewing date and time first.",
+      );
+      return;
+    }
 
-    setIsScheduleOpen(false);
-  };
+    try {
+      setSubmittingSchedule(true);
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user?.id) {
+        Alert.alert(
+          language === "id" ? "Login diperlukan" : "Login required",
+          language === "id"
+            ? "Silakan login terlebih dahulu untuk membuat jadwal viewing."
+            : "Please log in first to create a viewing schedule.",
+        );
+
+        router.push(
+          `/login?next=${encodeURIComponent(
+            `/properti/${encodeURIComponent(pathKey)}?schedule=1`,
+          )}` as any,
+        );
+        return;
+      }
+
+      const { data: senderProfile } = await supabase
+        .from("profiles")
+        .select("full_name, phone, email")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const receiverUserId = getReceiverUserId(property);
+      const receiverRole = getReceiverRole(property);
+
+      const message =
+        language === "id"
+          ? `Request viewing untuk ${title} pada ${selectedDate} jam ${selectedTime}`
+          : `Viewing request for ${title} on ${selectedDate} at ${selectedTime}`;
+
+      const leadPayload = {
+        property_id: property.id,
+        property_code: property.kode || null,
+        property_title: title || null,
+
+        sender_user_id: user.id,
+        sender_name:
+          (senderProfile as any)?.full_name ||
+          (typeof user.user_metadata?.full_name === "string"
+            ? user.user_metadata.full_name
+            : "Tetamo User"),
+        sender_email: (senderProfile as any)?.email || user.email || null,
+        sender_phone: (senderProfile as any)?.phone || null,
+
+        receiver_user_id: receiverUserId || null,
+        receiver_name: property.contactName || null,
+        receiver_role: receiverRole,
+
+        assigned_admin_user_id: null,
+        admin_visible: true,
+
+        lead_type: "viewing",
+        source: "viewing_form",
+        message,
+        viewing_date: selectedDate,
+        viewing_time: selectedTime,
+        viewing_status: "scheduled",
+        status: "new",
+        priority: "normal",
+        notes: null,
+      };
+
+      const { error } = await supabase.from("leads").insert(leadPayload);
+
+      if (error) {
+        console.error("Tetamo mobile viewing lead insert error:", error);
+        Alert.alert(
+          language === "id"
+            ? "Gagal mengirim jadwal"
+            : "Failed to send schedule",
+          error.message ||
+            (language === "id"
+              ? "Jadwal viewing belum bisa dikirim. Silakan coba lagi."
+              : "Viewing request could not be sent. Please try again."),
+        );
+        return;
+      }
+
+      Alert.alert(
+        language === "id" ? "Jadwal viewing terkirim" : "Viewing request sent",
+        language === "id"
+          ? "Permintaan viewing berhasil dikirim. Pemilik atau agen akan menerima jadwal ini di dashboard."
+          : "Your viewing request has been sent. The owner or agent will receive it in their dashboard.",
+      );
+
+      setIsScheduleOpen(false);
+      setSelectedDate("");
+      setSelectedTime("");
+    } catch (error: any) {
+      console.error("Tetamo mobile submit schedule error:", error);
+      Alert.alert(
+        language === "id" ? "Gagal mengirim jadwal" : "Failed to send schedule",
+        error?.message ||
+          (language === "id"
+            ? "Terjadi kesalahan. Silakan coba lagi."
+            : "Something went wrong. Please try again."),
+      );
+    } finally {
+      setSubmittingSchedule(false);
+    }
+  }
 
   const handleGalleryScrollEnd = (event: any) => {
     const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
@@ -515,7 +647,7 @@ Is this property still available?`;
 
             <View style={styles.actionRow}>
               <Pressable style={styles.whatsappButton} onPress={openWhatsapp}>
-                <MessageCircle color="#ffffff" size={16} />
+                <MessageCircle color="#7ee0a6" size={16} />
                 <Text style={styles.primaryButtonText}>WhatsApp</Text>
               </Pressable>
 
@@ -523,7 +655,7 @@ Is this property still available?`;
                 style={styles.scheduleButton}
                 onPress={() => setIsScheduleOpen(true)}
               >
-                <CalendarDays color="#111111" size={16} />
+                <CalendarDays color="#e6c15c" size={16} />
                 <Text style={styles.scheduleButtonText}>
                   {language === "id" ? "Jadwal" : "Schedule"}
                 </Text>
@@ -625,7 +757,7 @@ Is this property still available?`;
               </View>
 
               <Pressable style={styles.contactWhatsapp} onPress={openWhatsapp}>
-                <MessageCircle color="#ffffff" size={15} />
+                <MessageCircle color="#7ee0a6" size={15} />
                 <Text style={styles.contactWhatsappText}>WhatsApp</Text>
               </Pressable>
             </View>
@@ -648,7 +780,9 @@ Is this property still available?`;
                 <View style={styles.scheduleModalHeader}>
                   <View style={styles.scheduleModalTitleBox}>
                     <Text style={styles.scheduleModalTitle}>
-                      {language === "id" ? "Jadwalkan Viewing" : "Schedule Viewing"}
+                      {language === "id"
+                        ? "Jadwalkan Viewing"
+                        : "Schedule Viewing"}
                     </Text>
 
                     <Text style={styles.scheduleModalSub} numberOfLines={2}>
@@ -666,31 +800,127 @@ Is this property still available?`;
 
                 <Text style={styles.panelSub}>
                   {language === "id"
-                    ? "Pilih tanggal dan waktu viewing."
-                    : "Choose your preferred viewing date and time."}
+                    ? "Pilih tanggal dan waktu viewing. Pemilik atau agen akan menerima permintaan ini di dashboard."
+                    : "Choose your viewing date and time. The owner or agent will receive this request in their dashboard."}
                 </Text>
 
-                <TextInput
-                  value={selectedDate}
-                  onChangeText={setSelectedDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#888888"
-                  style={styles.input}
-                />
+                <View style={styles.scheduleBlock}>
+                  <Text style={styles.scheduleLabel}>
+                    {language === "id" ? "Pilih Tanggal" : "Choose Date"}
+                  </Text>
 
-                <TextInput
-                  value={selectedTime}
-                  onChangeText={setSelectedTime}
-                  placeholder="10:00 AM"
-                  placeholderTextColor="#888888"
-                  style={styles.input}
-                />
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.dateChipRow}
+                  >
+                    {viewingDateOptions.map((option) => {
+                      const active = selectedDate === option.value;
 
-                <Pressable style={styles.submitButton} onPress={submitSchedule}>
+                      return (
+                        <Pressable
+                          key={option.value}
+                          style={[
+                            styles.dateChip,
+                            active && styles.dateChipActive,
+                          ]}
+                          onPress={() => setSelectedDate(option.value)}
+                        >
+                          <Text
+                            style={[
+                              styles.dateChipLabel,
+                              active && styles.dateChipLabelActive,
+                            ]}
+                          >
+                            {option.label}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.dateChipSub,
+                              active && styles.dateChipSubActive,
+                            ]}
+                          >
+                            {option.sublabel}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                <View style={styles.scheduleBlock}>
+                  <Text style={styles.scheduleLabel}>
+                    {language === "id" ? "Pilih Waktu" : "Choose Time"}
+                  </Text>
+
+                  <View style={styles.timeChipGrid}>
+                    {VIEWING_TIME_OPTIONS.map((time) => {
+                      const active = selectedTime === time;
+
+                      return (
+                        <Pressable
+                          key={time}
+                          style={[
+                            styles.timeChip,
+                            active && styles.timeChipActive,
+                          ]}
+                          onPress={() => setSelectedTime(time)}
+                        >
+                          <Clock
+                            color={active ? "#111111" : "#e6c15c"}
+                            size={13}
+                          />
+                          <Text
+                            style={[
+                              styles.timeChipText,
+                              active && styles.timeChipTextActive,
+                            ]}
+                          >
+                            {time}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {selectedDate && selectedTime ? (
+                  <View style={styles.selectedScheduleBox}>
+                    <CheckCircle2 color="#22c55e" size={16} />
+                    <Text style={styles.selectedScheduleText}>
+                      {language === "id"
+                        ? `Viewing: ${formatDisplayDate(
+                            selectedDate,
+                            language,
+                          )} • ${selectedTime}`
+                        : `Viewing: ${formatDisplayDate(
+                            selectedDate,
+                            language,
+                          )} • ${selectedTime}`}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <Pressable
+                  style={[
+                    styles.submitButton,
+                    submittingSchedule && styles.submitButtonDisabled,
+                  ]}
+                  disabled={submittingSchedule}
+                  onPress={submitSchedule}
+                >
+                  {submittingSchedule ? (
+                    <ActivityIndicator color="#111111" />
+                  ) : null}
+
                   <Text style={styles.submitButtonText}>
-                    {language === "id"
-                      ? "Kirim Permintaan Viewing"
-                      : "Send Viewing Request"}
+                    {submittingSchedule
+                      ? language === "id"
+                        ? "Mengirim..."
+                        : "Sending..."
+                      : language === "id"
+                        ? "Kirim Permintaan Viewing"
+                        : "Send Viewing Request"}
                   </Text>
                 </Pressable>
               </View>
@@ -705,6 +935,36 @@ Is this property still available?`;
 function addChip(chips: DetailChip[], chip: DetailChip) {
   if (!chip.value || chip.value === "-") return;
   chips.push(chip);
+}
+
+function getReceiverUserId(property: TetamoProperty) {
+  return (
+    property.contactUserId ||
+    property.userId ||
+    (property as any).contact_user_id ||
+    (property as any).user_id ||
+    (property as any).ownerId ||
+    (property as any).owner_id ||
+    (property as any).agentId ||
+    (property as any).agent_id ||
+    ""
+  );
+}
+
+function getReceiverRole(property: TetamoProperty) {
+  const raw = String(
+    property.contactRole || property.source || (property as any).role || "",
+  )
+    .trim()
+    .toLowerCase();
+
+  if (raw === "agent" || raw.includes("agent")) return "agent";
+  if (raw === "developer" || raw.includes("developer")) return "developer";
+  if (raw === "owner" || raw === "pemilik" || raw.includes("owner")) {
+    return "owner";
+  }
+
+  return "owner";
 }
 
 function normalizeWhatsappPhone(value?: string | null) {
@@ -739,7 +999,9 @@ function formatLandUnit(value?: string | null) {
 }
 
 function formatPropertyType(value?: string | null, language?: Language) {
-  const raw = String(value || "").toLowerCase().trim();
+  const raw = String(value || "")
+    .toLowerCase()
+    .trim();
 
   if (!raw) return "";
   if (raw === "tanah") return language === "id" ? "Tanah" : "Land";
@@ -758,7 +1020,9 @@ function formatPropertyType(value?: string | null, language?: Language) {
 }
 
 function formatRentalType(value?: string | null, language?: Language) {
-  const raw = String(value || "").toLowerCase().trim();
+  const raw = String(value || "")
+    .toLowerCase()
+    .trim();
 
   if (!raw) return "";
 
@@ -804,6 +1068,65 @@ function getInitials(name: string) {
   const second = parts[1]?.[0] || "A";
 
   return `${first}${second}`.toUpperCase();
+}
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function toDateValue(date: Date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
+    date.getDate(),
+  )}`;
+}
+
+function addDays(base: Date, days: number) {
+  const next = new Date(base);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function getViewingDateOptions(language: Language): ViewingDateOption[] {
+  const today = new Date();
+
+  return Array.from({ length: 7 }).map((_, index) => {
+    const date = addDays(today, index);
+    const value = toDateValue(date);
+
+    let label = new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
+      weekday: "short",
+    }).format(date);
+
+    if (index === 0) label = language === "id" ? "Hari ini" : "Today";
+    if (index === 1) label = language === "id" ? "Besok" : "Tomorrow";
+
+    const sublabel = new Intl.DateTimeFormat(
+      language === "id" ? "id-ID" : "en-US",
+      {
+        day: "2-digit",
+        month: "short",
+      },
+    ).format(date);
+
+    return {
+      label,
+      sublabel,
+      value,
+    };
+  });
+}
+
+function formatDisplayDate(value: string, language: Language) {
+  const date = new Date(`${value}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 }
 
 function Meta({ icon, value }: { icon: ReactNode; value: string | number }) {
@@ -877,7 +1200,9 @@ function SafetyReportsPanel({
             </Text>
 
             <Text style={styles.safetyButtonSub}>
-              {language === "id" ? "Listing palsu/detail salah" : "Fake or wrong details"}
+              {language === "id"
+                ? "Listing palsu/detail salah"
+                : "Fake or wrong details"}
             </Text>
           </View>
         </Pressable>
@@ -891,7 +1216,9 @@ function SafetyReportsPanel({
             </Text>
 
             <Text style={styles.safetyButtonSub}>
-              {language === "id" ? "Agen/user mencurigakan" : "Suspicious user or agent"}
+              {language === "id"
+                ? "Agen/user mencurigakan"
+                : "Suspicious user or agent"}
             </Text>
           </View>
         </Pressable>
@@ -918,10 +1245,10 @@ function MortgageCalculatorPanel({
   priceIdr: number;
 }) {
   const [propertyPrice, setPropertyPrice] = useState(
-    priceIdr ? String(priceIdr) : ""
+    priceIdr ? String(priceIdr) : "",
   );
   const [downPayment, setDownPayment] = useState(
-    priceIdr ? String(Math.round(priceIdr * 0.2)) : ""
+    priceIdr ? String(Math.round(priceIdr * 0.2)) : "",
   );
   const [interestRate, setInterestRate] = useState("8");
   const [years, setYears] = useState("15");
@@ -1282,7 +1609,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 43,
     borderRadius: 15,
-    backgroundColor: "#25D366",
+    backgroundColor: "#101010",
+    borderWidth: 1,
+    borderColor: "rgba(37,211,102,0.55)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -1297,14 +1626,16 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 43,
     borderRadius: 15,
-    backgroundColor: "#e6c15c",
+    backgroundColor: "#101010",
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.65)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
   },
   scheduleButtonText: {
-    color: "#111111",
+    color: "#e6c15c",
     fontSize: 12,
     fontWeight: "900",
   },
@@ -1500,29 +1831,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "#302711",
   },
-  input: {
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#050505",
-    borderRadius: 15,
-    paddingHorizontal: 13,
-    height: 46,
-    color: "#ffffff",
-    marginTop: 10,
-  },
-  submitButton: {
-    minHeight: 46,
-    borderRadius: 16,
-    backgroundColor: "#e6c15c",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 14,
-  },
-  submitButtonText: {
-    color: "#111111",
-    fontSize: 12.5,
-    fontWeight: "900",
-  },
   contactPanel: {
     marginHorizontal: 18,
     marginTop: 18,
@@ -1584,7 +1892,9 @@ const styles = StyleSheet.create({
   },
   contactWhatsapp: {
     borderRadius: 999,
-    backgroundColor: "#25D366",
+    backgroundColor: "#101010",
+    borderWidth: 1,
+    borderColor: "rgba(37,211,102,0.55)",
     paddingHorizontal: 12,
     paddingVertical: 10,
     flexDirection: "row",
@@ -1695,6 +2005,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#303030",
     padding: 18,
+    maxHeight: "86%",
   },
   scheduleModalHeader: {
     flexDirection: "row",
@@ -1723,5 +2034,112 @@ const styles = StyleSheet.create({
     backgroundColor: "#1b1b1b",
     alignItems: "center",
     justifyContent: "center",
+  },
+  scheduleBlock: {
+    marginTop: 8,
+  },
+  scheduleLabel: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+  dateChipRow: {
+    gap: 8,
+    paddingRight: 4,
+  },
+  dateChip: {
+    minWidth: 92,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#303030",
+    backgroundColor: "#050505",
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+  },
+  dateChipActive: {
+    backgroundColor: "#e6c15c",
+    borderColor: "#e6c15c",
+  },
+  dateChipLabel: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  dateChipLabelActive: {
+    color: "#111111",
+  },
+  dateChipSub: {
+    color: "#a9a9a9",
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 3,
+  },
+  dateChipSubActive: {
+    color: "#111111",
+  },
+  timeChipGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  timeChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#705d2c",
+    backgroundColor: "#050505",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  timeChipActive: {
+    backgroundColor: "#e6c15c",
+    borderColor: "#e6c15c",
+  },
+  timeChipText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  timeChipTextActive: {
+    color: "#111111",
+  },
+  selectedScheduleBox: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#14532d",
+    backgroundColor: "#052e16",
+    padding: 11,
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  selectedScheduleText: {
+    color: "#bbf7d0",
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontWeight: "800",
+    flex: 1,
+  },
+  submitButton: {
+    minHeight: 46,
+    borderRadius: 16,
+    backgroundColor: "#e6c15c",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 14,
+    flexDirection: "row",
+    gap: 8,
+  },
+  submitButtonDisabled: {
+    opacity: 0.55,
+  },
+  submitButtonText: {
+    color: "#111111",
+    fontSize: 12.5,
+    fontWeight: "900",
   },
 });
