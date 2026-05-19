@@ -1,39 +1,39 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    ArrowLeft,
-    Bath,
-    BedDouble,
-    Building2,
-    CalendarDays,
-    Camera,
-    ChevronRight,
-    Eye,
-    Hash,
-    Home,
-    MapPin,
-    MessageCircle,
-    Search,
-    SlidersHorizontal,
-    X
+  ArrowLeft,
+  Bath,
+  BedDouble,
+  Building2,
+  CalendarDays,
+  Camera,
+  ChevronRight,
+  Eye,
+  Hash,
+  Home,
+  MapPin,
+  MessageCircle,
+  Search,
+  SlidersHorizontal,
+  X,
 } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    ImageBackground,
-    Linking,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  ImageBackground,
+  Linking,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import {
-    fetchHomepageProperties,
-    type TetamoProperty,
+  fetchHomepageProperties,
+  type TetamoProperty,
 } from "../services/properties";
 
 type Language = "en" | "id";
@@ -57,7 +57,8 @@ type SuggestionItem = {
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=1400&auto=format&fit=crop";
 
-const TETAMO_FALLBACK_WHATSAPP = process.env.EXPO_PUBLIC_TETAMO_FALLBACK_WHATSAPP || "";
+const TETAMO_FALLBACK_WHATSAPP =
+  process.env.EXPO_PUBLIC_TETAMO_FALLBACK_WHATSAPP || "";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -319,10 +320,8 @@ export default function SearchScreen() {
   const provinces = useMemo(() => {
     return Array.from(
       new Set(
-        allProperties
-          .map((item) => cleanString(item.province))
-          .filter(Boolean)
-      )
+        allProperties.map((item) => cleanString(item.province)).filter(Boolean),
+      ),
     ).sort();
   }, [allProperties]);
 
@@ -333,10 +332,8 @@ export default function SearchScreen() {
 
     return Array.from(
       new Set(
-        base
-          .map((item) => cleanString(item.area || item.city))
-          .filter(Boolean)
-      )
+        base.map((item) => cleanString(item.area || item.city)).filter(Boolean),
+      ),
     ).sort();
   }, [allProperties, province]);
 
@@ -345,8 +342,8 @@ export default function SearchScreen() {
       new Set(
         allProperties
           .map((item) => formatPropertyType(item.propertyType, language))
-          .filter(Boolean)
-      )
+          .filter(Boolean),
+      ),
     ).sort();
   }, [allProperties, language]);
 
@@ -384,12 +381,14 @@ export default function SearchScreen() {
     const lokasiValues = Array.from(
       new Set(
         allProperties.flatMap((item) => [
-          cleanString(`${item.area || item.city || ""}, ${item.province || ""}`),
+          cleanString(
+            `${item.area || item.city || ""}, ${item.province || ""}`,
+          ),
           cleanString(item.area),
           cleanString(item.city),
           cleanString(item.province),
-        ])
-      )
+        ]),
+      ),
     ).filter(Boolean);
 
     const lokasi = lokasiValues
@@ -442,11 +441,13 @@ export default function SearchScreen() {
 
         const matchesRental =
           !rentalType ||
-          (isRentProperty(item) && normalizeRentalType(item.rentalType) === rentalType);
+          (isRentProperty(item) &&
+            normalizeRentalType(item.rentalType) === rentalType);
 
         const matchesSale =
           !saleType ||
-          (isSaleProperty(item) && normalizeSaleType(item.saleType) === saleType);
+          (isSaleProperty(item) &&
+            normalizeSaleType(item.saleType) === saleType);
 
         const matchesProvince = !province || item.province === province;
 
@@ -482,9 +483,13 @@ export default function SearchScreen() {
       });
 
     if (sortBy === "harga-rendah") {
-      result = [...result].sort((a, b) => (a.item.priceIdr || 0) - (b.item.priceIdr || 0));
+      result = [...result].sort(
+        (a, b) => (a.item.priceIdr || 0) - (b.item.priceIdr || 0),
+      );
     } else if (sortBy === "harga-tinggi") {
-      result = [...result].sort((a, b) => (b.item.priceIdr || 0) - (a.item.priceIdr || 0));
+      result = [...result].sort(
+        (a, b) => (b.item.priceIdr || 0) - (a.item.priceIdr || 0),
+      );
     } else if (sortBy === "terbaru") {
       result = [...result].sort((a, b) => a.index - b.index);
     } else {
@@ -507,11 +512,14 @@ export default function SearchScreen() {
     language,
   ]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredResults.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredResults.length / ITEMS_PER_PAGE),
+  );
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const paginatedResults = filteredResults.slice(
     (safeCurrentPage - 1) * ITEMS_PER_PAGE,
-    safeCurrentPage * ITEMS_PER_PAGE
+    safeCurrentPage * ITEMS_PER_PAGE,
   );
 
   const startItem =
@@ -519,7 +527,10 @@ export default function SearchScreen() {
       ? 0
       : (safeCurrentPage - 1) * ITEMS_PER_PAGE + 1;
 
-  const endItem = Math.min(safeCurrentPage * ITEMS_PER_PAGE, filteredResults.length);
+  const endItem = Math.min(
+    safeCurrentPage * ITEMS_PER_PAGE,
+    filteredResults.length,
+  );
 
   const visiblePages = useMemo(() => {
     const pages: number[] = [];
@@ -559,15 +570,24 @@ export default function SearchScreen() {
 
       const normalizedRental = normalizeText(rental || "");
 
-      if (normalizedRental.includes("monthly") || normalizedRental.includes("bulanan")) {
+      if (
+        normalizedRental.includes("monthly") ||
+        normalizedRental.includes("bulanan")
+      ) {
         base += language === "id" ? " /bln" : " /mo";
       }
 
-      if (normalizedRental.includes("yearly") || normalizedRental.includes("tahunan")) {
+      if (
+        normalizedRental.includes("yearly") ||
+        normalizedRental.includes("tahunan")
+      ) {
         base += language === "id" ? " /thn" : " /yr";
       }
 
-      if (normalizedRental.includes("daily") || normalizedRental.includes("harian")) {
+      if (
+        normalizedRental.includes("daily") ||
+        normalizedRental.includes("harian")
+      ) {
         base += language === "id" ? " /hari" : " /day";
       }
 
@@ -638,7 +658,9 @@ Price: ${formatPrice(property.priceIdr, property.rentalType)}
 
 Is this property still available?`;
 
-    Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+    Linking.openURL(
+      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+    );
   };
 
   return (
@@ -676,7 +698,10 @@ Is this property still available?`;
               <Pressable
                 key={item}
                 onPress={() => setLanguage(item)}
-                style={[styles.toggleItem, language === item && styles.toggleActive]}
+                style={[
+                  styles.toggleItem,
+                  language === item && styles.toggleActive,
+                ]}
               >
                 <Text
                   style={[
@@ -695,7 +720,10 @@ Is this property still available?`;
               <Pressable
                 key={item}
                 onPress={() => setCurrency(item)}
-                style={[styles.currencyItem, currency === item && styles.toggleActive]}
+                style={[
+                  styles.currencyItem,
+                  currency === item && styles.toggleActive,
+                ]}
               >
                 <Text
                   style={[
@@ -745,7 +773,10 @@ Is this property still available?`;
               )}
             </View>
 
-            <Pressable style={styles.searchButton} onPress={() => handleSearch()}>
+            <Pressable
+              style={styles.searchButton}
+              onPress={() => handleSearch()}
+            >
               <Text style={styles.searchButtonText}>{t.search}</Text>
             </Pressable>
           </View>
@@ -890,7 +921,10 @@ Is this property still available?`;
                 value={category}
                 options={[
                   { label: t.property, value: "" },
-                  ...propertyTypes.map((item) => ({ label: item, value: item })),
+                  ...propertyTypes.map((item) => ({
+                    label: item,
+                    value: item,
+                  })),
                 ]}
                 onChange={setCategory}
               />
@@ -932,7 +966,10 @@ Is this property still available?`;
             </Text>
 
             {hasActiveFilters ? (
-              <Pressable style={styles.clearFilterButton} onPress={clearFilters}>
+              <Pressable
+                style={styles.clearFilterButton}
+                onPress={clearFilters}
+              >
                 <Text style={styles.clearFilterText}>{t.clearFilters}</Text>
               </Pressable>
             ) : null}
@@ -986,7 +1023,9 @@ Is this property still available?`;
                     styles.pageButton,
                     safeCurrentPage === 1 && styles.pageButtonDisabled,
                   ]}
-                  onPress={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
+                  onPress={() =>
+                    setCurrentPage(Math.max(1, safeCurrentPage - 1))
+                  }
                 >
                   <Text style={styles.pageButtonText}>{t.previous}</Text>
                 </Pressable>
@@ -1095,7 +1134,9 @@ function normalizeRentalType(value?: string | null): RentalType {
 }
 
 function normalizeSaleType(value?: string | null): SaleType {
-  const v = String(value || "").trim().toLowerCase();
+  const v = String(value || "")
+    .trim()
+    .toLowerCase();
 
   if (v === "freehold") return "freehold";
   if (v === "leasehold") return "leasehold";
@@ -1136,7 +1177,9 @@ function normalizeSort(value?: string | null): SortOption {
 }
 
 function getTitle(property: TetamoProperty, language: Language) {
-  return language === "id" ? property.titleId || property.titleEn : property.titleEn;
+  return language === "id"
+    ? property.titleId || property.titleEn
+    : property.titleEn;
 }
 
 function formatPricePlain(value?: number) {
@@ -1190,7 +1233,8 @@ function formatPropertyType(value?: string | null, language?: Language) {
   if (raw === "resort") return "Resort";
   if (raw === "pabrik") return language === "id" ? "Pabrik" : "Factory";
   if (raw === "toko") return language === "id" ? "Toko" : "Shop";
-  if (raw === "rukos") return language === "id" ? "Rukos" : "Shop-Boarding House";
+  if (raw === "rukos")
+    return language === "id" ? "Rukos" : "Shop-Boarding House";
 
   return raw
     .split(" ")
@@ -1214,7 +1258,8 @@ function getSaleTypeLabel(value?: string | null, language?: Language) {
   if (sale === "freehold") return "Freehold";
   if (sale === "leasehold") return "Leasehold";
   if (sale === "hgb") return "HGB";
-  if (sale === "hak_pakai") return language === "id" ? "Hak Pakai" : "Right to Use";
+  if (sale === "hak_pakai")
+    return language === "id" ? "Hak Pakai" : "Right to Use";
   if (sale === "lainnya") return language === "id" ? "Lainnya" : "Other";
 
   return "";
@@ -1295,22 +1340,24 @@ function calculateRelevanceScore(property: TetamoProperty, query: string) {
   const words = normalizedQuery.split(" ").filter(Boolean);
   const searchable = buildSearchableText(property);
   const normalizedCode = normalizeText(property.kode || "");
-  const normalizedTitle = normalizeText(`${property.titleEn} ${property.titleId}`);
+  const normalizedTitle = normalizeText(
+    `${property.titleEn} ${property.titleId}`,
+  );
   const normalizedArea = normalizeText(property.area || "");
   const normalizedProvince = normalizeText(property.province || "");
   const normalizedAgency = normalizeText(property.contactAgency || "");
   const normalizedAgent = normalizeText(property.contactName || "");
   const normalizedRental = normalizeText(
-    `${property.rentalType} ${getRentalTypeLabel(property.rentalType, "id")} ${getRentalTypeLabel(
+    `${property.rentalType} ${getRentalTypeLabel(
       property.rentalType,
-      "en"
-    )}`
+      "id",
+    )} ${getRentalTypeLabel(property.rentalType, "en")}`,
   );
   const normalizedSale = normalizeText(
-    `${property.saleType} ${getSaleTypeLabel(property.saleType, "id")} ${getSaleTypeLabel(
+    `${property.saleType} ${getSaleTypeLabel(
       property.saleType,
-      "en"
-    )}`
+      "id",
+    )} ${getSaleTypeLabel(property.saleType, "en")}`,
   );
 
   let score = 0;
@@ -1344,8 +1391,10 @@ function calculateRelevanceScore(property: TetamoProperty, query: string) {
     score += 220;
   }
 
-  if (normalizedQuery.includes("dijual") && isSaleProperty(property)) score += 120;
-  if (normalizedQuery.includes("disewa") && isRentProperty(property)) score += 120;
+  if (normalizedQuery.includes("dijual") && isSaleProperty(property))
+    score += 120;
+  if (normalizedQuery.includes("disewa") && isRentProperty(property))
+    score += 120;
 
   if (
     (normalizedQuery.includes("harian") || normalizedQuery.includes("daily")) &&
@@ -1355,24 +1404,32 @@ function calculateRelevanceScore(property: TetamoProperty, query: string) {
   }
 
   if (
-    (normalizedQuery.includes("bulanan") || normalizedQuery.includes("monthly")) &&
+    (normalizedQuery.includes("bulanan") ||
+      normalizedQuery.includes("monthly")) &&
     normalizeRentalType(property.rentalType) === "monthly"
   ) {
     score += 160;
   }
 
   if (
-    (normalizedQuery.includes("tahunan") || normalizedQuery.includes("yearly")) &&
+    (normalizedQuery.includes("tahunan") ||
+      normalizedQuery.includes("yearly")) &&
     normalizeRentalType(property.rentalType) === "yearly"
   ) {
     score += 160;
   }
 
-  if (normalizedQuery.includes("freehold") && normalizeSaleType(property.saleType) === "freehold") {
+  if (
+    normalizedQuery.includes("freehold") &&
+    normalizeSaleType(property.saleType) === "freehold"
+  ) {
     score += 160;
   }
 
-  if (normalizedQuery.includes("leasehold") && normalizeSaleType(property.saleType) === "leasehold") {
+  if (
+    normalizedQuery.includes("leasehold") &&
+    normalizeSaleType(property.saleType) === "leasehold"
+  ) {
     score += 160;
   }
 
@@ -1522,7 +1579,8 @@ function getBadgesForProperty({
   forSaleText: string;
   forRentText: string;
 }) {
-  const badges: { key: string; label: string; bg: string; color: string }[] = [];
+  const badges: { key: string; label: string; bg: string; color: string }[] =
+    [];
   const rentalType = normalizeRentalType(property.rentalType);
   const saleType = normalizeSaleType(property.saleType);
   const badge = normalizeText(property.badge || "");
@@ -1702,7 +1760,10 @@ function SearchResultCard({
         </View>
 
         <Text style={styles.resultLocationText} numberOfLines={1}>
-          {property.area || property.city || property.province || property.location}
+          {property.area ||
+            property.city ||
+            property.province ||
+            property.location}
         </Text>
 
         <Text style={styles.resultName} numberOfLines={2}>
@@ -1714,9 +1775,18 @@ function SearchResultCard({
         </Text>
 
         <View style={styles.specRow}>
-          <Spec icon={<Home color="#ffffff" size={11} />} value={`${property.size || 0} m²`} />
-          <Spec icon={<BedDouble color="#ffffff" size={11} />} value={property.beds || 0} />
-          <Spec icon={<Bath color="#ffffff" size={11} />} value={property.baths || 0} />
+          <Spec
+            icon={<Home color="#ffffff" size={11} />}
+            value={`${property.size || 0} m²`}
+          />
+          <Spec
+            icon={<BedDouble color="#ffffff" size={11} />}
+            value={property.beds || 0}
+          />
+          <Spec
+            icon={<Bath color="#ffffff" size={11} />}
+            value={property.baths || 0}
+          />
         </View>
 
         <View style={styles.metricRow}>
@@ -1738,7 +1808,7 @@ function SearchResultCard({
               onWhatsapp();
             }}
           >
-            <MessageCircle color="#ffffff" size={13} />
+            <MessageCircle color="#7ee0a6" size={13} />
             <Text style={styles.actionText}>{whatsappLabel}</Text>
           </Pressable>
 
@@ -1749,7 +1819,7 @@ function SearchResultCard({
               onSchedule();
             }}
           >
-            <CalendarDays color="#111111" size={13} />
+            <CalendarDays color="#e6c15c" size={13} />
             <Text style={styles.scheduleText}>{scheduleLabel}</Text>
           </Pressable>
         </View>
@@ -2209,7 +2279,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 42,
     borderRadius: 15,
-    backgroundColor: "#25D366",
+    backgroundColor: "#101010",
+    borderWidth: 1,
+    borderColor: "rgba(37,211,102,0.55)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -2219,7 +2291,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 42,
     borderRadius: 15,
-    backgroundColor: "#e6c15c",
+    backgroundColor: "#101010",
+    borderWidth: 1,
+    borderColor: "rgba(230,193,92,0.65)",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -2231,7 +2305,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   scheduleText: {
-    color: "#111111",
+    color: "#e6c15c",
     fontSize: 11.5,
     fontWeight: "900",
   },
