@@ -3,27 +3,27 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as WebBrowser from "expo-web-browser";
 import {
-    AlertCircle,
-    ArrowLeft,
-    Eye,
-    EyeOff,
-    KeyRound,
-    LockKeyhole,
-    Mail,
-    ShieldCheck,
+  AlertCircle,
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  KeyRound,
+  LockKeyhole,
+  Mail,
+  ShieldCheck,
 } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
@@ -102,11 +102,15 @@ export default function LoginScreen() {
           "Email atau kata sandi salah. Jika lupa kata sandi, gunakan reset password di bawah.",
         userNotFound: "User tidak ditemukan.",
         profileNotFound: "Profil pengguna tidak ditemukan.",
+        googleUrlError: "URL login Google gagal dibuat.",
+        googleCodeError: "Login Google tidak mengembalikan kode autentikasi.",
+        googleSessionError: "Sesi login Google gagal dibuat.",
+        googleLoginFailed: "Login dengan Google gagal.",
         showPassword: "Tampilkan",
         hidePassword: "Sembunyikan",
         quickTitle: "Akses aman",
         quickText:
-          "Setelah login, Tetamo akan membaca role dari profile Anda dan mengarahkan ke halaman yang sesuai.",
+          "Setelah login, Tetamo akan membaca role dari profil Anda dan mengarahkan ke halaman yang sesuai.",
       };
     }
 
@@ -135,6 +139,10 @@ export default function LoginScreen() {
         "Wrong email or password. If you forgot your password, use reset password below.",
       userNotFound: "User not found.",
       profileNotFound: "User profile not found.",
+      googleUrlError: "Google login URL was not created.",
+      googleCodeError: "Google login did not return an auth code.",
+      googleSessionError: "Google login session was not created.",
+      googleLoginFailed: "Google login failed.",
       showPassword: "Show",
       hidePassword: "Hide",
       quickTitle: "Secure access",
@@ -146,7 +154,7 @@ export default function LoginScreen() {
   function getDefaultRedirect(role: AllowedRole | null) {
     if (role === "owner") return "/owner/packages";
     if (role === "agent") return "/agent/packages";
-    if (role === "developer") return "/developer/packages";
+    if (role === "developer") return "/developer-license";
     if (role === "admin") return "/(tabs)/profile";
 
     return "/(tabs)/property";
@@ -217,7 +225,7 @@ export default function LoginScreen() {
         },
         {
           onConflict: "id",
-        }
+        },
       );
 
       if (insertError) {
@@ -356,11 +364,14 @@ export default function LoginScreen() {
 
       if (!data?.url) {
         setGoogleLoading(false);
-        setLoginError("Google login URL was not created.");
+        setLoginError(ui.googleUrlError);
         return;
       }
 
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectTo,
+      );
 
       if (result.type !== "success" || !result.url) {
         setGoogleLoading(false);
@@ -372,7 +383,7 @@ export default function LoginScreen() {
 
       if (!code) {
         setGoogleLoading(false);
-        setLoginError("Google login did not return an auth code.");
+        setLoginError(ui.googleCodeError);
         return;
       }
 
@@ -391,7 +402,7 @@ export default function LoginScreen() {
 
       if (!session?.user) {
         setGoogleLoading(false);
-        setLoginError("Google login session was not created.");
+        setLoginError(ui.googleSessionError);
         return;
       }
 
@@ -406,7 +417,7 @@ export default function LoginScreen() {
       });
     } catch (error: any) {
       setGoogleLoading(false);
-      setLoginError(error?.message || "Google login failed.");
+      setLoginError(error?.message || ui.googleLoginFailed);
     }
   }
 
@@ -434,7 +445,10 @@ export default function LoginScreen() {
                   styles.langButton,
                   language === item && styles.langButtonActive,
                 ]}
-                onPress={() => setLanguage(item)}
+                onPress={() => {
+                  setLoginError("");
+                  setLanguage(item);
+                }}
               >
                 <Text
                   style={[
