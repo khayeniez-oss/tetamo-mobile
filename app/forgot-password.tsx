@@ -2,28 +2,30 @@ import { makeRedirectUri } from "expo-auth-session";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    ArrowLeft,
-    CheckCircle2,
-    Mail,
-    Send,
-    ShieldCheck,
+  ArrowLeft,
+  CheckCircle2,
+  Mail,
+  Send,
+  ShieldCheck,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
 type Language = "en" | "id";
+type MessageType = "" | "success";
+type ErrorType = "" | "emptyEmail" | "invalidEmail" | "unableSend" | "custom";
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
@@ -32,36 +34,38 @@ export default function ForgotPasswordScreen() {
   const [language, setLanguage] = useState<Language>("en");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [messageType, setMessageType] = useState<MessageType>("");
+  const [errorType, setErrorType] = useState<ErrorType>("");
+  const [customError, setCustomError] = useState("");
 
   const ui = useMemo(() => {
     if (language === "id") {
       return {
-        badge: "Reset Password",
+        badge: "RESET KATA SANDI",
         title: "Lupa kata sandi?",
         subtitle:
-          "Masukkan email akun Tetamo Anda. Kami akan mengirimkan link untuk membuat kata sandi baru.",
+          "Masukkan email akun Tetamo Anda. Kami akan mengirimkan tautan untuk membuat kata sandi baru.",
         emailLabel: "Email",
         emailPlaceholder: "Masukkan email Anda",
-        sendButton: "Kirim Link Reset",
-        sending: "Mengirim link...",
+        sendButton: "Kirim Tautan Reset",
+        sending: "Mengirim tautan...",
         backToLogin: "Kembali ke Login",
         successTitle: "Cek email Anda",
         successMessage:
-          "Jika email tersebut terdaftar, link reset password sudah dikirim. Silakan cek inbox atau folder spam.",
+          "Jika email tersebut terdaftar, tautan reset kata sandi sudah dikirim. Silakan cek inbox atau folder spam.",
         emptyEmail: "Masukkan email Anda.",
         invalidEmail: "Format email tidak valid.",
+        unableSend: "Tautan reset belum bisa dikirim. Silakan coba lagi.",
         helperTitle: "Aman dan mudah",
         helperText:
-          "Link reset hanya dikirim ke email akun Anda. Setelah itu, Anda bisa membuat kata sandi baru.",
+          "Tautan reset hanya dikirim ke email akun Anda. Setelah itu, Anda bisa membuat kata sandi baru.",
         remember: "Ingat kata sandi Anda?",
         login: "Masuk",
       };
     }
 
     return {
-      badge: "Password Reset",
+      badge: "PASSWORD RESET",
       title: "Forgot your password?",
       subtitle:
         "Enter your Tetamo account email. We will send you a link to create a new password.",
@@ -75,6 +79,7 @@ export default function ForgotPasswordScreen() {
         "If that email is registered, a password reset link has been sent. Please check your inbox or spam folder.",
       emptyEmail: "Enter your email.",
       invalidEmail: "Please enter a valid email address.",
+      unableSend: "Unable to send the reset link. Please try again.",
       helperTitle: "Secure and simple",
       helperText:
         "The reset link is sent only to your account email. After that, you can create a new password.",
@@ -82,6 +87,19 @@ export default function ForgotPasswordScreen() {
       login: "Log in",
     };
   }, [language]);
+
+  const successMessage = messageType === "success" ? ui.successMessage : "";
+
+  const errorMessage =
+    errorType === "emptyEmail"
+      ? ui.emptyEmail
+      : errorType === "invalidEmail"
+        ? ui.invalidEmail
+        : errorType === "unableSend"
+          ? ui.unableSend
+          : errorType === "custom"
+            ? customError
+            : "";
 
   useEffect(() => {
     const emailFromUrl = readParam(params.email);
@@ -91,19 +109,24 @@ export default function ForgotPasswordScreen() {
     }
   }, [params.email]);
 
+  function resetMessages() {
+    setMessageType("");
+    setErrorType("");
+    setCustomError("");
+  }
+
   async function handleResetPassword() {
     const trimmedEmail = email.trim().toLowerCase();
 
-    setMessage("");
-    setErrorMessage("");
+    resetMessages();
 
     if (!trimmedEmail) {
-      setErrorMessage(ui.emptyEmail);
+      setErrorType("emptyEmail");
       return;
     }
 
     if (!isValidEmail(trimmedEmail)) {
-      setErrorMessage(ui.invalidEmail);
+      setErrorType("invalidEmail");
       return;
     }
 
@@ -119,17 +142,19 @@ export default function ForgotPasswordScreen() {
         trimmedEmail,
         {
           redirectTo,
-        }
+        },
       );
 
       if (error) {
-        setErrorMessage(error.message);
+        setErrorType("custom");
+        setCustomError(error.message || ui.unableSend);
         return;
       }
 
-      setMessage(ui.successMessage);
+      setMessageType("success");
     } catch (error: any) {
-      setErrorMessage(error?.message || "Unable to send reset link.");
+      setErrorType("custom");
+      setCustomError(error?.message || ui.unableSend);
     } finally {
       setLoading(false);
     }
@@ -150,7 +175,10 @@ export default function ForgotPasswordScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.topRow}>
-            <Pressable style={styles.backButton} onPress={() => router.push("/login" as any)}>
+            <Pressable
+              style={styles.backButton}
+              onPress={() => router.push("/login" as any)}
+            >
               <ArrowLeft color="#ffffff" size={16} />
               <Text style={styles.backText}>{ui.backToLogin}</Text>
             </Pressable>
@@ -206,12 +234,12 @@ export default function ForgotPasswordScreen() {
             <Text style={styles.formTitle}>{ui.title}</Text>
             <Text style={styles.formSub}>{ui.subtitle}</Text>
 
-            {message ? (
+            {successMessage ? (
               <View style={styles.successBox}>
                 <CheckCircle2 color="#22c55e" size={19} />
                 <View style={styles.messageTextBox}>
                   <Text style={styles.successTitle}>{ui.successTitle}</Text>
-                  <Text style={styles.successText}>{message}</Text>
+                  <Text style={styles.successText}>{successMessage}</Text>
                 </View>
               </View>
             ) : null}
@@ -229,8 +257,7 @@ export default function ForgotPasswordScreen() {
                 value={email}
                 onChangeText={(value) => {
                   setEmail(value);
-                  setMessage("");
-                  setErrorMessage("");
+                  resetMessages();
                 }}
                 placeholder={ui.emailPlaceholder}
                 placeholderTextColor="#777777"
@@ -246,7 +273,10 @@ export default function ForgotPasswordScreen() {
               onPress={handleResetPassword}
             >
               {loading ? (
-                <ActivityIndicator color="#111111" />
+                <>
+                  <ActivityIndicator color="#111111" />
+                  <Text style={styles.primaryButtonText}>{ui.sending}</Text>
+                </>
               ) : (
                 <>
                   <Send color="#111111" size={16} />

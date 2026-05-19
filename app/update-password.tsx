@@ -2,30 +2,38 @@ import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    AlertCircle,
-    ArrowLeft,
-    CheckCircle2,
-    Eye,
-    EyeOff,
-    LockKeyhole,
-    ShieldCheck,
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  ShieldCheck,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
 type Language = "en" | "id";
+type ErrorType =
+  | ""
+  | "invalidLink"
+  | "emptyPassword"
+  | "shortPassword"
+  | "mismatchPassword"
+  | "unableUpdate"
+  | "custom";
 
 export default function UpdatePasswordScreen() {
   const router = useRouter();
@@ -40,12 +48,13 @@ export default function UpdatePasswordScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errorType, setErrorType] = useState<ErrorType>("");
+  const [customError, setCustomError] = useState("");
 
   const ui = useMemo(() => {
     if (language === "id") {
       return {
-        badge: "Buat Password Baru",
+        badge: "BUAT KATA SANDI BARU",
         title: "Atur ulang kata sandi Anda",
         subtitle: "Masukkan kata sandi baru untuk akun Tetamo Anda.",
         helperTitle: "Aman dan cepat",
@@ -55,24 +64,25 @@ export default function UpdatePasswordScreen() {
         confirmPassword: "Konfirmasi Kata Sandi",
         newPasswordPlaceholder: "Masukkan kata sandi baru",
         confirmPasswordPlaceholder: "Ulangi kata sandi baru",
-        updateButton: "Update Password",
-        updating: "Mengupdate password...",
+        updateButton: "Perbarui Kata Sandi",
+        updating: "Memperbarui kata sandi...",
         backToLogin: "Kembali ke Login",
-        successTitle: "Password berhasil diupdate",
+        successTitle: "Kata sandi berhasil diperbarui",
         successMessage:
-          "Kata sandi Anda sudah berhasil diperbarui. Silakan login kembali dengan password baru.",
-        loadingSession: "Memeriksa link reset password...",
+          "Kata sandi Anda sudah berhasil diperbarui. Silakan login kembali dengan kata sandi baru.",
+        loadingSession: "Memeriksa tautan reset kata sandi...",
         invalidLink:
-          "Link reset password tidak valid atau sudah expired. Silakan request link baru.",
+          "Tautan reset kata sandi tidak valid atau sudah kedaluwarsa. Silakan minta tautan baru.",
         emptyPassword: "Masukkan kata sandi baru.",
         shortPassword: "Kata sandi minimal 8 karakter.",
         mismatchPassword: "Konfirmasi kata sandi tidak sama.",
-        requestNewLink: "Request link baru",
+        unableUpdate: "Kata sandi belum bisa diperbarui. Silakan coba lagi.",
+        requestNewLink: "Minta tautan baru",
       };
     }
 
     return {
-      badge: "Create New Password",
+      badge: "CREATE NEW PASSWORD",
       title: "Reset your password",
       subtitle: "Enter a new password for your Tetamo account.",
       helperTitle: "Secure and quick",
@@ -94,9 +104,25 @@ export default function UpdatePasswordScreen() {
       emptyPassword: "Enter your new password.",
       shortPassword: "Password must be at least 8 characters.",
       mismatchPassword: "Password confirmation does not match.",
+      unableUpdate: "Unable to update password. Please try again.",
       requestNewLink: "Request new link",
     };
   }, [language]);
+
+  const errorMessage =
+    errorType === "invalidLink"
+      ? ui.invalidLink
+      : errorType === "emptyPassword"
+        ? ui.emptyPassword
+        : errorType === "shortPassword"
+          ? ui.shortPassword
+          : errorType === "mismatchPassword"
+            ? ui.mismatchPassword
+            : errorType === "unableUpdate"
+              ? ui.unableUpdate
+              : errorType === "custom"
+                ? customError
+                : "";
 
   const paramCode = readParam(params.code);
   const paramAccessToken = readParam(params.access_token);
@@ -110,7 +136,9 @@ export default function UpdatePasswordScreen() {
     async function prepareRecoverySession(incomingUrl = "") {
       setInitializing(true);
       setReady(false);
-      setErrorMessage("");
+      setSuccess(false);
+      setErrorType("");
+      setCustomError("");
 
       try {
         const authParams = extractAuthParamsFromUrl(incomingUrl, {
@@ -126,7 +154,7 @@ export default function UpdatePasswordScreen() {
 
         if (authParams.code) {
           const { error } = await supabase.auth.exchangeCodeForSession(
-            authParams.code
+            authParams.code,
           );
 
           if (error) throw error;
@@ -145,7 +173,7 @@ export default function UpdatePasswordScreen() {
         } = await supabase.auth.getSession();
 
         if (error) throw error;
-        if (!session?.user) throw new Error(ui.invalidLink);
+        if (!session?.user) throw new Error("TETAMO_INVALID_RESET_LINK");
 
         if (!mounted) return;
 
@@ -156,7 +184,14 @@ export default function UpdatePasswordScreen() {
 
         setReady(false);
         setInitializing(false);
-        setErrorMessage(error?.message || ui.invalidLink);
+
+        if (error?.message === "TETAMO_INVALID_RESET_LINK") {
+          setErrorType("invalidLink");
+          return;
+        }
+
+        setErrorType("custom");
+        setCustomError(error?.message || "");
       }
     }
 
@@ -175,32 +210,27 @@ export default function UpdatePasswordScreen() {
       mounted = false;
       subscription.remove();
     };
-  }, [
-    paramCode,
-    paramAccessToken,
-    paramRefreshToken,
-    paramError,
-    ui.invalidLink,
-  ]);
+  }, [paramCode, paramAccessToken, paramRefreshToken, paramError]);
 
   async function handleUpdatePassword() {
-    setErrorMessage("");
+    setErrorType("");
+    setCustomError("");
 
     const newPassword = password.trim();
     const confirmNewPassword = confirmPassword.trim();
 
     if (!newPassword) {
-      setErrorMessage(ui.emptyPassword);
+      setErrorType("emptyPassword");
       return;
     }
 
     if (newPassword.length < 8) {
-      setErrorMessage(ui.shortPassword);
+      setErrorType("shortPassword");
       return;
     }
 
     if (newPassword !== confirmNewPassword) {
-      setErrorMessage(ui.mismatchPassword);
+      setErrorType("mismatchPassword");
       return;
     }
 
@@ -212,7 +242,8 @@ export default function UpdatePasswordScreen() {
       });
 
       if (error) {
-        setErrorMessage(error.message);
+        setErrorType("custom");
+        setCustomError(error.message || ui.unableUpdate);
         return;
       }
 
@@ -222,8 +253,11 @@ export default function UpdatePasswordScreen() {
       setReady(false);
       setPassword("");
       setConfirmPassword("");
+      setErrorType("");
+      setCustomError("");
     } catch (error: any) {
-      setErrorMessage(error?.message || "Unable to update password.");
+      setErrorType("custom");
+      setCustomError(error?.message || ui.unableUpdate);
     } finally {
       setLoading(false);
     }
@@ -352,7 +386,8 @@ export default function UpdatePasswordScreen() {
                       value={password}
                       onChangeText={(value) => {
                         setPassword(value);
-                        setErrorMessage("");
+                        setErrorType("");
+                        setCustomError("");
                       }}
                       placeholder={ui.newPasswordPlaceholder}
                       placeholderTextColor="#777777"
@@ -382,7 +417,8 @@ export default function UpdatePasswordScreen() {
                       value={confirmPassword}
                       onChangeText={(value) => {
                         setConfirmPassword(value);
-                        setErrorMessage("");
+                        setErrorType("");
+                        setCustomError("");
                       }}
                       placeholder={ui.confirmPasswordPlaceholder}
                       placeholderTextColor="#777777"
@@ -393,9 +429,7 @@ export default function UpdatePasswordScreen() {
 
                     <Pressable
                       style={styles.eyeButton}
-                      onPress={() =>
-                        setShowConfirmPassword((prev) => !prev)
-                      }
+                      onPress={() => setShowConfirmPassword((prev) => !prev)}
                     >
                       {showConfirmPassword ? (
                         <EyeOff color="#ffffff" size={18} />
@@ -407,12 +441,20 @@ export default function UpdatePasswordScreen() {
                 </View>
 
                 <Pressable
-                  style={[styles.primaryButton, loading && styles.primaryDisabled]}
+                  style={[
+                    styles.primaryButton,
+                    loading && styles.primaryDisabled,
+                  ]}
                   disabled={loading}
                   onPress={handleUpdatePassword}
                 >
                   {loading ? (
-                    <ActivityIndicator color="#111111" />
+                    <>
+                      <ActivityIndicator color="#111111" />
+                      <Text style={styles.primaryButtonText}>
+                        {ui.updating}
+                      </Text>
+                    </>
                   ) : (
                     <Text style={styles.primaryButtonText}>
                       {ui.updateButton}
@@ -427,7 +469,9 @@ export default function UpdatePasswordScreen() {
                 style={styles.primaryButton}
                 onPress={() => router.replace("/forgot-password" as any)}
               >
-                <Text style={styles.primaryButtonText}>{ui.requestNewLink}</Text>
+                <Text style={styles.primaryButtonText}>
+                  {ui.requestNewLink}
+                </Text>
               </Pressable>
             ) : null}
 
@@ -458,7 +502,7 @@ function extractAuthParamsFromUrl(
     accessToken: string;
     refreshToken: string;
     error: string;
-  }
+  },
 ) {
   const cleanUrl = String(url || "");
 
@@ -762,6 +806,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
+    flexDirection: "row",
+    gap: 7,
   },
   primaryDisabled: {
     opacity: 0.55,
