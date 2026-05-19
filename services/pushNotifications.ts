@@ -1,6 +1,5 @@
 import Constants from "expo-constants";
 import * as Device from "expo-device";
-import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { supabase } from "../lib/supabase";
 
@@ -8,16 +7,56 @@ export const TETAMO_SOUND_FILE = "tetamo_notification.wav";
 export const TETAMO_SOUND_CHANNEL_ID = "tetamo-alerts";
 export const TETAMO_SILENT_CHANNEL_ID = "tetamo-silent";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () =>
-    ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    } as any),
-});
+type PushResult = {
+  ok: boolean;
+  status: string;
+  token: string;
+};
+
+let notificationsModule: any | null | undefined;
+let notificationHandlerReady = false;
+
+function isAndroidExpoGo() {
+  return Platform.OS === "android" && Constants.appOwnership === "expo";
+}
+
+async function getNotificationsModule() {
+  if (isAndroidExpoGo()) {
+    return null;
+  }
+
+  if (notificationsModule !== undefined) {
+    return notificationsModule;
+  }
+
+  try {
+    notificationsModule = await import("expo-notifications");
+
+    if (!notificationHandlerReady && notificationsModule) {
+      notificationsModule.setNotificationHandler({
+        handleNotification: async () =>
+          ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+            shouldShowBanner: true,
+            shouldShowList: true,
+          }) as any,
+      });
+
+      notificationHandlerReady = true;
+    }
+
+    return notificationsModule;
+  } catch (error) {
+    console.warn(
+      "Tetamo notifications unavailable in this environment:",
+      error,
+    );
+    notificationsModule = null;
+    return null;
+  }
+}
 
 export function getTetamoNotificationChannelId(soundEnabled: boolean) {
   return soundEnabled ? TETAMO_SOUND_CHANNEL_ID : TETAMO_SILENT_CHANNEL_ID;
@@ -25,6 +64,10 @@ export function getTetamoNotificationChannelId(soundEnabled: boolean) {
 
 export async function setupTetamoNotificationChannels() {
   if (Platform.OS !== "android") return;
+
+  const Notifications = await getNotificationsModule();
+
+  if (!Notifications) return;
 
   await Notifications.setNotificationChannelAsync(TETAMO_SOUND_CHANNEL_ID, {
     name: "Tetamo Alerts",
@@ -51,8 +94,26 @@ function getExpoProjectId() {
   );
 }
 
-export async function registerTetamoPushNotifications() {
+export async function registerTetamoPushNotifications(): Promise<PushResult> {
   try {
+    if (isAndroidExpoGo()) {
+      return {
+        ok: false,
+        status: "android_expo_go_push_notifications_not_supported",
+        token: "",
+      };
+    }
+
+    const Notifications = await getNotificationsModule();
+
+    if (!Notifications) {
+      return {
+        ok: false,
+        status: "notifications_unavailable",
+        token: "",
+      };
+    }
+
     await setupTetamoNotificationChannels();
 
     const {
@@ -106,7 +167,9 @@ export async function registerTetamoPushNotifications() {
         platform: Platform.OS,
         device_name: Device.deviceName || "",
         app_version:
-          Constants.expoConfig?.version || Constants.manifest2?.extra?.expoClient?.version || "",
+          Constants.expoConfig?.version ||
+          Constants.manifest2?.extra?.expoClient?.version ||
+          "",
         project_id: projectId || null,
         status: "active",
         source: "tetamo-mobile",
@@ -121,7 +184,7 @@ export async function registerTetamoPushNotifications() {
       },
       {
         onConflict: "expo_push_token",
-      }
+      },
     );
 
     if (error) {
@@ -147,6 +210,22 @@ export async function registerTetamoPushNotifications() {
 }
 
 export async function sendTetamoLocalTestNotification(soundEnabled: boolean) {
+  if (isAndroidExpoGo()) {
+    return {
+      ok: false,
+      status: "android_expo_go_push_notifications_not_supported",
+    };
+  }
+
+  const Notifications = await getNotificationsModule();
+
+  if (!Notifications) {
+    return {
+      ok: false,
+      status: "notifications_unavailable",
+    };
+  }
+
   await setupTetamoNotificationChannels();
 
   const channelId = getTetamoNotificationChannelId(soundEnabled);
@@ -164,4 +243,9 @@ export async function sendTetamoLocalTestNotification(soundEnabled: boolean) {
       channelId,
     } as any,
   });
+
+  return {
+    ok: true,
+    status: "scheduled",
+  };
 }
