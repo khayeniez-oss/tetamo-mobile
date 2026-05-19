@@ -83,7 +83,7 @@ type PropertyRow = {
 type PropertyImageRow = {
   id: string;
   property_id: string;
-  image_url: string;
+  image_url: string | null;
   sort_order: number | null;
   is_cover: boolean | null;
 };
@@ -146,6 +146,26 @@ function normalizeExternalUrl(value: unknown) {
   return `https://${url}`;
 }
 
+function cleanPropertyImageUrl(value: unknown) {
+  const url = String(value || "").trim();
+
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return encodeURI(url);
+
+  const cleanedPath = url
+    .replace(/^\/+/, "")
+    .replace(/^property-images\//, "")
+    .trim();
+
+  if (!cleanedPath) return "";
+
+  const { data } = supabase.storage
+    .from("property-images")
+    .getPublicUrl(cleanedPath);
+
+  return data.publicUrl || "";
+}
+
 function formatIdr(value: number | null | undefined) {
   return `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
 }
@@ -177,7 +197,7 @@ function isMembershipActive(membership: AgentMembershipRow | null) {
 
 function getMembershipNumber(
   membership: AgentMembershipRow | null,
-  key: string
+  key: string,
 ) {
   const direct = Number((membership as any)?.[key] || 0);
   if (Number.isFinite(direct) && direct > 0) return direct;
@@ -234,7 +254,7 @@ function getStatusLabel(row: PropertyRow, language: Language) {
 
 function getBillingCycleLabel(
   value: string | null | undefined,
-  language: Language
+  language: Language,
 ) {
   const cycle = String(value || "").toLowerCase();
 
@@ -259,7 +279,8 @@ function attachImages(properties: PropertyRow[], images: PropertyImageRow[]) {
 
     return {
       ...property,
-      photo: propertyImages[0]?.image_url || FALLBACK_PHOTO,
+      photo:
+        cleanPropertyImageUrl(propertyImages[0]?.image_url) || FALLBACK_PHOTO,
     };
   });
 }
@@ -384,7 +405,7 @@ export default function ProfileScreen() {
         const { data: profileRow, error: profileError } = await supabase
           .from("profiles")
           .select(
-            "id, full_name, email, phone, role, agency, address, photo_url, instagram_url, facebook_url, tiktok_url, youtube_url, linkedin_url"
+            "id, full_name, email, phone, role, agency, address, photo_url, instagram_url, facebook_url, tiktok_url, youtube_url, linkedin_url",
           )
           .eq("id", user.id)
           .maybeSingle();
@@ -419,7 +440,7 @@ export default function ProfileScreen() {
           supabase
             .from("properties")
             .select(
-              "id, user_id, kode, title, title_id, price, province, city, area, source, status, verification_status, transaction_status, listing_expires_at, created_at, posted_date, plan_id"
+              "id, user_id, kode, title, title_id, price, province, city, area, source, status, verification_status, transaction_status, listing_expires_at, created_at, posted_date, plan_id",
             )
             .eq("user_id", user.id)
             .order("created_at", { ascending: false }),
@@ -427,7 +448,7 @@ export default function ProfileScreen() {
           supabase
             .from("agent_memberships")
             .select(
-              "id, user_id, payment_id, package_id, package_name, billing_cycle, listing_limit, status, auto_renew, starts_at, expires_at, metadata, created_at, updated_at"
+              "id, user_id, payment_id, package_id, package_name, billing_cycle, listing_limit, status, auto_renew, starts_at, expires_at, metadata, created_at, updated_at",
             )
             .eq("user_id", user.id)
             .order("created_at", { ascending: false }),
@@ -463,7 +484,7 @@ export default function ProfileScreen() {
           console.log("Tetamo mobile profile dashboard error:", error);
           setErrorMessage(
             error?.message ||
-              (isId ? "Gagal memuat profile." : "Failed to load profile.")
+              (isId ? "Gagal memuat profile." : "Failed to load profile."),
           );
           setLoading(false);
         }
@@ -490,15 +511,6 @@ export default function ProfileScreen() {
     setProperties([]);
     setMemberships([]);
     router.replace("/login" as any);
-  }
-
-  function comingSoon(title: string) {
-    Alert.alert(
-      title,
-      isId
-        ? "Halaman mobile ini akan kita sambungkan setelah dashboard utama siap."
-        : "We will connect this mobile page after the main dashboard hub is ready."
-    );
   }
 
   function routeOwnerAddListing() {
@@ -538,10 +550,7 @@ export default function ProfileScreen() {
     const canOpen = await Linking.canOpenURL(finalUrl);
 
     if (!canOpen) {
-      Alert.alert(
-        isId ? "Link tidak valid." : "Invalid link.",
-        finalUrl
-      );
+      Alert.alert(isId ? "Link tidak valid." : "Invalid link.", finalUrl);
       return;
     }
 
@@ -697,8 +706,8 @@ export default function ProfileScreen() {
                       ? "PEMILIK"
                       : "OWNER"
                     : role === "agent"
-                    ? "AGENT"
-                    : String(role || "USER").toUpperCase()}
+                      ? "AGENT"
+                      : String(role || "USER").toUpperCase()}
                 </Text>
               </View>
 
@@ -710,8 +719,8 @@ export default function ProfileScreen() {
                 {role === "agent"
                   ? displayAgency
                   : isId
-                  ? "Platform Tetamo"
-                  : "Tetamo Platform"}
+                    ? "Platform Tetamo"
+                    : "Tetamo Platform"}
               </Text>
 
               <View style={styles.locationRow}>
@@ -725,7 +734,7 @@ export default function ProfileScreen() {
 
           <View style={styles.profileInfoGrid}>
             <MiniInfo label="Email" value={displayEmail} />
-            <MiniInfo label={isId ? "WhatsApp" : "WhatsApp"} value={displayPhone} />
+            <MiniInfo label="WhatsApp" value={displayPhone} />
 
             {role === "agent" ? (
               <MiniInfo label="Agency" value={displayAgency} />
@@ -772,7 +781,7 @@ export default function ProfileScreen() {
               />
               <StatCard
                 icon={<Clock3 color="#f59e0b" size={18} />}
-                label={isId ? "Pending" : "Pending"}
+                label="Pending"
                 value={String(ownerStats.pending)}
               />
             </View>
@@ -867,8 +876,8 @@ export default function ProfileScreen() {
                         ? "Membership Aktif"
                         : "Active Membership"
                       : isId
-                      ? "Membership Belum Aktif"
-                      : "Membership Not Active"}
+                        ? "Membership Belum Aktif"
+                        : "Membership Not Active"}
                   </Text>
                   <Text style={styles.membershipSub}>
                     {latestMembership?.package_name ||
@@ -883,7 +892,7 @@ export default function ProfileScreen() {
                   label="Billing"
                   value={getBillingCycleLabel(
                     latestMembership?.billing_cycle,
-                    language
+                    language,
                   )}
                 />
                 <MiniStat
@@ -911,8 +920,8 @@ export default function ProfileScreen() {
                       ? "Lihat / Upgrade Paket"
                       : "View / Upgrade Package"
                     : isId
-                    ? "Pilih Paket Agent"
-                    : "Choose Agent Package"}
+                      ? "Pilih Paket Agent"
+                      : "Choose Agent Package"}
                 </Text>
                 <ChevronRight color="#111111" size={15} />
               </Pressable>
@@ -1008,10 +1017,8 @@ export default function ProfileScreen() {
                 icon={<BarChart3 color="#ffffff" size={20} />}
                 title={isId ? "Komisi" : "Commission"}
                 subtitle={isId ? "Tracking komisi" : "Commission tracking"}
-                 onPress={() => router.push("/dashboard/commission" as any)}
+                onPress={() => router.push("/dashboard/commission" as any)}
               />
-
-
             </View>
 
             <ListingPreview
@@ -1047,7 +1054,7 @@ export default function ProfileScreen() {
           <ToolRow
             icon={<Settings color="#ffffff" size={18} />}
             title={isId ? "Pengaturan" : "Settings"}
-            subtitle={isId ? "Update profile" : "Update profile"}
+            subtitle="Update profile"
             onPress={() => router.push("/dashboard/settings" as any)}
           />
 
@@ -1162,7 +1169,9 @@ function ToolRow({
       </View>
 
       <View style={styles.toolRowTextBox}>
-        <Text style={[styles.toolRowTitle, danger && styles.toolRowTitleDanger]}>
+        <Text
+          style={[styles.toolRowTitle, danger && styles.toolRowTitleDanger]}
+        >
           {title}
         </Text>
         <Text style={styles.toolRowSubtitle}>{subtitle}</Text>
@@ -1204,10 +1213,11 @@ function ListingPreview({
               <Image
                 source={{ uri: item.photo || FALLBACK_PHOTO }}
                 style={styles.listingImage}
+                resizeMode="cover"
               />
 
               <View style={styles.listingTextBox}>
-                <Text style={styles.listingTitle} numberOfLines={1}>
+                <Text style={styles.listingTitle} numberOfLines={2}>
                   {language === "id"
                     ? item.title_id || item.title || "-"
                     : item.title || item.title_id || "-"}
@@ -1723,49 +1733,47 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   listingList: {
-    gap: 10,
+    gap: 14,
   },
   listingCard: {
-    borderRadius: 22,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: "#303030",
     backgroundColor: "#101010",
-    padding: 10,
-    flexDirection: "row",
-    gap: 11,
+    overflow: "hidden",
   },
   listingImage: {
-    width: 92,
-    height: 92,
-    borderRadius: 17,
+    width: "100%",
+    height: 178,
     backgroundColor: "#050505",
   },
   listingTextBox: {
-    flex: 1,
+    padding: 12,
   },
   listingTitle: {
     color: "#ffffff",
-    fontSize: 12.8,
+    fontSize: 13.5,
+    lineHeight: 18,
     fontWeight: "900",
   },
   listingMeta: {
     color: "#9b9b9b",
     fontSize: 10.5,
     fontWeight: "700",
-    marginTop: 4,
+    marginTop: 5,
   },
   listingPrice: {
     color: "#e6c15c",
-    fontSize: 12.5,
+    fontSize: 13,
     fontWeight: "900",
-    marginTop: 5,
+    marginTop: 6,
   },
   listingBottomRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
-    marginTop: 8,
+    marginTop: 10,
   },
   statusPill: {
     flex: 1,
@@ -1774,7 +1782,7 @@ const styles = StyleSheet.create({
     borderColor: "#303030",
     backgroundColor: "#050505",
     paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingVertical: 7,
   },
   statusPillText: {
     color: "#d6d6d6",
@@ -1785,8 +1793,8 @@ const styles = StyleSheet.create({
   editButton: {
     borderRadius: 999,
     backgroundColor: "#e6c15c",
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
