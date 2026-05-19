@@ -3,31 +3,32 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as WebBrowser from "expo-web-browser";
 import {
-    ArrowLeft,
-    BriefcaseBusiness,
-    Building2,
-    Check,
-    Eye,
-    EyeOff,
-    LockKeyhole,
-    Mail,
-    Phone,
-    ShieldCheck,
-    UserRound,
+  ArrowLeft,
+  BriefcaseBusiness,
+  Building2,
+  Check,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  Mail,
+  Phone,
+  ShieldCheck,
+  UserRound,
 } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Linking as NativeLinking,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
@@ -35,6 +36,13 @@ WebBrowser.maybeCompleteAuthSession();
 
 type AllowedRole = "owner" | "agent" | "developer";
 type Language = "en" | "id";
+
+const TETAMO_SITE_URL =
+  process.env.EXPO_PUBLIC_TETAMO_SITE_URL || "https://www.tetamo.com";
+
+const TERMS_URL = `${TETAMO_SITE_URL}/terms`;
+const PRIVACY_URL = `${TETAMO_SITE_URL}/kebijakan-privasi`;
+const SUBSCRIPTION_URL = `${TETAMO_SITE_URL}/kebijakan-berlangganan`;
 
 function normalizePhoneNumber(value: string) {
   const raw = String(value || "").trim();
@@ -61,6 +69,14 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+async function openPolicyUrl(url: string) {
+  try {
+    await NativeLinking.openURL(url);
+  } catch {
+    Alert.alert("Unable to open this link. Please try again later.");
+  }
+}
+
 export default function SignupScreen() {
   const router = useRouter();
 
@@ -80,18 +96,18 @@ export default function SignupScreen() {
   const ui = useMemo(() => {
     if (isId) {
       return {
-        badge: "TETAMO SIGNUP",
+        badge: "DAFTAR TETAMO",
         title: "Buat akun Tetamo",
         subtitle: "Pilih peran Anda dan lanjutkan ke alur yang sesuai.",
         chooseRole: "Pilih Peran",
         chooseRoleDesc: "Pilih bagaimana Anda ingin menggunakan Tetamo.",
         ownerTitle: "Pemilik Properti",
         ownerDesc: "Untuk pemilik yang ingin memasang listing.",
-        agentTitle: "Agent Properti",
-        agentDesc: "Untuk agent yang ingin mengelola listing dan leads.",
+        agentTitle: "Agen Properti",
+        agentDesc: "Untuk agen yang ingin mengelola listing dan leads.",
         developerTitle: "Developer",
-        developerDesc: "Untuk developer yang ingin meminta quotation.",
-        requestQuote: "Request Quote",
+        developerDesc: "Untuk developer yang ingin meminta penawaran.",
+        requestQuote: "Minta Penawaran",
         selectedRole: "Peran terpilih",
         change: "Ganti",
         phone: "Nomor WhatsApp / Telepon",
@@ -107,7 +123,11 @@ export default function SignupScreen() {
         or: "atau",
         already: "Sudah punya akun?",
         login: "Masuk",
-        policyPrefix: "Saya menyetujui Syarat & Ketentuan, Kebijakan Privasi, dan Kebijakan Berlangganan Tetamo.",
+        policyStart: "Saya menyetujui ",
+        terms: "Syarat & Ketentuan",
+        privacy: "Kebijakan Privasi",
+        subscription: "Kebijakan Berlangganan",
+        and: "dan",
         emptyRole: "Silakan pilih peran terlebih dahulu.",
         emptyName: "Mohon masukkan nama lengkap Anda.",
         emptyPhone: "Mohon masukkan nomor WhatsApp / telepon Anda.",
@@ -119,9 +139,14 @@ export default function SignupScreen() {
           "Silakan setujui Syarat & Ketentuan, Kebijakan Privasi, dan Kebijakan Berlangganan terlebih dahulu.",
         signupSuccess:
           "Akun berhasil dibuat. Silakan cek email Anda jika diminta konfirmasi.",
+        signupFailed: "Pendaftaran gagal.",
+        googleUrlError: "URL pendaftaran Google gagal dibuat.",
+        googleCodeError: "Pendaftaran Google tidak mengembalikan kode autentikasi.",
+        googleSessionError: "Sesi pendaftaran Google gagal dibuat.",
+        googleSignupFailed: "Pendaftaran dengan Google gagal.",
         secureTitle: "Akun Anda lebih aman",
         secureText:
-          "Email digunakan untuk login, reset password, receipt, invoice, dan pemulihan akun.",
+          "Email digunakan untuk login, reset password, tanda terima, invoice, dan pemulihan akun.",
       };
     }
 
@@ -153,8 +178,11 @@ export default function SignupScreen() {
       or: "or",
       already: "Already have an account?",
       login: "Log in",
-      policyPrefix:
-        "I agree to Tetamo’s Terms & Conditions, Privacy Policy, and Subscription Policy.",
+      policyStart: "I agree to Tetamo’s ",
+      terms: "Terms & Conditions",
+      privacy: "Privacy Policy",
+      subscription: "Subscription Policy",
+      and: "and",
       emptyRole: "Please choose a role first.",
       emptyName: "Please enter your full name.",
       emptyPhone: "Please enter your WhatsApp / phone number.",
@@ -166,6 +194,11 @@ export default function SignupScreen() {
         "Please agree to the Terms, Privacy Policy, and Subscription Policy first.",
       signupSuccess:
         "Account created successfully. Please check your email if confirmation is required.",
+      signupFailed: "Signup failed.",
+      googleUrlError: "Google signup URL was not created.",
+      googleCodeError: "Google signup did not return an auth code.",
+      googleSessionError: "Google signup session was not created.",
+      googleSignupFailed: "Google signup failed.",
       secureTitle: "Your account is safer",
       secureText:
         "Email is used for login, password reset, receipts, invoices, and account recovery.",
@@ -174,7 +207,7 @@ export default function SignupScreen() {
 
   const roleLabel = useMemo(() => {
     if (selectedRole === "owner") return isId ? "Pemilik" : "Owner";
-    if (selectedRole === "agent") return "Agent";
+    if (selectedRole === "agent") return isId ? "Agen" : "Agent";
     if (selectedRole === "developer") return "Developer";
     return "";
   }, [selectedRole, isId]);
@@ -250,7 +283,7 @@ export default function SignupScreen() {
       },
       {
         onConflict: "id",
-      }
+      },
     );
 
     if (error) throw error;
@@ -318,11 +351,11 @@ export default function SignupScreen() {
       Alert.alert(ui.signupSuccess);
       router.replace(
         `/login?role=${base.role}&next=${encodeURIComponent(
-          getRoleRedirect(base.role)
-        )}` as any
+          getRoleRedirect(base.role),
+        )}` as any,
       );
     } catch (error: any) {
-      Alert.alert(error?.message || "Signup failed.");
+      Alert.alert(error?.message || ui.signupFailed);
     } finally {
       setLoadingEmail(false);
     }
@@ -354,7 +387,7 @@ export default function SignupScreen() {
       }
 
       if (!data?.url) {
-        Alert.alert("Google signup URL was not created.");
+        Alert.alert(ui.googleUrlError);
         return;
       }
 
@@ -368,7 +401,7 @@ export default function SignupScreen() {
       const code = returnedUrl.searchParams.get("code");
 
       if (!code) {
-        Alert.alert("Google signup did not return an auth code.");
+        Alert.alert(ui.googleCodeError);
         return;
       }
 
@@ -385,7 +418,7 @@ export default function SignupScreen() {
       } = await supabase.auth.getSession();
 
       if (!session?.user) {
-        Alert.alert("Google signup session was not created.");
+        Alert.alert(ui.googleSessionError);
         return;
       }
 
@@ -402,7 +435,7 @@ export default function SignupScreen() {
 
       router.replace(getRoleRedirect(base.role) as any);
     } catch (error: any) {
-      Alert.alert(error?.message || "Google signup failed.");
+      Alert.alert(error?.message || ui.googleSignupFailed);
     } finally {
       setLoadingGoogle(false);
     }
@@ -581,21 +614,42 @@ export default function SignupScreen() {
                 }
               />
 
-              <Pressable
-                style={styles.policyBox}
-                onPress={() => setAgreedToPolicies((prev) => !prev)}
-              >
-                <View
+              <View style={styles.policyBox}>
+                <Pressable
                   style={[
                     styles.checkbox,
                     agreedToPolicies && styles.checkboxActive,
                   ]}
+                  onPress={() => setAgreedToPolicies((prev) => !prev)}
                 >
                   {agreedToPolicies ? <Check color="#111111" size={13} /> : null}
-                </View>
+                </Pressable>
 
-                <Text style={styles.policyText}>{ui.policyPrefix}</Text>
-              </Pressable>
+                <Text style={styles.policyText}>
+                  {ui.policyStart}
+                  <Text
+                    style={styles.policyLink}
+                    onPress={() => void openPolicyUrl(TERMS_URL)}
+                  >
+                    {ui.terms}
+                  </Text>
+                  {", "}
+                  <Text
+                    style={styles.policyLink}
+                    onPress={() => void openPolicyUrl(PRIVACY_URL)}
+                  >
+                    {ui.privacy}
+                  </Text>
+                  {` ${ui.and} `}
+                  <Text
+                    style={styles.policyLink}
+                    onPress={() => void openPolicyUrl(SUBSCRIPTION_URL)}
+                  >
+                    {ui.subscription}
+                  </Text>
+                  .
+                </Text>
+              </View>
 
               <Pressable
                 style={[styles.primaryButton, isBusy && styles.disabled]}
@@ -644,8 +698,8 @@ export default function SignupScreen() {
                 onLogin={() =>
                   router.push(
                     `/login?role=${selectedRole}&next=${encodeURIComponent(
-                      getRoleRedirect(selectedRole)
-                    )}` as any
+                      getRoleRedirect(selectedRole),
+                    )}` as any,
                   )
                 }
               />
@@ -1060,6 +1114,11 @@ const styles = StyleSheet.create({
     fontSize: 10.8,
     lineHeight: 16,
     fontWeight: "700",
+  },
+  policyLink: {
+    color: "#e6c15c",
+    fontWeight: "900",
+    textDecorationLine: "underline",
   },
   primaryButton: {
     minHeight: 49,
