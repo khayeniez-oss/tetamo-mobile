@@ -141,7 +141,8 @@ export default function SignupScreen() {
           "Akun berhasil dibuat. Silakan cek email Anda jika diminta konfirmasi.",
         signupFailed: "Pendaftaran gagal.",
         googleUrlError: "URL pendaftaran Google gagal dibuat.",
-        googleCodeError: "Pendaftaran Google tidak mengembalikan kode autentikasi.",
+        googleCodeError:
+          "Pendaftaran Google tidak mengembalikan kode autentikasi.",
         googleSessionError: "Sesi pendaftaran Google gagal dibuat.",
         googleSignupFailed: "Pendaftaran dengan Google gagal.",
         secureTitle: "Akun Anda lebih aman",
@@ -391,7 +392,10 @@ export default function SignupScreen() {
         return;
       }
 
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectTo,
+      );
 
       if (result.type !== "success" || !result.url) {
         return;
@@ -622,7 +626,9 @@ export default function SignupScreen() {
                   ]}
                   onPress={() => setAgreedToPolicies((prev) => !prev)}
                 >
-                  {agreedToPolicies ? <Check color="#111111" size={13} /> : null}
+                  {agreedToPolicies ? (
+                    <Check color="#111111" size={13} />
+                  ) : null}
                 </Pressable>
 
                 <Text style={styles.policyText}>
