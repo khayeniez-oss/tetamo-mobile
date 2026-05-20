@@ -1,79 +1,20 @@
 import { Tabs } from "expo-router";
-import {
-  Building2,
-  Home,
-  Plus,
-  UserRound,
-  UserSearch,
-} from "lucide-react-native";
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#ffffff",
-        tabBarInactiveTintColor: "#8f8f8f",
         tabBarStyle: {
-          backgroundColor: "#050505",
-          borderTopColor: "#1f1f1f",
-          height: 86,
-          paddingTop: 8,
-          paddingBottom: 18,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "700",
+          display: "none",
         },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Home",
-          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
-        }}
-      />
-
-      <Tabs.Screen
-        name="property"
-        options={{
-          title: "Property",
-          tabBarIcon: ({ color, size }) => (
-            <Building2 color={color} size={size} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="add-listing"
-        options={{
-          title: "Add Listing",
-          tabBarIcon: ({ color }) => (
-            <Plus color={color} size={34} strokeWidth={2.6} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="buyer"
-        options={{
-          title: "Buyer",
-          tabBarIcon: ({ color, size }) => (
-            <UserSearch color={color} size={size} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color, size }) => (
-            <UserRound color={color} size={size} />
-          ),
-        }}
-      />
-</Tabs>
+      <Tabs.Screen name="index" />
+      <Tabs.Screen name="property" />
+      <Tabs.Screen name="add-listing" />
+      <Tabs.Screen name="buyer" />
+      <Tabs.Screen name="profile" />
+    </Tabs>
   );
 }
