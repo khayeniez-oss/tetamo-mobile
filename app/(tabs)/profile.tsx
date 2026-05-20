@@ -83,7 +83,7 @@ type PropertyRow = {
 type PropertyImageRow = {
   id: string;
   property_id: string;
-  image_url: string | null;
+  image_url: string;
   sort_order: number | null;
   is_cover: boolean | null;
 };
@@ -144,26 +144,6 @@ function normalizeExternalUrl(value: unknown) {
   if (/^https?:\/\//i.test(url)) return url;
 
   return `https://${url}`;
-}
-
-function cleanPropertyImageUrl(value: unknown) {
-  const url = String(value || "").trim();
-
-  if (!url) return "";
-  if (/^https?:\/\//i.test(url)) return encodeURI(url);
-
-  const cleanedPath = url
-    .replace(/^\/+/, "")
-    .replace(/^property-images\//, "")
-    .trim();
-
-  if (!cleanedPath) return "";
-
-  const { data } = supabase.storage
-    .from("property-images")
-    .getPublicUrl(cleanedPath);
-
-  return data.publicUrl || "";
 }
 
 function formatIdr(value: number | null | undefined) {
@@ -279,8 +259,7 @@ function attachImages(properties: PropertyRow[], images: PropertyImageRow[]) {
 
     return {
       ...property,
-      photo:
-        cleanPropertyImageUrl(propertyImages[0]?.image_url) || FALLBACK_PHOTO,
+      photo: propertyImages[0]?.image_url || FALLBACK_PHOTO,
     };
   });
 }
@@ -513,6 +492,15 @@ export default function ProfileScreen() {
     router.replace("/login" as any);
   }
 
+  function comingSoon(title: string) {
+    Alert.alert(
+      title,
+      isId
+        ? "Halaman mobile ini akan kita sambungkan setelah dashboard utama siap."
+        : "We will connect this mobile page after the main dashboard hub is ready.",
+    );
+  }
+
   function routeOwnerAddListing() {
     router.push("/add-listing?audience=owner" as any);
   }
@@ -734,7 +722,10 @@ export default function ProfileScreen() {
 
           <View style={styles.profileInfoGrid}>
             <MiniInfo label="Email" value={displayEmail} />
-            <MiniInfo label="WhatsApp" value={displayPhone} />
+            <MiniInfo
+              label={isId ? "WhatsApp" : "WhatsApp"}
+              value={displayPhone}
+            />
 
             {role === "agent" ? (
               <MiniInfo label="Agency" value={displayAgency} />
@@ -781,7 +772,7 @@ export default function ProfileScreen() {
               />
               <StatCard
                 icon={<Clock3 color="#f59e0b" size={18} />}
-                label="Pending"
+                label={isId ? "Pending" : "Pending"}
                 value={String(ownerStats.pending)}
               />
             </View>
@@ -1054,7 +1045,7 @@ export default function ProfileScreen() {
           <ToolRow
             icon={<Settings color="#ffffff" size={18} />}
             title={isId ? "Pengaturan" : "Settings"}
-            subtitle="Update profile"
+            subtitle={isId ? "Update profile" : "Update profile"}
             onPress={() => router.push("/dashboard/settings" as any)}
           />
 
@@ -1213,11 +1204,10 @@ function ListingPreview({
               <Image
                 source={{ uri: item.photo || FALLBACK_PHOTO }}
                 style={styles.listingImage}
-                resizeMode="cover"
               />
 
               <View style={styles.listingTextBox}>
-                <Text style={styles.listingTitle} numberOfLines={2}>
+                <Text style={styles.listingTitle} numberOfLines={1}>
                   {language === "id"
                     ? item.title_id || item.title || "-"
                     : item.title || item.title_id || "-"}
@@ -1733,47 +1723,49 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   listingList: {
-    gap: 14,
+    gap: 10,
   },
   listingCard: {
-    borderRadius: 24,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "#303030",
     backgroundColor: "#101010",
-    overflow: "hidden",
+    padding: 10,
+    flexDirection: "row",
+    gap: 11,
   },
   listingImage: {
-    width: "100%",
-    height: 178,
+    width: 130,
+    height: 92,
+    borderRadius: 17,
     backgroundColor: "#050505",
   },
   listingTextBox: {
-    padding: 12,
+    flex: 1,
   },
   listingTitle: {
     color: "#ffffff",
-    fontSize: 13.5,
-    lineHeight: 18,
+    fontSize: 12.8,
     fontWeight: "900",
   },
   listingMeta: {
     color: "#9b9b9b",
     fontSize: 10.5,
     fontWeight: "700",
-    marginTop: 5,
+    marginTop: 4,
   },
   listingPrice: {
     color: "#e6c15c",
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: "900",
-    marginTop: 6,
+    marginTop: 5,
   },
   listingBottomRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
-    marginTop: 10,
+    marginTop: 8,
   },
   statusPill: {
     flex: 1,
@@ -1782,7 +1774,7 @@ const styles = StyleSheet.create({
     borderColor: "#303030",
     backgroundColor: "#050505",
     paddingHorizontal: 8,
-    paddingVertical: 7,
+    paddingVertical: 6,
   },
   statusPillText: {
     color: "#d6d6d6",
@@ -1793,8 +1785,8 @@ const styles = StyleSheet.create({
   editButton: {
     borderRadius: 999,
     backgroundColor: "#e6c15c",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
