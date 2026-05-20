@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tetamo.mobile",
-      "buildNumber": "4",
+      "buildNumber": "5",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Tetamo lets you choose selected photos and videos to upload for your property listings and profile photo.",
         "ITSAppUsesNonExemptEncryption": false
@@ -56,7 +56,9 @@
       [
         "expo-notifications",
         {
-          "sounds": ["./assets/sounds/tetamo_notification.wav"]
+          "sounds": [
+            "./assets/sounds/tetamo_notification.wav"
+          ]
         }
       ],
       "expo-web-browser"
