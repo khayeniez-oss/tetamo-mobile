@@ -1,3 +1,5 @@
+import * as AppleAuthentication from "expo-apple-authentication";
+import * as Crypto from "expo-crypto";
 import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -10,7 +12,6 @@ import {
   KeyRound,
   LockKeyhole,
   Mail,
-  ShieldCheck,
 } from "lucide-react-native";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -56,6 +57,18 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function createNonce(length = 32) {
+  const charset =
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._";
+  let result = "";
+
+  for (let i = 0; i < length; i += 1) {
+    result += charset[Math.floor(Math.random() * charset.length)];
+  }
+
+  return result;
+}
+
 export default function LoginScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -68,6 +81,8 @@ export default function LoginScreen() {
   const [loginError, setLoginError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(Platform.OS === "ios");
 
   const isId = language === "id";
 
@@ -90,7 +105,8 @@ export default function LoginScreen() {
         passwordPlaceholder: "Kata sandi",
         login: "Masuk",
         loggingIn: "Sedang masuk...",
-        continueGoogle: "Lanjutkan dengan Google",
+        continueGoogle: "Masuk dengan Google",
+        continueApple: "Masuk dengan Apple",
         connecting: "Menghubungkan...",
         or: "atau",
         forgot: "Lupa kata sandi?",
@@ -106,11 +122,10 @@ export default function LoginScreen() {
         googleCodeError: "Login Google tidak mengembalikan kode autentikasi.",
         googleSessionError: "Sesi login Google gagal dibuat.",
         googleLoginFailed: "Login dengan Google gagal.",
-        showPassword: "Tampilkan",
-        hidePassword: "Sembunyikan",
-        quickTitle: "Akses aman",
-        quickText:
-          "Setelah login, Tetamo akan membaca role dari profil Anda dan mengarahkan ke halaman yang sesuai.",
+        appleUnavailable: "Login Apple hanya tersedia di perangkat iOS.",
+        appleTokenError: "Login Apple tidak mengembalikan token autentikasi.",
+        appleSessionError: "Sesi login Apple gagal dibuat.",
+        appleLoginFailed: "Login dengan Apple gagal.",
       };
     }
 
@@ -127,7 +142,8 @@ export default function LoginScreen() {
       passwordPlaceholder: "Password",
       login: "Log In",
       loggingIn: "Logging in...",
-      continueGoogle: "Continue with Google",
+      continueGoogle: "Log in with Google",
+      continueApple: "Log in with Apple",
       connecting: "Connecting...",
       or: "or",
       forgot: "Forgot password?",
@@ -143,11 +159,10 @@ export default function LoginScreen() {
       googleCodeError: "Google login did not return an auth code.",
       googleSessionError: "Google login session was not created.",
       googleLoginFailed: "Google login failed.",
-      showPassword: "Show",
-      hidePassword: "Hide",
-      quickTitle: "Secure access",
-      quickText:
-        "After login, Tetamo reads your profile role and sends you to the correct page.",
+      appleUnavailable: "Apple login is only available on iOS devices.",
+      appleTokenError: "Apple login did not return an identity token.",
+      appleSessionError: "Apple login session was not created.",
+      appleLoginFailed: "Apple login failed.",
     };
   }, [isId]);
 
@@ -206,6 +221,7 @@ export default function LoginScreen() {
       redirectingRef.current = false;
       setLoading(false);
       setGoogleLoading(false);
+      setAppleLoading(false);
       setLoginError(profileError.message || ui.profileNotFound);
       return;
     }
@@ -232,6 +248,7 @@ export default function LoginScreen() {
         redirectingRef.current = false;
         setLoading(false);
         setGoogleLoading(false);
+        setAppleLoading(false);
         setLoginError(insertError.message || ui.profileNotFound);
         return;
       }
@@ -241,12 +258,14 @@ export default function LoginScreen() {
       redirectingRef.current = false;
       setLoading(false);
       setGoogleLoading(false);
+      setAppleLoading(false);
       setLoginError(ui.profileNotFound);
       return;
     }
 
     setLoading(false);
     setGoogleLoading(false);
+    setAppleLoading(false);
 
     router.replace((safeNext || getDefaultRedirect(finalRole)) as any);
   }
@@ -269,7 +288,19 @@ export default function LoginScreen() {
       });
     }
 
+    async function checkAppleAvailability() {
+      if (Platform.OS !== "ios") {
+        setAppleAvailable(false);
+        return;
+      }
+
+      const available = await AppleAuthentication.isAvailableAsync();
+
+      if (mounted) setAppleAvailable(available);
+    }
+
     void checkExistingSession();
+    void checkAppleAvailability();
 
     const {
       data: { subscription },
@@ -309,6 +340,7 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       setGoogleLoading(false);
+      setAppleLoading(false);
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: trimmedEmail,
@@ -341,6 +373,7 @@ export default function LoginScreen() {
     try {
       setLoginError("");
       setLoading(false);
+      setAppleLoading(false);
       setGoogleLoading(true);
 
       const redirectTo = Linking.createURL("auth/callback");
@@ -421,7 +454,89 @@ export default function LoginScreen() {
     }
   }
 
-  const isBusy = loading || googleLoading;
+  async function handleAppleLogin() {
+    try {
+      setLoginError("");
+      setLoading(false);
+      setGoogleLoading(false);
+      setAppleLoading(true);
+
+      if (!appleAvailable) {
+        setAppleLoading(false);
+        setLoginError(ui.appleUnavailable);
+        return;
+      }
+
+      const rawNonce = createNonce();
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        rawNonce,
+      );
+
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      });
+
+      if (!credential.identityToken) {
+        setAppleLoading(false);
+        setLoginError(ui.appleTokenError);
+        return;
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithIdToken({
+        provider: "apple",
+        token: credential.identityToken,
+        nonce: rawNonce,
+      });
+
+      if (signInError) {
+        setAppleLoading(false);
+        setLoginError(signInError.message || ui.appleLoginFailed);
+        return;
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        setAppleLoading(false);
+        setLoginError(ui.appleSessionError);
+        return;
+      }
+
+      const appleFullName = [
+        credential.fullName?.givenName,
+        credential.fullName?.middleName,
+        credential.fullName?.familyName,
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      await finishLogin({
+        userId: session.user.id,
+        allowCreateProfile: true,
+        requestedRole: roleFromUrl || "owner",
+        fallbackEmail: session.user.email || credential.email || "",
+        fallbackFullName:
+          appleFullName ||
+          String(session.user.user_metadata?.full_name || "") ||
+          String(session.user.user_metadata?.name || ""),
+      });
+    } catch (error: any) {
+      setAppleLoading(false);
+
+      if (error?.code === "ERR_REQUEST_CANCELED") return;
+
+      setLoginError(error?.message || ui.appleLoginFailed);
+    }
+  }
+
+  const isBusy = loading || googleLoading || appleLoading;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -563,27 +678,44 @@ export default function LoginScreen() {
               <View style={styles.divider} />
             </View>
 
-            <Pressable
-              style={[styles.googleButton, isBusy && styles.disabled]}
-              disabled={isBusy}
-              onPress={handleGoogleLogin}
-            >
-              {googleLoading ? (
-                <ActivityIndicator color="#111111" />
-              ) : (
-                <Text style={styles.googleIcon}>G</Text>
-              )}
-              <Text style={styles.googleButtonText}>
-                {googleLoading ? ui.connecting : ui.continueGoogle}
-              </Text>
-            </Pressable>
+            <View style={styles.socialRow}>
+              <Pressable
+                style={[
+                  styles.socialButton,
+                  styles.googleButton,
+                  isBusy && styles.disabled,
+                ]}
+                disabled={isBusy}
+                onPress={handleGoogleLogin}
+              >
+                {googleLoading ? (
+                  <ActivityIndicator color="#e6c15c" />
+                ) : (
+                  <Text style={styles.googleIcon}>G</Text>
+                )}
+                <Text style={styles.socialButtonText} numberOfLines={1}>
+                  {googleLoading ? ui.connecting : ui.continueGoogle}
+                </Text>
+              </Pressable>
 
-            <View style={styles.infoBox}>
-              <ShieldCheck color="#60a5fa" size={17} />
-              <View style={styles.infoTextBox}>
-                <Text style={styles.infoTitle}>{ui.quickTitle}</Text>
-                <Text style={styles.infoText}>{ui.quickText}</Text>
-              </View>
+              <Pressable
+                style={[
+                  styles.socialButton,
+                  styles.appleButton,
+                  isBusy && styles.disabled,
+                ]}
+                disabled={isBusy}
+                onPress={handleAppleLogin}
+              >
+                {appleLoading ? (
+                  <ActivityIndicator color="#e6c15c" />
+                ) : (
+                  <Text style={styles.appleIcon}></Text>
+                )}
+                <Text style={styles.socialButtonText} numberOfLines={1}>
+                  {appleLoading ? ui.connecting : ui.continueApple}
+                </Text>
+              </Pressable>
             </View>
 
             <View style={styles.authFooter}>
@@ -892,52 +1024,48 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
   },
-  googleButton: {
+  socialRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  socialButton: {
+    flex: 1,
     minHeight: 49,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#ffffff",
+    borderColor: "#5b4a24",
+    backgroundColor: "#211a0b",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 9,
+    gap: 6,
+    paddingHorizontal: 7,
+  },
+  googleButton: {
+    borderColor: "#5b4a24",
+    backgroundColor: "#211a0b",
+  },
+  appleButton: {
+    borderColor: "#5b4a24",
+    backgroundColor: "#211a0b",
   },
   googleIcon: {
-    color: "#111111",
-    fontSize: 16,
+    color: "#e6c15c",
+    fontSize: 15,
     fontWeight: "900",
   },
-  googleButtonText: {
-    color: "#111111",
-    fontSize: 12.5,
+  appleIcon: {
+    color: "#e6c15c",
+    fontSize: 17,
     fontWeight: "900",
+    marginTop: -1,
   },
-  infoBox: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#1d4ed8",
-    backgroundColor: "#0b1624",
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 9,
-    marginTop: 13,
-  },
-  infoTextBox: {
-    flex: 1,
-  },
-  infoTitle: {
+  socialButtonText: {
     color: "#ffffff",
-    fontSize: 11.8,
+    fontSize: 10.7,
     fontWeight: "900",
-  },
-  infoText: {
-    color: "#bfdbfe",
-    fontSize: 10.8,
-    lineHeight: 15,
-    fontWeight: "700",
-    marginTop: 3,
+    flexShrink: 1,
   },
   authFooter: {
     flexDirection: "row",
