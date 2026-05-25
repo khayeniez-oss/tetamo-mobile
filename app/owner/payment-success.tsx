@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Linking,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -73,6 +74,8 @@ export default function OwnerPaymentSuccessScreen() {
   const params = useLocalSearchParams();
   const { clearDraft } = useListingDraft();
 
+  const isIOS = Platform.OS === "ios";
+
   const [language, setLanguage] = useState<Language>("en");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -123,6 +126,9 @@ export default function OwnerPaymentSuccessScreen() {
         loadPaymentError: "Gagal memuat status pembayaran.",
         paymentNotFound: "Data pembayaran tidak ditemukan.",
         successStatusText: "berhasil",
+        openingProfile: "Membuka Profile",
+        redirectProfile: "Anda akan diarahkan kembali ke profile.",
+        profile: "Profile",
         editApprovalDescription: (kode: string) =>
           kode && kode !== "-"
             ? `Perubahan listing ${kode} berhasil dikirim dan sekarang menunggu review admin.`
@@ -207,6 +213,9 @@ export default function OwnerPaymentSuccessScreen() {
       loadPaymentError: "Failed to load payment status.",
       paymentNotFound: "Payment data was not found.",
       successStatusText: "success",
+      openingProfile: "Opening Profile",
+      redirectProfile: "Redirecting you back to profile.",
+      profile: "Profile",
       editApprovalDescription: (kode: string) =>
         kode && kode !== "-"
           ? `Your changes for listing ${kode} have been submitted and are now waiting for admin review.`
@@ -270,6 +279,17 @@ export default function OwnerPaymentSuccessScreen() {
   }, [isId]);
 
   useEffect(() => {
+    if (!isIOS) return;
+
+    router.replace("/profile" as any);
+  }, [isIOS, router]);
+
+  useEffect(() => {
+    if (isIOS) {
+      setLoading(false);
+      return;
+    }
+
     let ignore = false;
 
     async function loadPayment() {
@@ -376,6 +396,7 @@ export default function OwnerPaymentSuccessScreen() {
       ignore = true;
     };
   }, [
+    isIOS,
     isEditApprovalFlow,
     paymentId,
     sessionId,
@@ -401,6 +422,11 @@ export default function OwnerPaymentSuccessScreen() {
     : payment?.property_code_snapshot || urlKode || "-";
 
   useEffect(() => {
+    if (isIOS) {
+      setLinkedProperty(null);
+      return;
+    }
+
     let ignore = false;
 
     async function loadLinkedProperty() {
@@ -439,9 +465,10 @@ export default function OwnerPaymentSuccessScreen() {
     return () => {
       ignore = true;
     };
-  }, [isEditApprovalFlow, resolvedKode, pollCount]);
+  }, [isIOS, isEditApprovalFlow, resolvedKode, pollCount]);
 
   const shouldPoll =
+    !isIOS &&
     !isEditApprovalFlow &&
     pollCount < 6 &&
     (Boolean(sessionId) || Boolean(paymentId) || returnedFromSuccess) &&
@@ -605,19 +632,35 @@ export default function OwnerPaymentSuccessScreen() {
   ]);
 
   const shouldShowContinuePayment =
+    !isIOS &&
     !successfulScreen &&
     (resolvedStatus === "pending" || resolvedStatus === "checkout_created") &&
     Boolean(payment?.checkout_url);
 
   async function openOwnerBilling() {
+    if (isIOS) {
+      router.replace("/profile" as any);
+      return;
+    }
+
     await Linking.openURL(`${siteUrl}/pemilikdashboard/tagihan`);
   }
 
   async function openOwnerDashboard() {
+    if (isIOS) {
+      router.replace("/profile" as any);
+      return;
+    }
+
     await Linking.openURL(`${siteUrl}/pemilikdashboard`);
   }
 
   async function openListing() {
+    if (isIOS) {
+      router.replace("/profile" as any);
+      return;
+    }
+
     if (linkedProperty?.id) {
       router.push(`/properti/${linkedProperty.id}` as any);
       return;
@@ -627,8 +670,36 @@ export default function OwnerPaymentSuccessScreen() {
   }
 
   async function addAnotherListing() {
+    if (isIOS) {
+      router.replace("/profile" as any);
+      return;
+    }
+
     await clearDraft();
     router.replace("/owner/packages" as any);
+  }
+
+  if (isIOS) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+
+        <View style={styles.iosRedirectBox}>
+          <ActivityIndicator color="#e6c15c" />
+
+          <Text style={styles.iosRedirectTitle}>{t.openingProfile}</Text>
+
+          <Text style={styles.iosRedirectText}>{t.redirectProfile}</Text>
+
+          <Pressable
+            style={styles.iosProfileButton}
+            onPress={() => router.replace("/profile" as any)}
+          >
+            <Text style={styles.iosProfileButtonText}>{t.profile}</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -1062,6 +1133,42 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
     backgroundColor: "#050505",
+  },
+  iosRedirectBox: {
+    flex: 1,
+    backgroundColor: "#050505",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    gap: 12,
+  },
+  iosRedirectTitle: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 6,
+  },
+  iosRedirectText: {
+    color: "#b8b8b8",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  iosProfileButton: {
+    minHeight: 48,
+    borderRadius: 17,
+    backgroundColor: "#e6c15c",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+    marginTop: 4,
+  },
+  iosProfileButtonText: {
+    color: "#111111",
+    fontSize: 13,
+    fontWeight: "900",
   },
   topBar: {
     paddingHorizontal: 18,
