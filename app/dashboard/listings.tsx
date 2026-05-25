@@ -1,40 +1,41 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    ArrowLeft,
-    BadgeCheck,
-    CalendarClock,
-    CheckCircle2,
-    CirclePause,
-    Clock3,
-    CreditCard,
-    Home,
-    Languages,
-    MapPin,
-    PackageCheck,
-    Pencil,
-    PlusCircle,
-    RotateCcw,
-    Search,
-    ShieldAlert,
-    ShieldCheck,
-    Sparkles,
-    Star,
-    XCircle,
+  ArrowLeft,
+  BadgeCheck,
+  CalendarClock,
+  CheckCircle2,
+  CirclePause,
+  Clock3,
+  CreditCard,
+  Home,
+  Languages,
+  MapPin,
+  PackageCheck,
+  Pencil,
+  PlusCircle,
+  RotateCcw,
+  Search,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  XCircle,
 } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
 
@@ -429,6 +430,8 @@ export default function DashboardListingsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
+  const isIOS = Platform.OS === "ios";
+
   const [language, setLanguage] = useState<Language>("en");
   const [role, setRole] = useState<DashboardRole>(
     readParam(params.role) === "agent" ? "agent" : "owner"
@@ -646,6 +649,11 @@ export default function DashboardListingsScreen() {
   }
 
   function goCreateListing() {
+    if (isIOS) {
+      router.push("/search" as any);
+      return;
+    }
+
     if (role === "agent") {
       if (!activeMembership) {
         router.push("/agent/packages" as any);
@@ -685,6 +693,10 @@ export default function DashboardListingsScreen() {
   }
 
   function goPaymentAction(item: ListingRow, action: "boost" | "spotlight" | "renew") {
+    if (isIOS) {
+      return;
+    }
+
     const title =
       action === "boost"
         ? "Boost"
@@ -951,7 +963,7 @@ export default function DashboardListingsScreen() {
           </View>
         </View>
 
-        {role === "agent" ? (
+        {role === "agent" && !isIOS ? (
           <View style={styles.membershipCard}>
             <View style={styles.membershipTop}>
               <View style={styles.membershipIcon}>
@@ -1043,24 +1055,26 @@ export default function DashboardListingsScreen() {
           />
         </View>
 
-        <View style={styles.actionRow}>
-          <Pressable style={styles.createButton} onPress={goCreateListing}>
-            <PlusCircle color="#111111" size={17} />
-            <Text style={styles.createButtonText}>
-              {role === "agent"
-                ? activeMembership
-                  ? isId
-                    ? "Tambah Listing"
-                    : "Add Listing"
+        {!isIOS ? (
+          <View style={styles.actionRow}>
+            <Pressable style={styles.createButton} onPress={goCreateListing}>
+              <PlusCircle color="#111111" size={17} />
+              <Text style={styles.createButtonText}>
+                {role === "agent"
+                  ? activeMembership
+                    ? isId
+                      ? "Tambah Listing"
+                      : "Add Listing"
+                    : isId
+                    ? "Pilih Paket"
+                    : "Choose Package"
                   : isId
-                  ? "Pilih Paket"
-                  : "Choose Package"
-                : isId
-                ? "Pasang Iklan"
-                : "Add Listing"}
-            </Text>
-          </Pressable>
-        </View>
+                  ? "Pasang Iklan"
+                  : "Add Listing"}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View style={styles.searchBox}>
           <Search color="#8f8f8f" size={17} />
@@ -1102,6 +1116,7 @@ export default function DashboardListingsScreen() {
                 role={role}
                 language={language}
                 busyId={busyId}
+                isIOS={isIOS}
                 onEdit={() => goEdit(item)}
                 onTogglePause={() => togglePause(item)}
                 onSold={() => markTransaction(item, "sold")}
@@ -1154,6 +1169,7 @@ function ListingCard({
   role,
   language,
   busyId,
+  isIOS,
   onEdit,
   onTogglePause,
   onSold,
@@ -1166,6 +1182,7 @@ function ListingCard({
   role: DashboardRole;
   language: Language;
   busyId: string;
+  isIOS: boolean;
   onEdit: () => void;
   onTogglePause: () => void;
   onSold: () => void;
@@ -1313,27 +1330,31 @@ function ListingCard({
             onPress={onRented}
           />
 
-          <ActionButton
-            label="Boost"
-            icon={<Star color="#ffffff" size={13} />}
-            disabled={actionBlocked || isAddonActive(item, "boost")}
-            onPress={onBoost}
-          />
+          {!isIOS ? (
+            <>
+              <ActionButton
+                label="Boost"
+                icon={<Star color="#ffffff" size={13} />}
+                disabled={actionBlocked || isAddonActive(item, "boost")}
+                onPress={onBoost}
+              />
 
-          <ActionButton
-            label="Spotlight"
-            icon={<Sparkles color="#ffffff" size={13} />}
-            disabled={actionBlocked || isAddonActive(item, "spotlight")}
-            onPress={onSpotlight}
-          />
+              <ActionButton
+                label="Spotlight"
+                icon={<Sparkles color="#ffffff" size={13} />}
+                disabled={actionBlocked || isAddonActive(item, "spotlight")}
+                onPress={onSpotlight}
+              />
 
-          {role === "owner" ? (
-            <ActionButton
-              label={isId ? "Perpanjang" : "Renew"}
-              icon={<RotateCcw color="#ffffff" size={13} />}
-              disabled={status !== "expired" && status !== "expiring"}
-              onPress={onRenew}
-            />
+              {role === "owner" ? (
+                <ActionButton
+                  label={isId ? "Perpanjang" : "Renew"}
+                  icon={<RotateCcw color="#ffffff" size={13} />}
+                  disabled={status !== "expired" && status !== "expiring"}
+                  onPress={onRenew}
+                />
+              ) : null}
+            </>
           ) : null}
         </View>
       </View>
