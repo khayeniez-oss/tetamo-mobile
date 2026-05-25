@@ -1,35 +1,33 @@
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    ArrowLeft,
-    ArrowRight,
-    BadgeCheck,
-    CalendarCheck,
-    Check,
-    Crown,
-    Home,
-    MessageCircle,
-    ShieldCheck,
-    Sparkles,
-    Store,
-    Tag,
+  ArrowLeft,
+  ArrowRight,
+  BadgeCheck,
+  CalendarCheck,
+  Check,
+  Crown,
+  Home,
+  MessageCircle,
+  ShieldCheck,
+  Sparkles,
+  Store,
+  Tag,
 } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
-import {
-    OWNER_PACKAGES,
-    type OwnerPackage,
-} from "../../services/pricelist";
+import { OWNER_PACKAGES, type OwnerPackage } from "../../services/pricelist";
 
 type Language = "en" | "id";
 
@@ -37,6 +35,7 @@ type UserRole = "owner" | "agent" | "developer" | "buyer" | "admin" | "unknown";
 
 export default function OwnerPackagesScreen() {
   const router = useRouter();
+  const isIOS = Platform.OS === "ios";
 
   const featuredOwnerPlanId =
     OWNER_PACKAGES.find((pkg) => pkg.id === "featured")?.id ||
@@ -90,6 +89,11 @@ export default function OwnerPackagesScreen() {
       viewMarketplace: isId ? "Lihat Marketplace" : "View Marketplace",
       checking: isId ? "Memeriksa akun..." : "Checking account...",
       signUpFirst: isId ? "Sign up dulu" : "Sign up first",
+      openingSearch: isId ? "Membuka Pencarian" : "Opening Search",
+      redirectSearch: isId
+        ? "Anda akan diarahkan ke pencarian properti."
+        : "Redirecting you to property search.",
+      searchProperties: isId ? "Cari Properti" : "Search Properties",
     }),
     [isId]
   );
@@ -124,6 +128,17 @@ export default function OwnerPackagesScreen() {
   );
 
   useEffect(() => {
+    if (!isIOS) return;
+
+    router.replace("/search" as any);
+  }, [isIOS, router]);
+
+  useEffect(() => {
+    if (isIOS) {
+      setCheckingSession(false);
+      return;
+    }
+
     let mounted = true;
 
     async function loadSession() {
@@ -187,7 +202,7 @@ export default function OwnerPackagesScreen() {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [isIOS]);
 
   const getPackageName = (pkg: OwnerPackage) => {
     return isId ? pkg.name : pkg.nameEn;
@@ -224,6 +239,11 @@ export default function OwnerPackagesScreen() {
   };
 
   const continueWithPlan = (planId: string) => {
+    if (isIOS) {
+      router.replace("/search" as any);
+      return;
+    }
+
     const nextPath = `/owner/create-listing?plan=${planId}`;
 
     if (!userId) {
@@ -246,6 +266,32 @@ export default function OwnerPackagesScreen() {
 
     router.push(nextPath as any);
   };
+
+  if (isIOS) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+
+        <View style={styles.iosRedirectBox}>
+          <ActivityIndicator color="#e6c15c" />
+
+          <Text style={styles.iosRedirectTitle}>{t.openingSearch}</Text>
+
+          <Text style={styles.iosRedirectText}>{t.redirectSearch}</Text>
+
+          <Pressable
+            style={styles.iosSearchButton}
+            onPress={() => router.replace("/search" as any)}
+          >
+            <Text style={styles.iosSearchButtonText}>
+              {t.searchProperties}
+            </Text>
+            <ArrowRight color="#111111" size={15} />
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -673,6 +719,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 18,
     paddingBottom: 38,
+  },
+  iosRedirectBox: {
+    flex: 1,
+    backgroundColor: "#050505",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    gap: 12,
+  },
+  iosRedirectTitle: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 6,
+  },
+  iosRedirectText: {
+    color: "#b8b8b8",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  iosSearchButton: {
+    minHeight: 48,
+    borderRadius: 17,
+    backgroundColor: "#e6c15c",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 16,
+    marginTop: 4,
+  },
+  iosSearchButtonText: {
+    color: "#111111",
+    fontSize: 13,
+    fontWeight: "900",
   },
   topRow: {
     flexDirection: "row",

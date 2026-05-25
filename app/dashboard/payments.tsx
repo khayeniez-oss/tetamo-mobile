@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
+  Platform,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -99,7 +100,11 @@ function normalizeStatus(value: unknown): NormalizedStatus {
     return "paid";
   }
 
-  if (status === "checkout_created" || status === "pending" || status === "initiated") {
+  if (
+    status === "checkout_created" ||
+    status === "pending" ||
+    status === "initiated"
+  ) {
     return "pending";
   }
 
@@ -151,10 +156,7 @@ function getPaymentMetaInfo(payment: PaymentRow) {
   const hitpay = asObject(metadata.hitpay);
 
   const gateway = String(
-    metadata.gateway ||
-      metadata.payment_gateway ||
-      hitpay.gateway ||
-      ""
+    metadata.gateway || metadata.payment_gateway || hitpay.gateway || "",
   ).toLowerCase();
 
   const method = String(
@@ -162,7 +164,7 @@ function getPaymentMetaInfo(payment: PaymentRow) {
       metadata.payment_method ||
       hitpay.paymentMethod ||
       hitpay.payment_method ||
-      ""
+      "",
   ).toLowerCase();
 
   const qrisReference = String(
@@ -171,7 +173,7 @@ function getPaymentMetaInfo(payment: PaymentRow) {
       hitpay.reference_number ||
       hitpay.payment_request_id ||
       hitpay.payment_id ||
-      ""
+      "",
   ).trim();
 
   const isQris = Boolean(
@@ -181,7 +183,7 @@ function getPaymentMetaInfo(payment: PaymentRow) {
       metadata.hitpay_reference_number ||
       hitpay.payment_request_id ||
       hitpay.reference_number ||
-      hitpay.payment_id
+      hitpay.payment_id,
   );
 
   return {
@@ -286,7 +288,7 @@ function getStatusUI(status: NormalizedStatus, language: Language) {
 
   if (status === "pending") {
     return {
-      label: language === "id" ? "PENDING" : "PENDING",
+      label: "PENDING",
       description:
         language === "id"
           ? "Menunggu pembayaran atau konfirmasi dari gateway."
@@ -300,7 +302,7 @@ function getStatusUI(status: NormalizedStatus, language: Language) {
 
   if (status === "unpaid") {
     return {
-      label: language === "id" ? "UNPAID" : "UNPAID",
+      label: "UNPAID",
       description:
         language === "id"
           ? "Tagihan belum dibayar."
@@ -314,7 +316,7 @@ function getStatusUI(status: NormalizedStatus, language: Language) {
 
   if (status === "expired") {
     return {
-      label: language === "id" ? "EXPIRED" : "EXPIRED",
+      label: "EXPIRED",
       description:
         language === "id"
           ? "Checkout sudah kedaluwarsa."
@@ -328,7 +330,7 @@ function getStatusUI(status: NormalizedStatus, language: Language) {
 
   if (status === "cancelled") {
     return {
-      label: language === "id" ? "CANCELLED" : "CANCELLED",
+      label: "CANCELLED",
       description:
         language === "id"
           ? "Pembayaran dibatalkan atau tidak diselesaikan."
@@ -355,7 +357,7 @@ function getStatusUI(status: NormalizedStatus, language: Language) {
   }
 
   return {
-    label: language === "id" ? "FAILED" : "FAILED",
+    label: "FAILED",
     description:
       language === "id"
         ? "Pembayaran gagal atau tidak berhasil diproses."
@@ -390,6 +392,7 @@ function shouldShowPayNow(status: NormalizedStatus, payment: PaymentRow) {
 
 export default function DashboardPaymentsScreen() {
   const router = useRouter();
+  const isIOS = Platform.OS === "ios";
 
   const [language, setLanguage] = useState<Language>("en");
   const [loading, setLoading] = useState(true);
@@ -425,6 +428,9 @@ export default function DashboardPaymentsScreen() {
         invoice: "Invoice",
         payNow: "Pay Now",
         noCheckout: "Link checkout tidak tersedia",
+        openingProfile: "Membuka Profile",
+        redirectProfile: "Anda akan diarahkan kembali ke profile.",
+        profile: "Profile",
       };
     }
 
@@ -452,6 +458,9 @@ export default function DashboardPaymentsScreen() {
       invoice: "Invoice",
       payNow: "Pay Now",
       noCheckout: "Checkout link unavailable",
+      openingProfile: "Opening Profile",
+      redirectProfile: "Redirecting you back to profile.",
+      profile: "Profile",
     };
   }, [isId]);
 
@@ -470,6 +479,13 @@ export default function DashboardPaymentsScreen() {
   }, [payments]);
 
   const loadPayments = useCallback(async () => {
+    if (isIOS) {
+      setPayments([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     setErrorMessage("");
 
     const {
@@ -523,7 +539,7 @@ export default function DashboardPaymentsScreen() {
           metadata,
           created_at,
           updated_at
-        `
+        `,
       )
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
@@ -539,24 +555,65 @@ export default function DashboardPaymentsScreen() {
     setPayments((data || []) as PaymentRow[]);
     setLoading(false);
     setRefreshing(false);
-  }, [router, ui.failedLoad]);
+  }, [isIOS, router, ui.failedLoad]);
+
+  useEffect(() => {
+    if (!isIOS) return;
+
+    router.replace("/profile" as any);
+  }, [isIOS, router]);
 
   useEffect(() => {
     void loadPayments();
   }, [loadPayments]);
 
   async function handleRefresh() {
+    if (isIOS) {
+      router.replace("/profile" as any);
+      return;
+    }
+
     setRefreshing(true);
     await loadPayments();
   }
 
   async function openUrl(url?: string | null) {
+    if (isIOS) return;
     if (!url) return;
+
     await Linking.openURL(url);
   }
 
   function openReceipt(payment: PaymentRow) {
+    if (isIOS) {
+      router.replace("/profile" as any);
+      return;
+    }
+
     router.push(`/dashboard/receipt/${payment.id}` as any);
+  }
+
+  if (isIOS) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+
+        <View style={styles.iosRedirectBox}>
+          <ActivityIndicator color="#e6c15c" />
+
+          <Text style={styles.iosRedirectTitle}>{ui.openingProfile}</Text>
+
+          <Text style={styles.iosRedirectText}>{ui.redirectProfile}</Text>
+
+          <Pressable
+            style={styles.iosProfileButton}
+            onPress={() => router.replace("/profile" as any)}
+          >
+            <Text style={styles.iosProfileButtonText}>{ui.profile}</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -707,7 +764,7 @@ export default function DashboardPaymentsScreen() {
                     label={ui.amount}
                     value={formatAmount(
                       payment.amount_total ?? payment.amount_subtotal ?? 0,
-                      payment.currency
+                      payment.currency,
                     )}
                   />
 
@@ -814,6 +871,42 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#050505",
+  },
+  iosRedirectBox: {
+    flex: 1,
+    backgroundColor: "#050505",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    gap: 12,
+  },
+  iosRedirectTitle: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 6,
+  },
+  iosRedirectText: {
+    color: "#b8b8b8",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  iosProfileButton: {
+    minHeight: 48,
+    borderRadius: 17,
+    backgroundColor: "#e6c15c",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+    marginTop: 4,
+  },
+  iosProfileButtonText: {
+    color: "#111111",
+    fontSize: 13,
+    fontWeight: "900",
   },
   topBar: {
     paddingHorizontal: 18,

@@ -1,27 +1,28 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    CheckCircle2,
-    Clock,
-    ExternalLink,
-    FileText,
-    Home,
-    PackageCheck,
-    ReceiptText,
-    RotateCcw,
-    ShieldCheck,
-    XCircle,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  FileText,
+  Home,
+  PackageCheck,
+  ReceiptText,
+  RotateCcw,
+  ShieldCheck,
+  XCircle,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-    ActivityIndicator,
-    Linking,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Linking,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
 
@@ -76,6 +77,8 @@ export default function AgentPaymentSuccessScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
+  const isIOS = Platform.OS === "ios";
+
   const [language, setLanguage] = useState<Language>("en");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -123,6 +126,9 @@ export default function AgentPaymentSuccessScreen() {
         failedTitle: "Pembayaran Belum Berhasil",
         expiredTitle: "Pembayaran Kadaluarsa",
         refundedTitle: "Pembayaran Direfund",
+        openingProfile: "Membuka Profile",
+        redirectProfile: "Anda akan diarahkan kembali ke profile.",
+        profile: "Profile",
         successDescription:
           "Pembayaran paket agen Anda berhasil. Membership Anda sudah diproses dan siap digunakan sesuai status terbaru.",
         successPoints: [
@@ -193,6 +199,9 @@ export default function AgentPaymentSuccessScreen() {
       failedTitle: "Payment Not Completed",
       expiredTitle: "Payment Expired",
       refundedTitle: "Payment Refunded",
+      openingProfile: "Opening Profile",
+      redirectProfile: "Redirecting you back to profile.",
+      profile: "Profile",
       successDescription:
         "Your agent package payment was successful. Your membership has been processed and is ready based on the latest status.",
       successPoints: [
@@ -235,6 +244,17 @@ export default function AgentPaymentSuccessScreen() {
   }, [isId]);
 
   useEffect(() => {
+    if (!isIOS) return;
+
+    router.replace("/profile" as any);
+  }, [isIOS, router]);
+
+  useEffect(() => {
+    if (isIOS) {
+      setLoading(false);
+      return;
+    }
+
     let ignore = false;
 
     async function loadPayment() {
@@ -347,6 +367,7 @@ export default function AgentPaymentSuccessScreen() {
       ignore = true;
     };
   }, [
+    isIOS,
     paymentId,
     sessionId,
     urlPackage,
@@ -366,6 +387,7 @@ export default function AgentPaymentSuccessScreen() {
     resolvedStatus === "pending" || resolvedStatus === "checkout_created";
 
   const shouldPoll =
+    !isIOS &&
     pollCount < 8 &&
     (Boolean(paymentId) || Boolean(sessionId) || urlPayment === "success") &&
     !isPaid &&
@@ -461,19 +483,27 @@ export default function AgentPaymentSuccessScreen() {
   }, [isPaid, isPending, resolvedStatus, t]);
 
   const shouldShowContinuePayment =
-    !isPaid &&
-    isPending &&
-    Boolean(payment?.checkout_url);
+    !isIOS && !isPaid && isPending && Boolean(payment?.checkout_url);
 
   async function openAgentDashboard() {
     router.push("/(tabs)/profile" as any);
   }
 
   async function openPayments() {
+    if (isIOS) {
+      router.replace("/profile" as any);
+      return;
+    }
+
     router.push("/dashboard/payments" as any);
   }
 
   async function openReceipt() {
+    if (isIOS) {
+      router.replace("/profile" as any);
+      return;
+    }
+
     if (payment?.id) {
       router.push(`/dashboard/receipt/${payment.id}` as any);
       return;
@@ -483,11 +513,44 @@ export default function AgentPaymentSuccessScreen() {
   }
 
   async function openPackages() {
+    if (isIOS) {
+      router.replace("/profile" as any);
+      return;
+    }
+
     router.push("/agent/packages" as any);
   }
 
   async function createListing() {
+    if (isIOS) {
+      router.replace("/profile" as any);
+      return;
+    }
+
     router.push("/agent/create-listing" as any);
+  }
+
+  if (isIOS) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+
+        <View style={styles.iosRedirectBox}>
+          <ActivityIndicator color="#e6c15c" />
+
+          <Text style={styles.iosRedirectTitle}>{t.openingProfile}</Text>
+
+          <Text style={styles.iosRedirectText}>{t.redirectProfile}</Text>
+
+          <Pressable
+            style={styles.iosProfileButton}
+            onPress={() => router.replace("/profile" as any)}
+          >
+            <Text style={styles.iosProfileButtonText}>{t.profile}</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -963,6 +1026,42 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
     backgroundColor: "#050505",
+  },
+  iosRedirectBox: {
+    flex: 1,
+    backgroundColor: "#050505",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    gap: 12,
+  },
+  iosRedirectTitle: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 6,
+  },
+  iosRedirectText: {
+    color: "#b8b8b8",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  iosProfileButton: {
+    minHeight: 48,
+    borderRadius: 17,
+    backgroundColor: "#e6c15c",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+    marginTop: 4,
+  },
+  iosProfileButtonText: {
+    color: "#111111",
+    fontSize: 13,
+    fontWeight: "900",
   },
   topBar: {
     paddingHorizontal: 18,

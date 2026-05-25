@@ -17,6 +17,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -279,6 +280,8 @@ export default function AgentPaymentScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
+  const isIOS = Platform.OS === "ios";
+
   const [language, setLanguage] = useState<Language>("en");
   const [selectedGateway, setSelectedGateway] =
     useState<GatewayType>("hitpay");
@@ -321,6 +324,17 @@ export default function AgentPaymentScreen() {
     : [];
 
   useEffect(() => {
+    if (!isIOS) return;
+
+    router.replace("/search" as any);
+  }, [isIOS, router]);
+
+  useEffect(() => {
+    if (isIOS) {
+      setLoadingUser(false);
+      return;
+    }
+
     let ignore = false;
 
     async function loadUser() {
@@ -377,9 +391,14 @@ export default function AgentPaymentScreen() {
     return () => {
       ignore = true;
     };
-  }, [isId]);
+  }, [isIOS, isId]);
 
   async function createPayment() {
+    if (isIOS) {
+      router.replace("/search" as any);
+      return;
+    }
+
     if (!selectedPackage || submitting) return;
 
     try {
@@ -528,6 +547,38 @@ export default function AgentPaymentScreen() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (isIOS) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+
+        <View style={styles.iosRedirectBox}>
+          <ActivityIndicator color="#e6c15c" />
+
+          <Text style={styles.iosRedirectTitle}>
+            {isId ? "Membuka Pencarian" : "Opening Search"}
+          </Text>
+
+          <Text style={styles.iosRedirectText}>
+            {isId
+              ? "Anda akan diarahkan ke pencarian properti."
+              : "Redirecting you to property search."}
+          </Text>
+
+          <Pressable
+            style={styles.iosSearchButton}
+            onPress={() => router.replace("/search" as any)}
+          >
+            <Text style={styles.iosSearchButtonText}>
+              {isId ? "Cari Properti" : "Search Properties"}
+            </Text>
+            <ChevronRight color="#111111" size={16} />
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   if (loadingUser) {
@@ -839,6 +890,44 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 18,
     paddingBottom: 38,
+  },
+  iosRedirectBox: {
+    flex: 1,
+    backgroundColor: "#050505",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    gap: 12,
+  },
+  iosRedirectTitle: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 6,
+  },
+  iosRedirectText: {
+    color: "#b8b8b8",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  iosSearchButton: {
+    minHeight: 48,
+    borderRadius: 17,
+    backgroundColor: "#e6c15c",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 16,
+    marginTop: 4,
+  },
+  iosSearchButtonText: {
+    color: "#111111",
+    fontSize: 13,
+    fontWeight: "900",
   },
   topBar: {
     paddingHorizontal: 18,

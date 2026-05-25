@@ -1,27 +1,28 @@
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    ArrowLeft,
-    CalendarDays,
-    Check,
-    ChevronRight,
-    Crown,
-    Languages,
-    PackageCheck,
-    ShieldCheck,
-    Sparkles,
+  ArrowLeft,
+  CalendarDays,
+  Check,
+  ChevronRight,
+  Crown,
+  Languages,
+  PackageCheck,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Linking,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
 import { AGENT_PACKAGES, type AgentPackage } from "../../services/pricelist";
@@ -227,6 +228,7 @@ function getPackageIntro(pkg: AgentPackage, language: Language) {
 
 export default function AgentPackagesScreen() {
   const router = useRouter();
+  const isIOS = Platform.OS === "ios";
 
   const [language, setLanguage] = useState<Language>("en");
   const [loadingPage, setLoadingPage] = useState(true);
@@ -290,6 +292,12 @@ export default function AgentPackagesScreen() {
   const isId = language === "id";
 
   useEffect(() => {
+    if (!isIOS) return;
+
+    router.replace("/search" as any);
+  }, [isIOS, router]);
+
+  useEffect(() => {
     if (!selectedPackage) return;
 
     const available = getAvailableBillingCycles(selectedPackage);
@@ -300,6 +308,11 @@ export default function AgentPackagesScreen() {
   }, [selectedPackage, selectedBillingCycle]);
 
   useEffect(() => {
+    if (isIOS) {
+      setLoadingPage(false);
+      return;
+    }
+
     let ignore = false;
 
     async function loadUserAndMembership() {
@@ -398,7 +411,7 @@ export default function AgentPackagesScreen() {
     return () => {
       ignore = true;
     };
-  }, [isId, recommendedPackageId, sortedPackages]);
+  }, [isId, recommendedPackageId, sortedPackages, isIOS]);
 
   function handleBack() {
     router.back();
@@ -450,6 +463,38 @@ export default function AgentPackagesScreen() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (isIOS) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+
+        <View style={styles.iosRedirectBox}>
+          <ActivityIndicator color="#e6c15c" />
+
+          <Text style={styles.iosRedirectTitle}>
+            {isId ? "Membuka Pencarian" : "Opening Search"}
+          </Text>
+
+          <Text style={styles.iosRedirectText}>
+            {isId
+              ? "Anda akan diarahkan ke pencarian properti."
+              : "Redirecting you to property search."}
+          </Text>
+
+          <Pressable
+            style={styles.iosSearchButton}
+            onPress={() => router.replace("/search" as any)}
+          >
+            <Text style={styles.iosSearchButtonText}>
+              {isId ? "Cari Properti" : "Search Properties"}
+            </Text>
+            <ChevronRight color="#111111" size={17} />
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   if (loadingPage) {
@@ -818,6 +863,44 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 18,
     paddingBottom: 38,
+  },
+  iosRedirectBox: {
+    flex: 1,
+    backgroundColor: "#050505",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    gap: 12,
+  },
+  iosRedirectTitle: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 6,
+  },
+  iosRedirectText: {
+    color: "#b8b8b8",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  iosSearchButton: {
+    minHeight: 48,
+    borderRadius: 17,
+    backgroundColor: "#e6c15c",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 16,
+    marginTop: 4,
+  },
+  iosSearchButtonText: {
+    color: "#111111",
+    fontSize: 13,
+    fontWeight: "900",
   },
   topBar: {
     paddingHorizontal: 18,

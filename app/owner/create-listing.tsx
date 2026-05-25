@@ -1,19 +1,20 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ArrowLeft, PackageCheck } from "lucide-react-native";
+import { ArrowLeft, ChevronRight, PackageCheck } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import {
-    getEmptyListingDraft,
-    type OwnerPlanType,
-    useListingDraft,
+  getEmptyListingDraft,
+  type OwnerPlanType,
+  useListingDraft,
 } from "../../components/listing/ListingDraftContext";
 import ListingIklan from "../../components/listing/ListingIklan";
 import { getOwnerPackageById } from "../../services/pricelist";
@@ -24,6 +25,8 @@ export default function OwnerCreateListingScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { loading, draft, setDraft, clearDraft } = useListingDraft();
+
+  const isIOS = Platform.OS === "ios";
 
   const [language, setLanguage] = useState<Language>("en");
 
@@ -43,11 +46,17 @@ export default function OwnerCreateListingScreen() {
   const isId = language === "id";
 
   useEffect(() => {
+    if (!isIOS) return;
+
+    router.replace("/search" as any);
+  }, [isIOS, router]);
+
+  useEffect(() => {
+    if (isIOS) return;
     if (loading) return;
 
     setDraft((prev) => {
-      const shouldStartFresh =
-        prev.source === "agent" || prev.mode === "edit";
+      const shouldStartFresh = prev.source === "agent" || prev.mode === "edit";
 
       const baseDraft = shouldStartFresh ? getEmptyListingDraft() : prev;
 
@@ -65,16 +74,58 @@ export default function OwnerCreateListingScreen() {
         },
       };
     });
-  }, [currentPlan, loading, selectedPackage?.priceIdr, setDraft]);
+  }, [currentPlan, loading, selectedPackage?.priceIdr, setDraft, isIOS]);
 
   const handleNext = () => {
+    if (isIOS) {
+      router.replace("/search" as any);
+      return;
+    }
+
     router.push(`/owner/listing-details?plan=${currentPlan}` as any);
   };
 
   const handleReset = async () => {
+    if (isIOS) {
+      router.replace("/search" as any);
+      return;
+    }
+
     await clearDraft();
     router.replace("/owner/packages" as any);
   };
+
+  if (isIOS) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+
+        <View style={styles.iosRedirectBox}>
+          <ActivityIndicator color="#e6c15c" />
+
+          <Text style={styles.iosRedirectTitle}>
+            {isId ? "Membuka Pencarian" : "Opening Search"}
+          </Text>
+
+          <Text style={styles.iosRedirectText}>
+            {isId
+              ? "Anda akan diarahkan ke pencarian properti."
+              : "Redirecting you to property search."}
+          </Text>
+
+          <Pressable
+            style={styles.iosSearchButton}
+            onPress={() => router.replace("/search" as any)}
+          >
+            <Text style={styles.iosSearchButtonText}>
+              {isId ? "Cari Properti" : "Search Properties"}
+            </Text>
+            <ChevronRight color="#111111" size={16} />
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (loading) {
     return (
@@ -171,6 +222,44 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#050505",
+  },
+  iosRedirectBox: {
+    flex: 1,
+    backgroundColor: "#050505",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    gap: 12,
+  },
+  iosRedirectTitle: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 6,
+  },
+  iosRedirectText: {
+    color: "#b8b8b8",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  iosSearchButton: {
+    minHeight: 48,
+    borderRadius: 17,
+    backgroundColor: "#e6c15c",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 16,
+    marginTop: 4,
+  },
+  iosSearchButtonText: {
+    color: "#111111",
+    fontSize: 13,
+    fontWeight: "900",
   },
   topBar: {
     paddingHorizontal: 18,

@@ -57,6 +57,27 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function normalizePhoneNumber(value: string) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const cleaned = raw.replace(/[^\d+]/g, "");
+  if (!cleaned) return "";
+
+  if (cleaned.startsWith("+")) return cleaned;
+  if (cleaned.startsWith("00")) return `+${cleaned.slice(2)}`;
+  if (cleaned.startsWith("0")) return `+62${cleaned.slice(1)}`;
+  if (cleaned.startsWith("62")) return `+${cleaned}`;
+  if (cleaned.startsWith("8")) return `+62${cleaned}`;
+
+  return `+${cleaned}`;
+}
+
+function isValidInternationalPhone(value: string) {
+  if (!value) return false;
+  return /^\+[1-9]\d{7,14}$/.test(value);
+}
+
 function createNonce(length = 32) {
   const charset =
     "0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._";
@@ -99,8 +120,8 @@ export default function LoginScreen() {
           "Lanjutkan ke akun Anda untuk mengelola listing, leads, dan aktivitas Tetamo.",
         welcome: "Selamat Datang",
         welcomeSub: "Masuk ke akun Anda",
-        email: "Email",
-        emailPlaceholder: "Email",
+        email: "Email atau Nomor WhatsApp",
+        emailPlaceholder: "Email atau +62 812 3456 7890",
         password: "Kata Sandi",
         passwordPlaceholder: "Kata sandi",
         login: "Masuk",
@@ -112,10 +133,11 @@ export default function LoginScreen() {
         forgot: "Lupa kata sandi?",
         noAccount: "Belum punya akun?",
         signup: "Daftar",
-        emptyFields: "Masukkan email dan kata sandi.",
-        invalidEmail: "Format email tidak valid.",
+        emptyFields: "Masukkan email/nomor WhatsApp dan kata sandi.",
+        invalidLogin:
+          "Masukkan email atau nomor WhatsApp yang valid.",
         wrongLogin:
-          "Email atau kata sandi salah. Jika lupa kata sandi, gunakan reset password di bawah.",
+          "Email/nomor WhatsApp atau kata sandi salah. Jika lupa kata sandi, gunakan reset password di bawah.",
         userNotFound: "User tidak ditemukan.",
         profileNotFound: "Profil pengguna tidak ditemukan.",
         googleUrlError: "URL login Google gagal dibuat.",
@@ -136,8 +158,8 @@ export default function LoginScreen() {
         "Continue to your account to manage listings, leads, and Tetamo activity.",
       welcome: "Welcome Back",
       welcomeSub: "Log in to your account",
-      email: "Email",
-      emailPlaceholder: "Email",
+      email: "Email or WhatsApp Number",
+      emailPlaceholder: "Email or +62 812 3456 7890",
       password: "Password",
       passwordPlaceholder: "Password",
       login: "Log In",
@@ -149,10 +171,11 @@ export default function LoginScreen() {
       forgot: "Forgot password?",
       noAccount: "Don’t have an account?",
       signup: "Sign Up",
-      emptyFields: "Enter your email and password.",
-      invalidEmail: "Please enter a valid email address.",
+      emptyFields: "Enter your email/WhatsApp number and password.",
+      invalidLogin:
+        "Please enter a valid email address or WhatsApp number.",
       wrongLogin:
-        "Wrong email or password. If you forgot your password, use reset password below.",
+        "Wrong email/WhatsApp number or password. If you forgot your password, use reset password below.",
       userNotFound: "User not found.",
       profileNotFound: "User profile not found.",
       googleUrlError: "Google login URL was not created.",
@@ -167,6 +190,13 @@ export default function LoginScreen() {
   }, [isId]);
 
   function getDefaultRedirect(role: AllowedRole | null) {
+    if (Platform.OS === "ios") {
+      if (role === "developer") return "/developer-license";
+      if (role === "admin") return "/(tabs)/profile";
+
+      return "/(tabs)/property";
+    }
+
     if (role === "owner") return "/owner/packages";
     if (role === "agent") return "/agent/packages";
     if (role === "developer") return "/developer-license";
@@ -175,11 +205,22 @@ export default function LoginScreen() {
     return "/(tabs)/property";
   }
 
+  function getFinalRedirect(role: AllowedRole | null) {
+    if (Platform.OS === "ios") {
+      return getDefaultRedirect(role);
+    }
+
+    return safeNext || getDefaultRedirect(role);
+  }
+
   function getSignupPath() {
     const query = new URLSearchParams();
 
     if (roleFromUrl) query.set("role", roleFromUrl);
-    if (safeNext) query.set("next", safeNext);
+
+    if (Platform.OS !== "ios" && safeNext) {
+      query.set("next", safeNext);
+    }
 
     const queryString = query.toString();
 
@@ -189,9 +230,42 @@ export default function LoginScreen() {
   function getForgotPasswordPath() {
     const trimmedEmail = email.trim().toLowerCase();
 
-    if (!trimmedEmail) return "/forgot-password";
+    if (!isValidEmail(trimmedEmail)) return "/forgot-password";
 
     return `/forgot-password?email=${encodeURIComponent(trimmedEmail)}`;
+  }
+
+  async function resolveLoginEmail(value: string) {
+    const loginValue = value.trim().toLowerCase();
+
+    if (isValidEmail(loginValue)) {
+      return loginValue;
+    }
+
+    const normalizedPhone = normalizePhoneNumber(loginValue);
+
+    if (!isValidInternationalPhone(normalizedPhone)) {
+      throw new Error(ui.invalidLogin);
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("phone", normalizedPhone)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(ui.wrongLogin);
+    }
+
+    const profileEmail = String((data as any)?.email || "").trim().toLowerCase();
+
+    if (!profileEmail || !isValidEmail(profileEmail)) {
+      throw new Error(ui.wrongLogin);
+    }
+
+    return profileEmail;
   }
 
   async function finishLogin({
@@ -267,7 +341,7 @@ export default function LoginScreen() {
     setGoogleLoading(false);
     setAppleLoading(false);
 
-    router.replace((safeNext || getDefaultRedirect(finalRole)) as any);
+    router.replace(getFinalRedirect(finalRole) as any);
   }
 
   useEffect(() => {
@@ -323,17 +397,12 @@ export default function LoginScreen() {
   }, []);
 
   async function handleLogin() {
-    const trimmedEmail = email.trim().toLowerCase();
+    const loginValue = email.trim();
 
     setLoginError("");
 
-    if (!trimmedEmail || !password) {
+    if (!loginValue || !password) {
       setLoginError(ui.emptyFields);
-      return;
-    }
-
-    if (!isValidEmail(trimmedEmail)) {
-      setLoginError(ui.invalidEmail);
       return;
     }
 
@@ -342,8 +411,10 @@ export default function LoginScreen() {
       setGoogleLoading(false);
       setAppleLoading(false);
 
+      const loginEmail = await resolveLoginEmail(loginValue);
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: trimmedEmail,
+        email: loginEmail,
         password,
       });
 

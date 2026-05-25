@@ -36,6 +36,7 @@ import {
   Image,
   ImageBackground,
   Linking,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -329,6 +330,7 @@ export default function HomeScreen() {
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   const t = copy[language];
+  const isIOS = Platform.OS === "ios";
   const heroCardWidth = width - 36;
 
   useEffect(() => {
@@ -508,6 +510,11 @@ export default function HomeScreen() {
   };
 
   const goAddListing = (audience?: string) => {
+    if (Platform.OS === "ios") {
+      goSearch();
+      return;
+    }
+
     router.push(
       audience
         ? (`/add-listing?audience=${audience}` as any)
@@ -857,12 +864,26 @@ Is this property still available?`;
           </View>
 
           <View style={styles.ctaTextBox}>
-            <Text style={styles.ctaTitle}>{t.listCta}</Text>
-            <Text style={styles.ctaSub}>{t.listCtaSub}</Text>
+            <Text style={styles.ctaTitle}>
+              {isIOS
+                ? language === "id"
+                  ? "Cari properti di TETAMO"
+                  : "Search properties on TETAMO"
+                : t.listCta}
+            </Text>
+            <Text style={styles.ctaSub}>
+              {isIOS
+                ? language === "id"
+                  ? "Temukan properti terverifikasi, hubungi via WhatsApp, dan jadwalkan viewing."
+                  : "Find verified properties, contact via WhatsApp, and schedule viewings."
+                : t.listCtaSub}
+            </Text>
           </View>
 
           <Pressable onPress={() => goAddListing()} style={styles.ctaButton}>
-            <Text style={styles.ctaButtonText}>{t.getStarted}</Text>
+            <Text style={styles.ctaButtonText}>
+              {isIOS ? (language === "id" ? "Cari" : "Search") : t.getStarted}
+            </Text>
             <ChevronRight color="#111111" size={15} />
           </Pressable>
         </View>
@@ -986,30 +1007,48 @@ Is this property still available?`;
         </CompactFeaturePanel>
 
         <View style={styles.entryGrid}>
-          <EntryCard
-            icon={<UserRound color={SCORPIO_GOLD} size={24} />}
-            title={t.owner}
-            subtitle={t.ownerSub}
-            onPress={() => goAddListing("owner")}
-          />
-          <EntryCard
-            icon={<BriefcaseBusiness color={SCORPIO_GOLD} size={24} />}
-            title={t.agent}
-            subtitle={t.agentSub}
-            onPress={() => goAddListing("agent")}
-          />
-          <EntryCard
-            icon={<Building2 color={SCORPIO_GOLD} size={24} />}
-            title={t.developer}
-            subtitle={t.developerSub}
-            onPress={() => goAddListing("developer")}
-          />
+          {!isIOS ? (
+            <>
+              <EntryCard
+                icon={<UserRound color={SCORPIO_GOLD} size={24} />}
+                title={t.owner}
+                subtitle={t.ownerSub}
+                onPress={() => goAddListing("owner")}
+              />
+              <EntryCard
+                icon={<BriefcaseBusiness color={SCORPIO_GOLD} size={24} />}
+                title={t.agent}
+                subtitle={t.agentSub}
+                onPress={() => goAddListing("agent")}
+              />
+              <EntryCard
+                icon={<Building2 color={SCORPIO_GOLD} size={24} />}
+                title={t.developer}
+                subtitle={t.developerSub}
+                onPress={() => goAddListing("developer")}
+              />
+            </>
+          ) : null}
+
           <EntryCard
             icon={<House color={SCORPIO_GOLD} size={24} />}
             title={t.buyRent}
             subtitle={t.buyRentSub}
             onPress={() => goSearch()}
           />
+
+          {isIOS ? (
+            <EntryCard
+              icon={<Search color={SCORPIO_GOLD} size={24} />}
+              title={language === "id" ? "Cari Properti" : "Search Property"}
+              subtitle={
+                language === "id"
+                  ? "Jelajahi listing"
+                  : "Browse listings"
+              }
+              onPress={() => goSearch()}
+            />
+          ) : null}
         </View>
 
         <SectionHeader

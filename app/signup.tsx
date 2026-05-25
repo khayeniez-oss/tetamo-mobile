@@ -1,3 +1,5 @@
+import * as AppleAuthentication from "expo-apple-authentication";
+import * as Crypto from "expo-crypto";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -12,10 +14,9 @@ import {
   LockKeyhole,
   Mail,
   Phone,
-  ShieldCheck,
   UserRound,
 } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -69,6 +70,18 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function createNonce(length = 32) {
+  const charset =
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._";
+  let result = "";
+
+  for (let i = 0; i < length; i += 1) {
+    result += charset[Math.floor(Math.random() * charset.length)];
+  }
+
+  return result;
+}
+
 async function openPolicyUrl(url: string) {
   try {
     await NativeLinking.openURL(url);
@@ -90,8 +103,11 @@ export default function SignupScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loadingEmail, setLoadingEmail] = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
+  const [loadingApple, setLoadingApple] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(Platform.OS === "ios");
 
   const isId = language === "id";
+  const isIOS = Platform.OS === "ios";
 
   const ui = useMemo(() => {
     if (isId) {
@@ -118,8 +134,11 @@ export default function SignupScreen() {
         password: "Kata Sandi",
         createAccount: "Buat Akun",
         creating: "Membuat akun...",
-        continueGoogle: "Lanjutkan dengan Google",
+        continueGoogle: "Daftar dengan Google",
+        continueApple: "Daftar dengan Apple",
         connecting: "Menghubungkan...",
+        socialNote:
+          "Google/Apple menggunakan email akun Anda. Untuk Google/Apple, cukup isi nomor WhatsApp dan centang persetujuan.",
         or: "atau",
         already: "Sudah punya akun?",
         login: "Masuk",
@@ -145,9 +164,10 @@ export default function SignupScreen() {
           "Pendaftaran Google tidak mengembalikan kode autentikasi.",
         googleSessionError: "Sesi pendaftaran Google gagal dibuat.",
         googleSignupFailed: "Pendaftaran dengan Google gagal.",
-        secureTitle: "Akun Anda lebih aman",
-        secureText:
-          "Email digunakan untuk login, reset password, tanda terima, invoice, dan pemulihan akun.",
+        appleUnavailable: "Daftar dengan Apple hanya tersedia di perangkat iOS.",
+        appleTokenError: "Apple tidak mengembalikan token autentikasi.",
+        appleSessionError: "Sesi pendaftaran Apple gagal dibuat.",
+        appleSignupFailed: "Pendaftaran dengan Apple gagal.",
       };
     }
 
@@ -174,8 +194,11 @@ export default function SignupScreen() {
       password: "Password",
       createAccount: "Create Account",
       creating: "Creating account...",
-      continueGoogle: "Continue with Google",
+      continueGoogle: "Sign up with Google",
+      continueApple: "Sign up with Apple",
       connecting: "Connecting...",
+      socialNote:
+        "Google/Apple use your account email. For Google/Apple, only WhatsApp number and policy agreement are required.",
       or: "or",
       already: "Already have an account?",
       login: "Log in",
@@ -200,9 +223,10 @@ export default function SignupScreen() {
       googleCodeError: "Google signup did not return an auth code.",
       googleSessionError: "Google signup session was not created.",
       googleSignupFailed: "Google signup failed.",
-      secureTitle: "Your account is safer",
-      secureText:
-        "Email is used for login, password reset, receipts, invoices, and account recovery.",
+      appleUnavailable: "Sign up with Apple is only available on iOS devices.",
+      appleTokenError: "Apple did not return an identity token.",
+      appleSessionError: "Apple signup session was not created.",
+      appleSignupFailed: "Apple signup failed.",
     };
   }, [isId]);
 
@@ -213,15 +237,41 @@ export default function SignupScreen() {
     return "";
   }, [selectedRole, isId]);
 
-  const isBusy = loadingEmail || loadingGoogle;
+  const isBusy = loadingEmail || loadingGoogle || loadingApple;
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkAppleAvailability() {
+      if (Platform.OS !== "ios") {
+        setAppleAvailable(false);
+        return;
+      }
+
+      const available = await AppleAuthentication.isAvailableAsync();
+
+      if (mounted) setAppleAvailable(available);
+    }
+
+    void checkAppleAvailability();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   function getRoleRedirect(role: AllowedRole) {
+    if (Platform.OS === "ios") {
+      if (role === "developer") return "/developer-license";
+      return "/(tabs)/property";
+    }
+
     if (role === "owner") return "/owner/packages";
     if (role === "agent") return "/agent/packages";
     return "/developer-license";
   }
 
-  function validateBaseFields() {
+  function validateSharedFields() {
     if (!selectedRole) {
       Alert.alert(ui.emptyRole);
       return null;
@@ -229,12 +279,6 @@ export default function SignupScreen() {
 
     if (selectedRole === "developer") {
       router.push("/developer-license" as any);
-      return null;
-    }
-
-    const trimmedFullName = fullName.trim();
-    if (!trimmedFullName) {
-      Alert.alert(ui.emptyName);
       return null;
     }
 
@@ -256,8 +300,44 @@ export default function SignupScreen() {
 
     return {
       role: selectedRole,
-      fullName: trimmedFullName,
       phone: normalizedPhone,
+      fullName: fullName.trim(),
+    };
+  }
+
+  function validateEmailSignupFields() {
+    const base = validateSharedFields();
+    if (!base) return null;
+
+    const trimmedFullName = fullName.trim();
+    if (!trimmedFullName) {
+      Alert.alert(ui.emptyName);
+      return null;
+    }
+
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedEmail || !trimmedPassword) {
+      Alert.alert(ui.emptyEmailPassword);
+      return null;
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      Alert.alert(ui.invalidEmail);
+      return null;
+    }
+
+    if (trimmedPassword.length < 6) {
+      Alert.alert(ui.shortPassword);
+      return null;
+    }
+
+    return {
+      ...base,
+      fullName: trimmedFullName,
+      email: trimmedEmail,
+      password: trimmedPassword,
     };
   }
 
@@ -291,33 +371,17 @@ export default function SignupScreen() {
   }
 
   async function handleEmailSignup() {
-    const base = validateBaseFields();
+    const base = validateEmailSignupFields();
     if (!base) return;
-
-    const trimmedEmail = email.trim().toLowerCase();
-    const trimmedPassword = password.trim();
-
-    if (!trimmedEmail || !trimmedPassword) {
-      Alert.alert(ui.emptyEmailPassword);
-      return;
-    }
-
-    if (!isValidEmail(trimmedEmail)) {
-      Alert.alert(ui.invalidEmail);
-      return;
-    }
-
-    if (trimmedPassword.length < 6) {
-      Alert.alert(ui.shortPassword);
-      return;
-    }
 
     try {
       setLoadingEmail(true);
+      setLoadingGoogle(false);
+      setLoadingApple(false);
 
       const { data, error } = await supabase.auth.signUp({
-        email: trimmedEmail,
-        password: trimmedPassword,
+        email: base.email,
+        password: base.password,
         options: {
           data: {
             full_name: base.fullName,
@@ -337,22 +401,24 @@ export default function SignupScreen() {
       if (data.user) {
         await saveProfile({
           userId: data.user.id,
-          userEmail: trimmedEmail,
+          userEmail: base.email,
           role: base.role,
           name: base.fullName,
           phone: base.phone,
         });
       }
 
+      const redirectPath = getRoleRedirect(base.role);
+
       if (data.session) {
-        router.replace(getRoleRedirect(base.role) as any);
+        router.replace(redirectPath as any);
         return;
       }
 
       Alert.alert(ui.signupSuccess);
       router.replace(
         `/login?role=${base.role}&next=${encodeURIComponent(
-          getRoleRedirect(base.role),
+          redirectPath,
         )}` as any,
       );
     } catch (error: any) {
@@ -363,11 +429,13 @@ export default function SignupScreen() {
   }
 
   async function handleGoogleSignup() {
-    const base = validateBaseFields();
+    const base = validateSharedFields();
     if (!base) return;
 
     try {
       setLoadingGoogle(true);
+      setLoadingEmail(false);
+      setLoadingApple(false);
 
       const redirectTo = Linking.createURL("auth/callback");
 
@@ -433,7 +501,8 @@ export default function SignupScreen() {
         name:
           base.fullName ||
           String(session.user.user_metadata?.full_name || "") ||
-          String(session.user.user_metadata?.name || ""),
+          String(session.user.user_metadata?.name || "") ||
+          "Tetamo User",
         phone: base.phone,
       });
 
@@ -442,6 +511,90 @@ export default function SignupScreen() {
       Alert.alert(error?.message || ui.googleSignupFailed);
     } finally {
       setLoadingGoogle(false);
+    }
+  }
+
+  async function handleAppleSignup() {
+    const base = validateSharedFields();
+    if (!base) return;
+
+    try {
+      setLoadingApple(true);
+      setLoadingEmail(false);
+      setLoadingGoogle(false);
+
+      if (!appleAvailable) {
+        Alert.alert(ui.appleUnavailable);
+        return;
+      }
+
+      const rawNonce = createNonce();
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        rawNonce,
+      );
+
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      });
+
+      if (!credential.identityToken) {
+        Alert.alert(ui.appleTokenError);
+        return;
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithIdToken({
+        provider: "apple",
+        token: credential.identityToken,
+        nonce: rawNonce,
+      });
+
+      if (signInError) {
+        Alert.alert(signInError.message || ui.appleSignupFailed);
+        return;
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        Alert.alert(ui.appleSessionError);
+        return;
+      }
+
+      const appleFullName = [
+        credential.fullName?.givenName,
+        credential.fullName?.middleName,
+        credential.fullName?.familyName,
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      await saveProfile({
+        userId: session.user.id,
+        userEmail: session.user.email || credential.email || "",
+        role: base.role,
+        name:
+          base.fullName ||
+          appleFullName ||
+          String(session.user.user_metadata?.full_name || "") ||
+          String(session.user.user_metadata?.name || "") ||
+          "Tetamo User",
+        phone: base.phone,
+      });
+
+      router.replace(getRoleRedirect(base.role) as any);
+    } catch (error: any) {
+      if (error?.code === "ERR_REQUEST_CANCELED") return;
+
+      Alert.alert(error?.message || ui.appleSignupFailed);
+    } finally {
+      setLoadingApple(false);
     }
   }
 
@@ -674,28 +827,66 @@ export default function SignupScreen() {
                 <View style={styles.divider} />
               </View>
 
-              <Pressable
-                style={[styles.googleButton, isBusy && styles.disabled]}
-                disabled={isBusy}
-                onPress={handleGoogleSignup}
-              >
-                {loadingGoogle ? (
-                  <ActivityIndicator color="#111111" />
-                ) : (
-                  <Text style={styles.googleIcon}>G</Text>
-                )}
-                <Text style={styles.googleButtonText}>
-                  {loadingGoogle ? ui.connecting : ui.continueGoogle}
-                </Text>
-              </Pressable>
+              {isIOS ? (
+                <>
+                  <Text style={styles.socialNote}>{ui.socialNote}</Text>
 
-              <View style={styles.secureBox}>
-                <ShieldCheck color="#60a5fa" size={17} />
-                <View style={styles.secureTextBox}>
-                  <Text style={styles.secureTitle}>{ui.secureTitle}</Text>
-                  <Text style={styles.secureText}>{ui.secureText}</Text>
-                </View>
-              </View>
+                  <View style={styles.socialRow}>
+                    <Pressable
+                      style={[
+                        styles.socialButton,
+                        styles.googleSocialButton,
+                        isBusy && styles.disabled,
+                      ]}
+                      disabled={isBusy}
+                      onPress={handleGoogleSignup}
+                    >
+                      {loadingGoogle ? (
+                        <ActivityIndicator color="#e6c15c" />
+                      ) : (
+                        <Text style={styles.socialIcon}>G</Text>
+                      )}
+                      <Text style={styles.socialButtonText} numberOfLines={1}>
+                        {loadingGoogle ? ui.connecting : ui.continueGoogle}
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={[
+                        styles.socialButton,
+                        styles.appleSocialButton,
+                        isBusy && styles.disabled,
+                      ]}
+                      disabled={isBusy}
+                      onPress={handleAppleSignup}
+                    >
+                      {loadingApple ? (
+                        <ActivityIndicator color="#e6c15c" />
+                      ) : (
+                        <Text style={styles.appleIcon}></Text>
+                      )}
+                      <Text style={styles.socialButtonText} numberOfLines={1}>
+                        {loadingApple ? ui.connecting : ui.continueApple}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </>
+              ) : (
+                <Pressable
+                  style={[styles.googleButton, isBusy && styles.disabled]}
+                  disabled={isBusy}
+                  onPress={handleGoogleSignup}
+                >
+                  {loadingGoogle ? (
+                    <ActivityIndicator color="#111111" />
+                  ) : (
+                    <Text style={styles.googleIcon}>G</Text>
+                  )}
+                  <Text style={styles.googleButtonText}>
+                    {loadingGoogle ? ui.connecting : ui.continueGoogle}
+                  </Text>
+                </Pressable>
+              )}
 
               <AuthFooter
                 isId={isId}
@@ -1162,6 +1353,57 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
   },
+  socialNote: {
+    color: "#a9a9a9",
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  socialRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  socialButton: {
+    flex: 1,
+    minHeight: 49,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#5b4a24",
+    backgroundColor: "#211a0b",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 7,
+  },
+  googleSocialButton: {
+    borderColor: "#5b4a24",
+    backgroundColor: "#211a0b",
+  },
+  appleSocialButton: {
+    borderColor: "#5b4a24",
+    backgroundColor: "#211a0b",
+  },
+  socialIcon: {
+    color: "#e6c15c",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  appleIcon: {
+    color: "#e6c15c",
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: -1,
+  },
+  socialButtonText: {
+    color: "#ffffff",
+    fontSize: 10.7,
+    fontWeight: "900",
+    flexShrink: 1,
+  },
   googleButton: {
     minHeight: 49,
     borderRadius: 17,
@@ -1182,32 +1424,6 @@ const styles = StyleSheet.create({
     color: "#111111",
     fontSize: 12.5,
     fontWeight: "900",
-  },
-  secureBox: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#1d4ed8",
-    backgroundColor: "#0b1624",
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 9,
-    marginTop: 13,
-  },
-  secureTextBox: {
-    flex: 1,
-  },
-  secureTitle: {
-    color: "#ffffff",
-    fontSize: 11.8,
-    fontWeight: "900",
-  },
-  secureText: {
-    color: "#bfdbfe",
-    fontSize: 10.8,
-    lineHeight: 15,
-    fontWeight: "700",
-    marginTop: 3,
   },
   authFooter: {
     flexDirection: "row",

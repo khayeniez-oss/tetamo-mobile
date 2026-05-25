@@ -13,10 +13,11 @@ import {
   ShieldCheck,
   XCircle,
 } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Linking,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -119,7 +120,11 @@ function normalizeStatus(value: unknown): NormalizedStatus {
     return "paid";
   }
 
-  if (status === "checkout_created" || status === "pending" || status === "initiated") {
+  if (
+    status === "checkout_created" ||
+    status === "pending" ||
+    status === "initiated"
+  ) {
     return "pending";
   }
 
@@ -171,10 +176,7 @@ function getPaymentMetaInfo(payment: PaymentRow | null) {
   const hitpay = asObject(metadata.hitpay);
 
   const gateway = String(
-    metadata.gateway ||
-      metadata.payment_gateway ||
-      hitpay.gateway ||
-      ""
+    metadata.gateway || metadata.payment_gateway || hitpay.gateway || ""
   ).toLowerCase();
 
   const method = String(
@@ -257,7 +259,11 @@ function getGatewayReceiptUrl(payment: PaymentRow | null) {
   return payment?.receipt_url || getInvoiceUrl(payment);
 }
 
-function getTitle(payment: PaymentRow | null, membership: AgentMembershipRow | null, language: Language) {
+function getTitle(
+  payment: PaymentRow | null,
+  membership: AgentMembershipRow | null,
+  language: Language
+) {
   const paymentType = String(payment?.payment_type || "").toLowerCase();
 
   if (payment?.description) return payment.description;
@@ -300,7 +306,11 @@ function getPaymentType(payment: PaymentRow | null, language: Language) {
   return cleanText(payment?.payment_type || payment?.product_type || "Payment");
 }
 
-function getBillingCycle(payment: PaymentRow | null, membership: AgentMembershipRow | null, language: Language) {
+function getBillingCycle(
+  payment: PaymentRow | null,
+  membership: AgentMembershipRow | null,
+  language: Language
+) {
   const metadata = asObject(payment?.metadata);
 
   const raw = String(
@@ -323,7 +333,10 @@ function getBillingCycle(payment: PaymentRow | null, membership: AgentMembership
   return "-";
 }
 
-function getListingLimit(payment: PaymentRow | null, membership: AgentMembershipRow | null) {
+function getListingLimit(
+  payment: PaymentRow | null,
+  membership: AgentMembershipRow | null
+) {
   const metadata = asObject(payment?.metadata);
   const activation = asObject(metadata.activation);
 
@@ -338,7 +351,11 @@ function getListingLimit(payment: PaymentRow | null, membership: AgentMembership
   return Number.isFinite(value) && value > 0 ? String(value) : "-";
 }
 
-function getExpiryDate(payment: PaymentRow | null, membership: AgentMembershipRow | null, language: Language) {
+function getExpiryDate(
+  payment: PaymentRow | null,
+  membership: AgentMembershipRow | null,
+  language: Language
+) {
   const metadata = asObject(payment?.metadata);
   const activation = asObject(metadata.activation);
 
@@ -440,6 +457,7 @@ function shouldShowPayNow(status: NormalizedStatus, payment: PaymentRow | null) 
 export default function DashboardReceiptScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const isIOS = Platform.OS === "ios";
 
   const [language, setLanguage] = useState<Language>("en");
   const [payment, setPayment] = useState<PaymentRow | null>(null);
@@ -488,6 +506,9 @@ export default function DashboardReceiptScreen() {
         openGatewayReceipt: "Buka Receipt Gateway",
         openInvoice: "Buka Invoice",
         payNow: "Pay Now",
+        openingProfile: "Membuka Profile",
+        redirectProfile: "Anda akan diarahkan kembali ke profile.",
+        profile: "Profile",
       };
     }
 
@@ -522,10 +543,24 @@ export default function DashboardReceiptScreen() {
       openGatewayReceipt: "Open Gateway Receipt",
       openInvoice: "Open Invoice",
       payNow: "Pay Now",
+      openingProfile: "Opening Profile",
+      redirectProfile: "Redirecting you back to profile.",
+      profile: "Profile",
     };
   }, [isId]);
 
   useEffect(() => {
+    if (!isIOS) return;
+
+    router.replace("/profile" as any);
+  }, [isIOS, router]);
+
+  useEffect(() => {
+    if (isIOS) {
+      setLoading(false);
+      return;
+    }
+
     let ignore = false;
 
     async function loadReceipt() {
@@ -651,7 +686,7 @@ export default function DashboardReceiptScreen() {
     return () => {
       ignore = true;
     };
-  }, [paymentId, router, ui.notFound]);
+  }, [isIOS, paymentId, router, ui.notFound]);
 
   const status = normalizeStatus(payment?.status);
   const statusUI = getStatusUI(status, language);
@@ -660,8 +695,33 @@ export default function DashboardReceiptScreen() {
   const showPayNow = shouldShowPayNow(status, payment);
 
   async function openUrl(url?: string | null) {
+    if (isIOS) return;
     if (!url) return;
+
     await Linking.openURL(url);
+  }
+
+  if (isIOS) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+
+        <View style={styles.iosRedirectBox}>
+          <ActivityIndicator color="#e6c15c" />
+
+          <Text style={styles.iosRedirectTitle}>{ui.openingProfile}</Text>
+
+          <Text style={styles.iosRedirectText}>{ui.redirectProfile}</Text>
+
+          <Pressable
+            style={styles.iosProfileButton}
+            onPress={() => router.replace("/profile" as any)}
+          >
+            <Text style={styles.iosProfileButtonText}>{ui.profile}</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   if (loading) {
@@ -951,7 +1011,7 @@ function InfoItem({
 }: {
   label: string;
   value: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
 }) {
   return (
     <View style={styles.infoItem}>
@@ -992,6 +1052,42 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#050505",
+  },
+  iosRedirectBox: {
+    flex: 1,
+    backgroundColor: "#050505",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    gap: 12,
+  },
+  iosRedirectTitle: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 6,
+  },
+  iosRedirectText: {
+    color: "#b8b8b8",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  iosProfileButton: {
+    minHeight: 48,
+    borderRadius: 17,
+    backgroundColor: "#e6c15c",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+    marginTop: 4,
+  },
+  iosProfileButtonText: {
+    color: "#111111",
+    fontSize: 13,
+    fontWeight: "900",
   },
   topBar: {
     paddingHorizontal: 18,

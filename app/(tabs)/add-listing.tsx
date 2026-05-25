@@ -1,23 +1,24 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    Building2,
-    ChevronRight,
-    Home,
-    Search,
-    ShieldCheck,
-    UserRound,
+  Building2,
+  ChevronRight,
+  Home,
+  Search,
+  ShieldCheck,
+  UserRound,
 } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
 
@@ -78,6 +79,8 @@ export default function AddListingScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
+  const isIOS = Platform.OS === "ios";
+
   const roleFromUrl = useMemo(() => {
     return normalizeRole(readParam(params.audience) || readParam(params.role));
   }, [params.audience, params.role]);
@@ -99,12 +102,20 @@ export default function AddListingScreen() {
     profileRole === "buyer";
 
   useEffect(() => {
+    if (Platform.OS === "ios") {
+      router.replace(ROUTES.search as any);
+    }
+  }, [router]);
+
+  useEffect(() => {
     if (roleFromUrl && roleFromUrl !== "unknown" && roleFromUrl !== "buyer") {
       setSelectedRole(roleFromUrl);
     }
   }, [roleFromUrl]);
 
   useEffect(() => {
+    if (isIOS) return;
+
     let mounted = true;
 
     async function loadSession() {
@@ -152,7 +163,7 @@ export default function AddListingScreen() {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [isIOS]);
 
   async function loadProfile(profileUserId: string, mounted: boolean) {
     try {
@@ -219,6 +230,31 @@ export default function AddListingScreen() {
   const continueToLogin = () => {
     router.push(`${ROUTES.login}?next=add-listing&role=${selectedRole}` as any);
   };
+
+  if (isIOS) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+
+        <View style={styles.iosRedirectBox}>
+          <ActivityIndicator color="#e6c15c" />
+
+          <Text style={styles.iosRedirectTitle}>Opening Search</Text>
+          <Text style={styles.iosRedirectText}>
+            Redirecting you to property search.
+          </Text>
+
+          <Pressable
+            style={styles.primaryButton}
+            onPress={() => router.replace(ROUTES.search as any)}
+          >
+            <Text style={styles.primaryButtonText}>Search Properties</Text>
+            <ChevronRight color="#111111" size={17} />
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -476,6 +512,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 18,
     paddingBottom: 34,
+  },
+  iosRedirectBox: {
+    flex: 1,
+    backgroundColor: "#050505",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    gap: 12,
+  },
+  iosRedirectTitle: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 6,
+  },
+  iosRedirectText: {
+    color: "#b8b8b8",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 6,
   },
   header: {
     marginBottom: 18,

@@ -1,26 +1,27 @@
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-    AlertTriangle,
-    ArrowLeft,
-    ChevronRight,
-    Languages,
-    PackageCheck,
-    ShieldCheck,
+  AlertTriangle,
+  ArrowLeft,
+  ChevronRight,
+  Languages,
+  PackageCheck,
+  ShieldCheck,
 } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import {
-    type ListingDraft,
-    useListingDraft,
+  type ListingDraft,
+  useListingDraft,
 } from "../../components/listing/ListingDraftContext";
 import ListingIklan from "../../components/listing/ListingIklan";
 import { supabase } from "../../lib/supabase";
@@ -136,6 +137,8 @@ export default function AgentCreateListingScreen() {
   const router = useRouter();
   const { draft, setDraft, clearDraft } = useListingDraft();
 
+  const isIOS = Platform.OS === "ios";
+
   const [language, setLanguage] = useState<Language>("en");
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [accessError, setAccessError] = useState("");
@@ -146,6 +149,17 @@ export default function AgentCreateListingScreen() {
   const isId = language === "id";
 
   useEffect(() => {
+    if (!isIOS) return;
+
+    router.replace("/search" as any);
+  }, [isIOS, router]);
+
+  useEffect(() => {
+    if (isIOS) {
+      setCheckingAccess(false);
+      return;
+    }
+
     let ignore = false;
 
     async function checkAgentAccess() {
@@ -229,7 +243,7 @@ export default function AgentCreateListingScreen() {
     return () => {
       ignore = true;
     };
-  }, [router, isId]);
+  }, [router, isId, isIOS]);
 
   const listingLimit = useMemo(() => {
     return getMembershipListingLimit(activeMembership);
@@ -287,6 +301,11 @@ export default function AgentCreateListingScreen() {
   );
 
   function handleNext() {
+    if (isIOS) {
+      router.replace("/search" as any);
+      return;
+    }
+
     if (!activeMembership) {
       router.push("/agent/packages" as any);
       return;
@@ -325,12 +344,54 @@ export default function AgentCreateListingScreen() {
   }
 
   async function handleReset() {
+    if (isIOS) {
+      router.replace("/search" as any);
+      return;
+    }
+
     await clearDraft();
     router.push("/agent/packages" as any);
   }
 
   function handleBack() {
+    if (isIOS) {
+      router.replace("/search" as any);
+      return;
+    }
+
     router.push("/agent/packages" as any);
+  }
+
+  if (isIOS) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+
+        <View style={styles.iosRedirectBox}>
+          <ActivityIndicator color="#e6c15c" />
+
+          <Text style={styles.iosRedirectTitle}>
+            {isId ? "Membuka Pencarian" : "Opening Search"}
+          </Text>
+
+          <Text style={styles.iosRedirectText}>
+            {isId
+              ? "Anda akan diarahkan ke pencarian properti."
+              : "Redirecting you to property search."}
+          </Text>
+
+          <Pressable
+            style={styles.iosSearchButton}
+            onPress={() => router.replace("/search" as any)}
+          >
+            <Text style={styles.iosSearchButtonText}>
+              {isId ? "Cari Properti" : "Search Properties"}
+            </Text>
+            <ChevronRight color="#111111" size={16} />
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   if (checkingAccess) {
@@ -573,6 +634,44 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 18,
     paddingBottom: 38,
+  },
+  iosRedirectBox: {
+    flex: 1,
+    backgroundColor: "#050505",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    gap: 12,
+  },
+  iosRedirectTitle: {
+    color: "#ffffff",
+    fontSize: 22,
+    fontWeight: "900",
+    marginTop: 6,
+  },
+  iosRedirectText: {
+    color: "#b8b8b8",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  iosSearchButton: {
+    minHeight: 48,
+    borderRadius: 17,
+    backgroundColor: "#e6c15c",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 16,
+    marginTop: 4,
+  },
+  iosSearchButtonText: {
+    color: "#111111",
+    fontSize: 13,
+    fontWeight: "900",
   },
   topBar: {
     paddingHorizontal: 18,
