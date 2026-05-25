@@ -32,6 +32,7 @@ import {
   Alert,
   Image,
   Linking,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -266,6 +267,7 @@ function attachImages(properties: PropertyRow[], images: PropertyImageRow[]) {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const isIOS = Platform.OS === "ios";
 
   const [language, setLanguage] = useState<Language>("en");
   const [loading, setLoading] = useState(true);
@@ -492,20 +494,21 @@ export default function ProfileScreen() {
     router.replace("/login" as any);
   }
 
-  function comingSoon(title: string) {
-    Alert.alert(
-      title,
-      isId
-        ? "Halaman mobile ini akan kita sambungkan setelah dashboard utama siap."
-        : "We will connect this mobile page after the main dashboard hub is ready.",
-    );
-  }
-
   function routeOwnerAddListing() {
+    if (isIOS) {
+      router.push("/search" as any);
+      return;
+    }
+
     router.push("/add-listing?audience=owner" as any);
   }
 
   function routeAgentCreateListing() {
+    if (isIOS) {
+      router.push("/search" as any);
+      return;
+    }
+
     if (!activeMembership) {
       router.push("/agent/packages" as any);
       return;
@@ -580,9 +583,13 @@ export default function ProfileScreen() {
             </Text>
 
             <Text style={styles.guestText}>
-              {isId
-                ? "Login untuk mengelola akun, listing, paket, pembayaran, dan dashboard Tetamo Anda."
-                : "Log in to manage your account, listings, packages, payments, and Tetamo dashboard."}
+              {isIOS
+                ? isId
+                  ? "Login untuk mengelola akun, melihat listing, leads, jadwal viewing, properti tersimpan, dan aktivitas Tetamo Anda."
+                  : "Log in to manage your account, view listings, leads, viewing schedules, saved properties, and Tetamo activity."
+                : isId
+                  ? "Login untuk mengelola akun, listing, paket, pembayaran, dan dashboard Tetamo Anda."
+                  : "Log in to manage your account, listings, packages, payments, and Tetamo dashboard."}
             </Text>
 
             <View style={styles.guestButtons}>
@@ -778,13 +785,15 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.toolGrid}>
-              <ToolCard
-                icon={<Plus color="#111111" size={20} />}
-                title={isId ? "Pasang Iklan" : "Add Listing"}
-                subtitle={isId ? "Buat listing baru" : "Create new listing"}
-                featured
-                onPress={routeOwnerAddListing}
-              />
+              {!isIOS ? (
+                <ToolCard
+                  icon={<Plus color="#111111" size={20} />}
+                  title={isId ? "Pasang Iklan" : "Add Listing"}
+                  subtitle={isId ? "Buat listing baru" : "Create new listing"}
+                  featured
+                  onPress={routeOwnerAddListing}
+                />
+              ) : null}
 
               <ToolCard
                 icon={<Home color="#ffffff" size={20} />}
@@ -808,14 +817,16 @@ export default function ProfileScreen() {
                 }
               />
 
-              <ToolCard
-                icon={<ReceiptText color="#ffffff" size={20} />}
-                title="Payment / Receipt"
-                subtitle={
-                  isId ? "Tagihan & bukti bayar" : "Billing and receipts"
-                }
-                onPress={() => router.push("/dashboard/payments" as any)}
-              />
+              {!isIOS ? (
+                <ToolCard
+                  icon={<ReceiptText color="#ffffff" size={20} />}
+                  title="Payment / Receipt"
+                  subtitle={
+                    isId ? "Tagihan & bukti bayar" : "Billing and receipts"
+                  }
+                  onPress={() => router.push("/dashboard/payments" as any)}
+                />
+              ) : null}
 
               <ToolCard
                 icon={<Bookmark color="#ffffff" size={20} />}
@@ -854,69 +865,71 @@ export default function ProfileScreen() {
               </Text>
             </View>
 
-            <View style={styles.membershipCard}>
-              <View style={styles.membershipTop}>
-                <View style={styles.membershipIcon}>
-                  <ShieldCheck color="#60a5fa" size={21} />
+            {!isIOS ? (
+              <View style={styles.membershipCard}>
+                <View style={styles.membershipTop}>
+                  <View style={styles.membershipIcon}>
+                    <ShieldCheck color="#60a5fa" size={21} />
+                  </View>
+
+                  <View style={styles.membershipTextBox}>
+                    <Text style={styles.membershipTitle}>
+                      {activeMembership
+                        ? isId
+                          ? "Membership Aktif"
+                          : "Active Membership"
+                        : isId
+                          ? "Membership Belum Aktif"
+                          : "Membership Not Active"}
+                    </Text>
+                    <Text style={styles.membershipSub}>
+                      {latestMembership?.package_name ||
+                        latestMembership?.package_id ||
+                        (isId ? "Pilih paket agen" : "Choose agent package")}
+                    </Text>
+                  </View>
                 </View>
 
-                <View style={styles.membershipTextBox}>
-                  <Text style={styles.membershipTitle}>
+                <View style={styles.membershipStats}>
+                  <MiniStat
+                    label="Billing"
+                    value={getBillingCycleLabel(
+                      latestMembership?.billing_cycle,
+                      language,
+                    )}
+                  />
+                  <MiniStat
+                    label={isId ? "Expired" : "Expires"}
+                    value={formatDate(latestMembership?.expires_at, language)}
+                  />
+                  <MiniStat
+                    label="Limit"
+                    value={String(agentListingLimit || 0)}
+                  />
+                  <MiniStat
+                    label={isId ? "Sisa" : "Remaining"}
+                    value={String(remainingAgentSlots || 0)}
+                  />
+                </View>
+
+                <Pressable
+                  style={styles.membershipButton}
+                  onPress={() => router.push("/agent/packages" as any)}
+                >
+                  <PackageCheck color="#111111" size={16} />
+                  <Text style={styles.membershipButtonText}>
                     {activeMembership
                       ? isId
-                        ? "Membership Aktif"
-                        : "Active Membership"
+                        ? "Lihat / Upgrade Paket"
+                        : "View / Upgrade Package"
                       : isId
-                        ? "Membership Belum Aktif"
-                        : "Membership Not Active"}
+                        ? "Pilih Paket Agent"
+                        : "Choose Agent Package"}
                   </Text>
-                  <Text style={styles.membershipSub}>
-                    {latestMembership?.package_name ||
-                      latestMembership?.package_id ||
-                      (isId ? "Pilih paket agen" : "Choose agent package")}
-                  </Text>
-                </View>
+                  <ChevronRight color="#111111" size={15} />
+                </Pressable>
               </View>
-
-              <View style={styles.membershipStats}>
-                <MiniStat
-                  label="Billing"
-                  value={getBillingCycleLabel(
-                    latestMembership?.billing_cycle,
-                    language,
-                  )}
-                />
-                <MiniStat
-                  label={isId ? "Expired" : "Expires"}
-                  value={formatDate(latestMembership?.expires_at, language)}
-                />
-                <MiniStat
-                  label="Limit"
-                  value={String(agentListingLimit || 0)}
-                />
-                <MiniStat
-                  label={isId ? "Sisa" : "Remaining"}
-                  value={String(remainingAgentSlots || 0)}
-                />
-              </View>
-
-              <Pressable
-                style={styles.membershipButton}
-                onPress={() => router.push("/agent/packages" as any)}
-              >
-                <PackageCheck color="#111111" size={16} />
-                <Text style={styles.membershipButtonText}>
-                  {activeMembership
-                    ? isId
-                      ? "Lihat / Upgrade Paket"
-                      : "View / Upgrade Package"
-                    : isId
-                      ? "Pilih Paket Agent"
-                      : "Choose Agent Package"}
-                </Text>
-                <ChevronRight color="#111111" size={15} />
-              </Pressable>
-            </View>
+            ) : null}
 
             <View style={styles.statsGrid}>
               <StatCard
@@ -924,11 +937,13 @@ export default function ProfileScreen() {
                 label={isId ? "Total Listing" : "Total Listings"}
                 value={String(agentStats.total)}
               />
-              <StatCard
-                icon={<Wallet color="#22c55e" size={18} />}
-                label={isId ? "Terpakai" : "Used Slots"}
-                value={String(usedAgentSlots)}
-              />
+              {!isIOS ? (
+                <StatCard
+                  icon={<Wallet color="#22c55e" size={18} />}
+                  label={isId ? "Terpakai" : "Used Slots"}
+                  value={String(usedAgentSlots)}
+                />
+              ) : null}
               <StatCard
                 icon={<Clock3 color="#f59e0b" size={18} />}
                 label="Pending"
@@ -937,13 +952,15 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.toolGrid}>
-              <ToolCard
-                icon={<Plus color="#111111" size={20} />}
-                title={isId ? "Pasang Iklan" : "Add Listing"}
-                subtitle={isId ? "Buat listing agent" : "Create agent listing"}
-                featured
-                onPress={routeAgentCreateListing}
-              />
+              {!isIOS ? (
+                <ToolCard
+                  icon={<Plus color="#111111" size={20} />}
+                  title={isId ? "Pasang Iklan" : "Add Listing"}
+                  subtitle={isId ? "Buat listing agent" : "Create agent listing"}
+                  featured
+                  onPress={routeAgentCreateListing}
+                />
+              ) : null}
 
               <ToolCard
                 icon={<Bot color="#ffffff" size={20} />}
@@ -983,12 +1000,14 @@ export default function ProfileScreen() {
                 }
               />
 
-              <ToolCard
-                icon={<ReceiptText color="#ffffff" size={20} />}
-                title={isId ? "Tagihan" : "Billing"}
-                subtitle={isId ? "Payment & receipt" : "Payment and receipts"}
-                onPress={() => router.push("/dashboard/payments" as any)}
-              />
+              {!isIOS ? (
+                <ToolCard
+                  icon={<ReceiptText color="#ffffff" size={20} />}
+                  title={isId ? "Tagihan" : "Billing"}
+                  subtitle={isId ? "Payment & receipt" : "Payment and receipts"}
+                  onPress={() => router.push("/dashboard/payments" as any)}
+                />
+              ) : null}
 
               <ToolCard
                 icon={<Bookmark color="#ffffff" size={20} />}
@@ -1004,12 +1023,14 @@ export default function ProfileScreen() {
                 onPress={() => router.push("/dashboard/liked" as any)}
               />
 
-              <ToolCard
-                icon={<BarChart3 color="#ffffff" size={20} />}
-                title={isId ? "Komisi" : "Commission"}
-                subtitle={isId ? "Tracking komisi" : "Commission tracking"}
-                onPress={() => router.push("/dashboard/commission" as any)}
-              />
+              {!isIOS ? (
+                <ToolCard
+                  icon={<BarChart3 color="#ffffff" size={20} />}
+                  title={isId ? "Komisi" : "Commission"}
+                  subtitle={isId ? "Tracking komisi" : "Commission tracking"}
+                  onPress={() => router.push("/dashboard/commission" as any)}
+                />
+              ) : null}
             </View>
 
             <ListingPreview
@@ -1540,11 +1561,13 @@ const styles = StyleSheet.create({
   },
   statsGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 9,
     marginBottom: 14,
   },
   statCard: {
     flex: 1,
+    minWidth: "30%",
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "#303030",
