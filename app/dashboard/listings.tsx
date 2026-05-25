@@ -194,7 +194,9 @@ function computeLifecycleStatus(listingExpiresAt: string | null | undefined) {
   return "active";
 }
 
-function normalizeTransactionStatus(value: string | null | undefined): TransactionStatus {
+function normalizeTransactionStatus(
+  value: string | null | undefined,
+): TransactionStatus {
   if (value === "sold") return "sold";
   if (value === "rented") return "rented";
   return "available";
@@ -272,13 +274,23 @@ function getStatusIcon(status: EffectiveStatus) {
   if (status === "paused") return <CirclePause color="#a9a9a9" size={13} />;
   if (status === "sold") return <CheckCircle2 color="#22c55e" size={13} />;
   if (status === "rented") return <Home color="#38bdf8" size={13} />;
-  if (status === "pending_payment") return <CreditCard color="#f97316" size={13} />;
-  if (status === "pending_approval") return <ShieldAlert color="#818cf8" size={13} />;
-  if (status === "pending_verification") return <ShieldCheck color="#f59e0b" size={13} />;
+  if (status === "pending_payment") {
+    return <CreditCard color="#f97316" size={13} />;
+  }
+  if (status === "pending_approval") {
+    return <ShieldAlert color="#818cf8" size={13} />;
+  }
+  if (status === "pending_verification") {
+    return <ShieldCheck color="#f59e0b" size={13} />;
+  }
+
   return <XCircle color="#ef4444" size={13} />;
 }
 
-function formatPropertyType(value: string | null | undefined, language: Language) {
+function formatPropertyType(
+  value: string | null | undefined,
+  language: Language,
+) {
   const raw = String(value || "").trim().toLowerCase();
 
   if (!raw) return "-";
@@ -300,9 +312,15 @@ function formatPropertyType(value: string | null | undefined, language: Language
 function formatRentalType(value: string | null | undefined, language: Language) {
   const raw = String(value || "").toLowerCase();
 
-  if (raw === "daily" || raw === "harian") return language === "id" ? "Harian" : "Daily";
-  if (raw === "monthly" || raw === "bulanan") return language === "id" ? "Bulanan" : "Monthly";
-  if (raw === "yearly" || raw === "tahunan") return language === "id" ? "Tahunan" : "Yearly";
+  if (raw === "daily" || raw === "harian") {
+    return language === "id" ? "Harian" : "Daily";
+  }
+  if (raw === "monthly" || raw === "bulanan") {
+    return language === "id" ? "Bulanan" : "Monthly";
+  }
+  if (raw === "yearly" || raw === "tahunan") {
+    return language === "id" ? "Tahunan" : "Yearly";
+  }
 
   return "";
 }
@@ -368,7 +386,7 @@ function isMembershipActive(membership: AgentMembershipRow | null) {
 
 function getMembershipNumber(
   membership: AgentMembershipRow | null,
-  key: string
+  key: string,
 ) {
   const direct = Number((membership as any)?.[key] || 0);
   if (Number.isFinite(direct) && direct > 0) return direct;
@@ -388,7 +406,10 @@ function getMembershipListingLimit(membership: AgentMembershipRow | null) {
   );
 }
 
-function getBillingCycleLabel(value: string | null | undefined, language: Language) {
+function getBillingCycleLabel(
+  value: string | null | undefined,
+  language: Language,
+) {
   const raw = String(value || "").toLowerCase();
 
   if (raw === "monthly") return language === "id" ? "Bulanan" : "Monthly";
@@ -434,7 +455,7 @@ export default function DashboardListingsScreen() {
 
   const [language, setLanguage] = useState<Language>("en");
   const [role, setRole] = useState<DashboardRole>(
-    readParam(params.role) === "agent" ? "agent" : "owner"
+    readParam(params.role) === "agent" ? "agent" : "owner",
   );
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [allListings, setAllListings] = useState<ListingRow[]>([]);
@@ -473,7 +494,7 @@ export default function DashboardListingsScreen() {
 
   const remainingListingSlots = Math.max(
     membershipListingLimit - usedListingSlots,
-    0
+    0,
   );
 
   const filteredListings = useMemo(() => {
@@ -551,8 +572,8 @@ export default function DashboardListingsScreen() {
         if (authError || !user) {
           router.replace(
             `/login?next=${encodeURIComponent(
-              `/dashboard/listings?role=${role}`
-            )}` as any
+              `/dashboard/listings?role=${role}`,
+            )}` as any,
           );
           return;
         }
@@ -578,7 +599,7 @@ export default function DashboardListingsScreen() {
           supabase
             .from("properties")
             .select(
-              "id, user_id, status, verified_ok, verification_status, kode, posted_date, created_at, title, title_id, price, source, city, area, province, listing_type, rental_type, sale_type, property_type, land_size, building_size, land_unit, road_access, ownership_type, land_type, zoning_type, listing_expires_at, featured_expires_at, is_paused, plan_id, boost_active, boost_expires_at, spotlight_active, spotlight_expires_at, transaction_status, transaction_closed_at, transaction_closed_by"
+              "id, user_id, status, verified_ok, verification_status, kode, posted_date, created_at, title, title_id, price, source, city, area, province, listing_type, rental_type, sale_type, property_type, land_size, building_size, land_unit, road_access, ownership_type, land_type, zoning_type, listing_expires_at, featured_expires_at, is_paused, plan_id, boost_active, boost_expires_at, spotlight_active, spotlight_expires_at, transaction_status, transaction_closed_at, transaction_closed_by",
             )
             .eq("user_id", user.id)
             .order("created_at", { ascending: false }),
@@ -586,7 +607,7 @@ export default function DashboardListingsScreen() {
           supabase
             .from("agent_memberships")
             .select(
-              "id, user_id, payment_id, package_id, package_name, billing_cycle, listing_limit, status, auto_renew, starts_at, expires_at, metadata, created_at, updated_at"
+              "id, user_id, payment_id, package_id, package_name, billing_cycle, listing_limit, status, auto_renew, starts_at, expires_at, metadata, created_at, updated_at",
             )
             .eq("user_id", user.id)
             .order("created_at", { ascending: false }),
@@ -630,7 +651,7 @@ export default function DashboardListingsScreen() {
           console.log("Tetamo mobile dashboard listings error:", error);
           setErrorMessage(
             error?.message ||
-              (isId ? "Gagal memuat listing." : "Failed to load listings.")
+              (isId ? "Gagal memuat listing." : "Failed to load listings."),
           );
           setLoading(false);
         }
@@ -665,7 +686,7 @@ export default function DashboardListingsScreen() {
           isId ? "Limit penuh" : "Limit full",
           isId
             ? "Limit listing aktif Anda sudah penuh. Tandai listing sebagai sold/rented atau upgrade paket."
-            : "Your active listing limit is full. Mark a listing as sold/rented or upgrade your package."
+            : "Your active listing limit is full. Mark a listing as sold/rented or upgrade your package.",
         );
         return;
       }
@@ -692,7 +713,10 @@ export default function DashboardListingsScreen() {
     router.push(`/owner/edit-listing/${encodeURIComponent(kode)}` as any);
   }
 
-  function goPaymentAction(item: ListingRow, action: "boost" | "spotlight" | "renew") {
+  function goPaymentAction(
+    item: ListingRow,
+    action: "boost" | "spotlight" | "renew",
+  ) {
     if (isIOS) {
       return;
     }
@@ -701,16 +725,16 @@ export default function DashboardListingsScreen() {
       action === "boost"
         ? "Boost"
         : action === "spotlight"
-        ? "Spotlight"
-        : isId
-        ? "Perpanjang"
-        : "Renew";
+          ? "Spotlight"
+          : isId
+            ? "Perpanjang"
+            : "Renew";
 
     Alert.alert(
       title,
       isId
         ? "Halaman pembayaran add-on mobile akan kita sambungkan setelah halaman listing ini selesai."
-        : "The mobile add-on payment page will be connected after this listing page is complete."
+        : "The mobile add-on payment page will be connected after this listing page is complete.",
     );
   }
 
@@ -720,7 +744,7 @@ export default function DashboardListingsScreen() {
         isId ? "Aksi tidak tersedia" : "Action unavailable",
         isId
           ? "Listing ini belum bisa dijeda karena statusnya masih proses / sudah selesai."
-          : "This listing cannot be paused because it is still in process or already closed."
+          : "This listing cannot be paused because it is still in process or already closed.",
       );
       return;
     }
@@ -739,15 +763,15 @@ export default function DashboardListingsScreen() {
 
       setAllListings((prev) =>
         prev.map((listing) =>
-          listing.id === item.id ? { ...listing, is_paused: nextPaused } : listing
-        )
+          listing.id === item.id ? { ...listing, is_paused: nextPaused } : listing,
+        ),
       );
     } catch (error: any) {
       Alert.alert(
         error?.message ||
           (isId
             ? "Gagal mengubah status listing."
-            : "Failed to change listing status.")
+            : "Failed to change listing status."),
       );
     } finally {
       setBusyId("");
@@ -756,7 +780,7 @@ export default function DashboardListingsScreen() {
 
   async function markTransaction(
     item: ListingRow,
-    nextStatus: Extract<TransactionStatus, "sold" | "rented">
+    nextStatus: Extract<TransactionStatus, "sold" | "rented">,
   ) {
     if (deriveEffectiveStatus(item) === "pending_payment") return;
 
@@ -766,8 +790,8 @@ export default function DashboardListingsScreen() {
           ? "terjual"
           : "sold"
         : isId
-        ? "tersewa"
-        : "rented";
+          ? "tersewa"
+          : "rented";
 
     Alert.alert(
       isId ? "Konfirmasi status" : "Confirm status",
@@ -812,22 +836,22 @@ export default function DashboardListingsScreen() {
                         transaction_closed_at: now,
                         transaction_closed_by: user?.id || null,
                       }
-                    : listing
-                )
+                    : listing,
+                ),
               );
             } catch (error: any) {
               Alert.alert(
                 error?.message ||
                   (isId
                     ? "Gagal memperbarui status transaksi."
-                    : "Failed to update transaction status.")
+                    : "Failed to update transaction status."),
               );
             } finally {
               setBusyId("");
             }
           },
         },
-      ]
+      ],
     );
   }
 
@@ -899,21 +923,21 @@ export default function DashboardListingsScreen() {
               {role === "agent"
                 ? isId
                   ? "LISTING AGENT"
-                  : "AGENT LISTINGS"
+                  : "AGENT LISTING"
                 : isId
-                ? "IKLAN PEMILIK"
-                : "OWNER LISTINGS"}
+                  ? "IKLAN PEMILIK"
+                  : "OWNER LISTING"}
             </Text>
           </View>
 
           <Text style={styles.title}>
             {role === "agent"
               ? isId
-                ? "Listing Saya"
-                : "My Agent Listings"
+                ? "Listing Agent"
+                : "Agent Listing"
               : isId
-              ? "Iklan Saya"
-              : "My Listings"}
+                ? "Iklan Pemilik"
+                : "Owner Listing"}
           </Text>
 
           <Text style={styles.subtitle}>
@@ -922,45 +946,9 @@ export default function DashboardListingsScreen() {
                 ? "Kelola listing agent, status verifikasi, slot aktif, leads, dan aksi cepat."
                 : "Manage agent listings, verification status, active slots, leads, and quick actions."
               : isId
-              ? "Kelola iklan pemilik, status transaksi, promosi, perpanjangan, dan aksi cepat."
-              : "Manage owner listings, transaction status, promotions, renewals, and quick actions."}
+                ? "Kelola iklan pemilik, status transaksi, promosi, perpanjangan, dan aksi cepat."
+                : "Manage owner listings, transaction status, promotions, renewals, and quick actions."}
           </Text>
-
-          <View style={styles.roleSwitch}>
-            <Pressable
-              style={[
-                styles.roleSwitchButton,
-                role === "owner" && styles.roleSwitchActive,
-              ]}
-              onPress={() => setRole("owner")}
-            >
-              <Text
-                style={[
-                  styles.roleSwitchText,
-                  role === "owner" && styles.roleSwitchTextActive,
-                ]}
-              >
-                Owner
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.roleSwitchButton,
-                role === "agent" && styles.roleSwitchActive,
-              ]}
-              onPress={() => setRole("agent")}
-            >
-              <Text
-                style={[
-                  styles.roleSwitchText,
-                  role === "agent" && styles.roleSwitchTextActive,
-                ]}
-              >
-                Agent
-              </Text>
-            </Pressable>
-          </View>
         </View>
 
         {role === "agent" && !isIOS ? (
@@ -977,8 +965,8 @@ export default function DashboardListingsScreen() {
                       ? "Paket Agent Aktif"
                       : "Active Agent Package"
                     : isId
-                    ? "Paket Agent Belum Aktif"
-                    : "Agent Package Not Active"}
+                      ? "Paket Agent Belum Aktif"
+                      : "Agent Package Not Active"}
                 </Text>
                 <Text style={styles.membershipSub}>
                   {latestMembership?.package_name ||
@@ -993,7 +981,7 @@ export default function DashboardListingsScreen() {
                 label={isId ? "Billing" : "Billing"}
                 value={getBillingCycleLabel(
                   latestMembership?.billing_cycle,
-                  language
+                  language,
                 )}
               />
               <MiniStat
@@ -1025,8 +1013,8 @@ export default function DashboardListingsScreen() {
                     ? "Lihat / Upgrade Paket"
                     : "View / Upgrade Package"
                   : isId
-                  ? "Pilih Paket"
-                  : "Choose Package"}
+                    ? "Pilih Paket"
+                    : "Choose Package"}
               </Text>
             </Pressable>
           </View>
@@ -1066,11 +1054,11 @@ export default function DashboardListingsScreen() {
                       ? "Tambah Listing"
                       : "Add Listing"
                     : isId
-                    ? "Pilih Paket"
-                    : "Choose Package"
+                      ? "Pilih Paket"
+                      : "Choose Package"
                   : isId
-                  ? "Pasang Iklan"
-                  : "Add Listing"}
+                    ? "Pasang Iklan"
+                    : "Add Listing"}
               </Text>
             </Pressable>
           </View>
@@ -1103,8 +1091,8 @@ export default function DashboardListingsScreen() {
                   ? "Listing agent Anda akan tampil di sini setelah dibuat."
                   : "Your agent listings will appear here after you create them."
                 : isId
-                ? "Iklan pemilik Anda akan tampil di sini setelah dibuat."
-                : "Your owner listings will appear here after you create them."}
+                  ? "Iklan pemilik Anda akan tampil di sini setelah dibuat."
+                  : "Your owner listings will appear here after you create them."}
             </Text>
           </View>
         ) : (
@@ -1202,8 +1190,8 @@ function ListingCard({
         ? "Disewa"
         : "For Rent"
       : isId
-      ? "Dijual"
-      : "For Sale";
+        ? "Dijual"
+        : "For Sale";
 
   const rentalType = formatRentalType(item.rental_type, language);
   const saleType = formatSaleType(item.sale_type, language);
@@ -1238,7 +1226,9 @@ function ListingCard({
         </View>
 
         <Text style={styles.cardTitle} numberOfLines={2}>
-          {language === "id" ? item.title_id || item.title || "-" : item.title || item.title_id || "-"}
+          {language === "id"
+            ? item.title_id || item.title || "-"
+            : item.title || item.title_id || "-"}
         </Text>
 
         <View style={styles.locationRow}>
@@ -1258,10 +1248,24 @@ function ListingCard({
         </View>
 
         <View style={styles.detailGrid}>
-          {landText ? <DetailPill label={isId ? "Tanah" : "Land"} value={landText} /> : null}
-          {buildingText ? <DetailPill label={isId ? "Bangunan" : "Building"} value={buildingText} /> : null}
-          {item.road_access ? <DetailPill label={isId ? "Akses" : "Road"} value={item.road_access} /> : null}
-          {item.zoning_type ? <DetailPill label="Zoning" value={item.zoning_type} /> : null}
+          {landText ? (
+            <DetailPill label={isId ? "Tanah" : "Land"} value={landText} />
+          ) : null}
+          {buildingText ? (
+            <DetailPill
+              label={isId ? "Bangunan" : "Building"}
+              value={buildingText}
+            />
+          ) : null}
+          {item.road_access ? (
+            <DetailPill
+              label={isId ? "Akses" : "Road"}
+              value={item.road_access}
+            />
+          ) : null}
+          {item.zoning_type ? (
+            <DetailPill label="Zoning" value={item.zoning_type} />
+          ) : null}
         </View>
 
         <View style={styles.promoRow}>
@@ -1310,7 +1314,15 @@ function ListingCard({
           />
 
           <ActionButton
-            label={item.is_paused ? (isId ? "Aktifkan" : "Activate") : isId ? "Jeda" : "Pause"}
+            label={
+              item.is_paused
+                ? isId
+                  ? "Aktifkan"
+                  : "Activate"
+                : isId
+                  ? "Jeda"
+                  : "Pause"
+            }
             icon={<CirclePause color="#ffffff" size={13} />}
             disabled={actionBlocked || busyId === `${item.id}-pause`}
             onPress={onTogglePause}
@@ -1566,33 +1578,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: "700",
     marginTop: 7,
-  },
-  roleSwitch: {
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#050505",
-    padding: 4,
-    flexDirection: "row",
-    marginTop: 14,
-  },
-  roleSwitchButton: {
-    flex: 1,
-    minHeight: 38,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  roleSwitchActive: {
-    backgroundColor: "#e6c15c",
-  },
-  roleSwitchText: {
-    color: "#a9a9a9",
-    fontSize: 11.5,
-    fontWeight: "900",
-  },
-  roleSwitchTextActive: {
-    color: "#111111",
   },
   membershipCard: {
     borderRadius: 26,
