@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.tetamo.mobile",
-      "versionCode": 7,
+      "versionCode": 8,
       "blockedPermissions": [
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
