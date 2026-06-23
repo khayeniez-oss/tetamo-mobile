@@ -120,6 +120,8 @@ const PROPERTY_SELECT = `
   status,
   verified_ok,
   verification_status,
+  is_paused,
+  transaction_status,
   listing_type,
   rental_type,
   sale_type,
@@ -324,17 +326,59 @@ function isFutureDate(value: unknown) {
   return time > Date.now();
 }
 
+function normalizeTransactionStatus(value: unknown) {
+  const status = safeString(value).toLowerCase();
+
+  if (status === "sold") return "sold";
+  if (status === "rented") return "rented";
+
+  return "available";
+}
+
+function isPublicProperty(property: PropertyRow) {
+  const status = safeString(property.status).toLowerCase();
+  const verificationStatus = safeString(property.verification_status).toLowerCase();
+
+  if (status === "rejected") return false;
+  if (status === "pending_payment") return false;
+  if (verificationStatus === "pending_payment") return false;
+  if (safeBoolean(property.is_paused)) return false;
+
+  if (normalizeTransactionStatus(property.transaction_status) !== "available") {
+    return false;
+  }
+
+  if (property.listing_expires_at && !isFutureDate(property.listing_expires_at)) {
+    return false;
+  }
+
+  return true;
+}
+
 function getPropertyBadge(property: PropertyRow): string {
   if (property.spotlight_active) return "Spotlight";
   if (property.boost_active) return "Boosted";
   if (isFutureDate(property.featured_expires_at)) return "Featured";
   if (property.market_type === "new_project") return "New Project";
 
-  if (property.verified_ok || property.verification_status === "approved") {
+  const verificationStatus = safeString(property.verification_status).toLowerCase();
+
+  if (
+    property.verified_ok === true ||
+    verificationStatus === "verified" ||
+    verificationStatus === "approved"
+  ) {
     return "Verified";
   }
 
-  return "Verified";
+  if (
+    verificationStatus === "pending_verification" ||
+    verificationStatus === "pending_approval"
+  ) {
+    return "Pending Verification";
+  }
+
+  return "Pending Verification";
 }
 
 function getLocation(property: PropertyRow): string {
@@ -522,7 +566,9 @@ async function fetchPropertyEngagement(propertyIds: string[]) {
 }
 
 async function attachImagesEngagementAndNormalize(properties: PropertyRow[]) {
-  const propertyIds = properties
+  const publicProperties = properties.filter(isPublicProperty);
+
+  const propertyIds = publicProperties
     .map((property) => String(property.id))
     .filter(Boolean);
 
@@ -534,7 +580,7 @@ async function attachImagesEngagementAndNormalize(properties: PropertyRow[]) {
   const imagesByPropertyId = groupImagesByPropertyId(images);
   const engagementByPropertyId = groupEngagementByPropertyId(engagement);
 
-  return properties.map((property) =>
+  return publicProperties.map((property) =>
     normalizeProperty(property, imagesByPropertyId, engagementByPropertyId),
   );
 }
@@ -634,7 +680,7 @@ export async function fetchPropertyByPathKey(pathKey: string) {
       continue;
     }
 
-    if (data) {
+    if (data && isPublicProperty(data)) {
       const normalized = await attachImagesEngagementAndNormalize([data]);
       return normalized[0] || null;
     }
