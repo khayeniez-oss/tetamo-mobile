@@ -265,7 +265,7 @@ export default function UpdatePasswordScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
       <KeyboardAvoidingView
         style={styles.keyboard}
@@ -282,7 +282,7 @@ export default function UpdatePasswordScreen() {
               style={styles.backButton}
               onPress={() => router.replace("/login" as any)}
             >
-              <ArrowLeft color="#ffffff" size={16} />
+              <ArrowLeft color="#171717" size={16} />
               <Text style={styles.backText}>{ui.backToLogin}</Text>
             </Pressable>
 
@@ -309,29 +309,17 @@ export default function UpdatePasswordScreen() {
             </View>
           </View>
 
-          <View style={styles.heroPanel}>
+          <View style={styles.formPanel}>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{ui.badge}</Text>
             </View>
 
-            <Text style={styles.title}>{ui.title}</Text>
-            <Text style={styles.subtitle}>{ui.subtitle}</Text>
-
-            <View style={styles.helperBox}>
-              <View style={styles.helperIcon}>
-                <ShieldCheck color="#e6c15c" size={22} />
-              </View>
-
-              <View style={styles.helperTextBox}>
-                <Text style={styles.helperTitle}>{ui.helperTitle}</Text>
-                <Text style={styles.helperText}>{ui.helperText}</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.formPanel}>
             <View style={styles.lockIcon}>
-              <LockKeyhole color="#e6c15c" size={26} />
+              {success ? (
+                <CheckCircle2 color="#27835C" size={27} />
+              ) : (
+                <LockKeyhole color="#A47B21" size={27} />
+              )}
             </View>
 
             <Text style={styles.formTitle}>
@@ -342,22 +330,38 @@ export default function UpdatePasswordScreen() {
               {success ? ui.successMessage : ui.subtitle}
             </Text>
 
+            {!success ? (
+              <View style={styles.helperBox}>
+                <View style={styles.helperIcon}>
+                  <ShieldCheck color="#A47B21" size={20} />
+                </View>
+
+                <View style={styles.helperTextBox}>
+                  <Text style={styles.helperTitle}>{ui.helperTitle}</Text>
+                  <Text style={styles.helperText}>{ui.helperText}</Text>
+                </View>
+              </View>
+            ) : null}
+
             {initializing ? (
               <View style={styles.loadingBox}>
-                <ActivityIndicator color="#e6c15c" />
+                <ActivityIndicator color="#A47B21" />
                 <Text style={styles.loadingText}>{ui.loadingSession}</Text>
               </View>
             ) : null}
 
             {errorMessage ? (
               <View style={styles.errorBox}>
-                <AlertCircle color="#fb7185" size={18} />
+                <AlertCircle color="#B84A4A" size={18} />
+
                 <View style={styles.errorTextBox}>
                   <Text style={styles.errorText}>{errorMessage}</Text>
 
                   {!ready ? (
                     <Pressable
-                      onPress={() => router.replace("/forgot-password" as any)}
+                      onPress={() =>
+                        router.replace("/forgot-password" as any)
+                      }
                     >
                       <Text style={styles.errorLink}>{ui.requestNewLink}</Text>
                     </Pressable>
@@ -368,7 +372,8 @@ export default function UpdatePasswordScreen() {
 
             {success ? (
               <View style={styles.successBox}>
-                <CheckCircle2 color="#22c55e" size={19} />
+                <CheckCircle2 color="#27835C" size={19} />
+
                 <View style={styles.successTextBox}>
                   <Text style={styles.successTitle}>{ui.successTitle}</Text>
                   <Text style={styles.successText}>{ui.successMessage}</Text>
@@ -378,7 +383,7 @@ export default function UpdatePasswordScreen() {
 
             {!initializing && ready && !success ? (
               <>
-                <View>
+                <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>{ui.newPassword}</Text>
 
                   <View style={styles.passwordWrap}>
@@ -390,9 +395,10 @@ export default function UpdatePasswordScreen() {
                         setCustomError("");
                       }}
                       placeholder={ui.newPasswordPlaceholder}
-                      placeholderTextColor="#777777"
+                      placeholderTextColor="#9A948B"
                       secureTextEntry={!showPassword}
                       autoCapitalize="none"
+                      autoCorrect={false}
                       style={styles.passwordInput}
                     />
 
@@ -401,15 +407,15 @@ export default function UpdatePasswordScreen() {
                       onPress={() => setShowPassword((prev) => !prev)}
                     >
                       {showPassword ? (
-                        <EyeOff color="#ffffff" size={18} />
+                        <EyeOff color="#777169" size={18} />
                       ) : (
-                        <Eye color="#ffffff" size={18} />
+                        <Eye color="#777169" size={18} />
                       )}
                     </Pressable>
                   </View>
                 </View>
 
-                <View>
+                <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>{ui.confirmPassword}</Text>
 
                   <View style={styles.passwordWrap}>
@@ -421,20 +427,23 @@ export default function UpdatePasswordScreen() {
                         setCustomError("");
                       }}
                       placeholder={ui.confirmPasswordPlaceholder}
-                      placeholderTextColor="#777777"
+                      placeholderTextColor="#9A948B"
                       secureTextEntry={!showConfirmPassword}
                       autoCapitalize="none"
+                      autoCorrect={false}
                       style={styles.passwordInput}
                     />
 
                     <Pressable
                       style={styles.eyeButton}
-                      onPress={() => setShowConfirmPassword((prev) => !prev)}
+                      onPress={() =>
+                        setShowConfirmPassword((prev) => !prev)
+                      }
                     >
                       {showConfirmPassword ? (
-                        <EyeOff color="#ffffff" size={18} />
+                        <EyeOff color="#777169" size={18} />
                       ) : (
-                        <Eye color="#ffffff" size={18} />
+                        <Eye color="#777169" size={18} />
                       )}
                     </Pressable>
                   </View>
@@ -450,15 +459,11 @@ export default function UpdatePasswordScreen() {
                 >
                   {loading ? (
                     <>
-                      <ActivityIndicator color="#111111" />
-                      <Text style={styles.primaryButtonText}>
-                        {ui.updating}
-                      </Text>
+                      <ActivityIndicator color="#171717" />
+                      <Text style={styles.primaryButtonText}>{ui.updating}</Text>
                     </>
                   ) : (
-                    <Text style={styles.primaryButtonText}>
-                      {ui.updateButton}
-                    </Text>
+                    <Text style={styles.primaryButtonText}>{ui.updateButton}</Text>
                   )}
                 </Pressable>
               </>
@@ -469,9 +474,7 @@ export default function UpdatePasswordScreen() {
                 style={styles.primaryButton}
                 onPress={() => router.replace("/forgot-password" as any)}
               >
-                <Text style={styles.primaryButtonText}>
-                  {ui.requestNewLink}
-                </Text>
+                <Text style={styles.primaryButtonText}>{ui.requestNewLink}</Text>
               </Pressable>
             ) : null}
 
@@ -537,284 +540,311 @@ function extractAuthParamsFromUrl(
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#050505",
+    backgroundColor: "#F7F5EF",
   },
+
   keyboard: {
     flex: 1,
   },
+
   scroll: {
     flex: 1,
-    backgroundColor: "#050505",
+    backgroundColor: "#F7F5EF",
   },
+
   content: {
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 34,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
+
   topRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 28,
     gap: 10,
   },
+
   backButton: {
+    minHeight: 40,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#333333",
-    backgroundColor: "#101010",
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    borderColor: "#E3DDD4",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 13,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
+
   backText: {
-    color: "#ffffff",
+    color: "#171717",
     fontSize: 11.5,
     fontWeight: "900",
   },
+
   langToggle: {
     flexDirection: "row",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#5b4a24",
+    borderColor: "#DCCB9A",
+    backgroundColor: "#FFFFFF",
     overflow: "hidden",
   },
+
   langButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
   },
+
   langButtonActive: {
-    backgroundColor: "#e6c15c",
+    backgroundColor: "#F0D889",
   },
+
   langText: {
-    color: "#e6c15c",
+    color: "#9A7624",
     fontSize: 10,
     fontWeight: "900",
   },
+
   langTextActive: {
-    color: "#111111",
+    color: "#171717",
   },
-  heroPanel: {
-    borderRadius: 26,
+
+  formPanel: {
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 17,
-    marginBottom: 14,
+    borderColor: "#E8E1D7",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 20,
+    paddingVertical: 24,
   },
+
   badge: {
-    alignSelf: "flex-start",
+    alignSelf: "center",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    paddingHorizontal: 10,
+    borderColor: "#DFC76E",
+    backgroundColor: "#FFF8DF",
+    paddingHorizontal: 11,
     paddingVertical: 6,
   },
+
   badgeText: {
-    color: "#e6c15c",
+    color: "#9A7624",
     fontSize: 9.5,
     fontWeight: "900",
     letterSpacing: 0.8,
     textTransform: "uppercase",
   },
-  title: {
-    color: "#ffffff",
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: "900",
-    letterSpacing: -0.6,
-    marginTop: 13,
-  },
-  subtitle: {
-    color: "#b8b8b8",
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: "700",
-    marginTop: 8,
-  },
-  helperBox: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    padding: 13,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 11,
-    marginTop: 15,
-  },
-  helperIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
-    backgroundColor: "#151106",
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  helperTextBox: {
-    flex: 1,
-  },
-  helperTitle: {
-    color: "#ffffff",
-    fontSize: 13.5,
-    fontWeight: "900",
-  },
-  helperText: {
-    color: "#d6d6d6",
-    fontSize: 11.2,
-    lineHeight: 16,
-    fontWeight: "700",
-    marginTop: 4,
-  },
-  formPanel: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 16,
-    gap: 13,
-  },
+
   lockIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 22,
+    width: 62,
+    height: 62,
+    borderRadius: 21,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#171717",
+    borderColor: "#E5D9B6",
+    backgroundColor: "#FFF9EA",
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "center",
+    marginTop: 20,
   },
+
   formTitle: {
-    color: "#ffffff",
-    fontSize: 22,
+    color: "#171717",
+    fontSize: 26,
+    lineHeight: 31,
     fontWeight: "900",
+    letterSpacing: -0.5,
     textAlign: "center",
-    marginTop: 2,
+    marginTop: 18,
   },
+
   formSub: {
-    color: "#a9a9a9",
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "700",
+    color: "#777169",
+    fontSize: 12.5,
+    lineHeight: 19,
+    fontWeight: "600",
     textAlign: "center",
+    marginTop: 8,
   },
-  loadingBox: {
+
+  helperBox: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#050505",
-    padding: 12,
+    borderColor: "#E7DBB9",
+    backgroundColor: "#FFFAED",
+    padding: 13,
     flexDirection: "row",
     alignItems: "center",
+    gap: 11,
+    marginTop: 20,
+  },
+
+  helperIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "#FFF3CB",
+    alignItems: "center",
     justifyContent: "center",
-    gap: 9,
   },
-  loadingText: {
-    color: "#ffffff",
-    fontSize: 11.5,
-    fontWeight: "800",
-  },
-  errorBox: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#7f1d1d",
-    backgroundColor: "#2a0d0d",
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 9,
-  },
-  errorTextBox: {
+
+  helperTextBox: {
     flex: 1,
   },
-  errorText: {
-    color: "#fecaca",
-    fontSize: 11.5,
-    lineHeight: 16,
-    fontWeight: "700",
-  },
-  errorLink: {
-    color: "#ffffff",
-    fontSize: 11,
-    fontWeight: "900",
-    marginTop: 5,
-    textDecorationLine: "underline",
-  },
-  successBox: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#14532d",
-    backgroundColor: "#052e16",
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 9,
-  },
-  successTextBox: {
-    flex: 1,
-  },
-  successTitle: {
-    color: "#bbf7d0",
+
+  helperTitle: {
+    color: "#38332E",
     fontSize: 12.5,
     fontWeight: "900",
   },
-  successText: {
-    color: "#bbf7d0",
+
+  helperText: {
+    color: "#777169",
+    fontSize: 10.8,
+    lineHeight: 15,
+    fontWeight: "600",
+    marginTop: 3,
+  },
+
+  loadingBox: {
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#E4DDD3",
+    backgroundColor: "#FAF9F6",
+    padding: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    marginTop: 18,
+  },
+
+  loadingText: {
+    color: "#5F5A53",
+    fontSize: 11.5,
+    fontWeight: "700",
+  },
+
+  errorBox: {
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#EAC5C5",
+    backgroundColor: "#FFF2F2",
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    marginTop: 18,
+  },
+
+  errorTextBox: {
+    flex: 1,
+  },
+
+  errorText: {
+    color: "#A23C3C",
     fontSize: 11.5,
     lineHeight: 16,
     fontWeight: "700",
+  },
+
+  errorLink: {
+    color: "#9A4A3B",
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 6,
+    textDecorationLine: "underline",
+  },
+
+  successBox: {
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#B9DEC8",
+    backgroundColor: "#EFFAF3",
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    marginTop: 18,
+  },
+
+  successTextBox: {
+    flex: 1,
+  },
+
+  successTitle: {
+    color: "#206B49",
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+
+  successText: {
+    color: "#397A5B",
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "600",
     marginTop: 2,
   },
+
+  inputGroup: {
+    marginTop: 20,
+  },
+
   inputLabel: {
-    color: "#ffffff",
-    fontSize: 12,
+    color: "#38332E",
+    fontSize: 11.5,
     fontWeight: "900",
     marginBottom: 7,
   },
+
   passwordWrap: {
-    minHeight: 50,
+    minHeight: 52,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#050505",
+    borderColor: "#DDD6CC",
+    backgroundColor: "#FAF9F6",
     flexDirection: "row",
     alignItems: "center",
   },
+
   passwordInput: {
     flex: 1,
-    color: "#ffffff",
-    paddingHorizontal: 13,
+    color: "#171717",
+    paddingHorizontal: 14,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
   },
+
   eyeButton: {
-    width: 46,
-    height: 50,
+    width: 48,
+    height: 52,
     alignItems: "center",
     justifyContent: "center",
   },
+
   primaryButton: {
-    minHeight: 49,
+    minHeight: 52,
     borderRadius: 17,
-    backgroundColor: "#e6c15c",
+    backgroundColor: "#F0C957",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
     flexDirection: "row",
     gap: 7,
+    marginTop: 20,
   },
+
   primaryDisabled: {
     opacity: 0.55,
   },
+
   primaryButtonText: {
-    color: "#111111",
-    fontSize: 13,
+    color: "#171717",
+    fontSize: 12.5,
     fontWeight: "900",
   },
 });

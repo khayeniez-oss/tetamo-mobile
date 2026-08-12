@@ -162,7 +162,7 @@ export default function ForgotPasswordScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
       <KeyboardAvoidingView
         style={styles.keyboard}
@@ -179,7 +179,7 @@ export default function ForgotPasswordScreen() {
               style={styles.backButton}
               onPress={() => router.push("/login" as any)}
             >
-              <ArrowLeft color="#ffffff" size={16} />
+              <ArrowLeft color="#171717" size={16} />
               <Text style={styles.backText}>{ui.backToLogin}</Text>
             </Pressable>
 
@@ -206,17 +206,21 @@ export default function ForgotPasswordScreen() {
             </View>
           </View>
 
-          <View style={styles.heroPanel}>
+          <View style={styles.formPanel}>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{ui.badge}</Text>
             </View>
 
-            <Text style={styles.title}>{ui.title}</Text>
-            <Text style={styles.subtitle}>{ui.subtitle}</Text>
+            <View style={styles.mailIcon}>
+              <Mail color="#A47B21" size={27} />
+            </View>
+
+            <Text style={styles.formTitle}>{ui.title}</Text>
+            <Text style={styles.formSub}>{ui.subtitle}</Text>
 
             <View style={styles.helperBox}>
               <View style={styles.helperIcon}>
-                <ShieldCheck color="#e6c15c" size={22} />
+                <ShieldCheck color="#A47B21" size={20} />
               </View>
 
               <View style={styles.helperTextBox}>
@@ -224,19 +228,11 @@ export default function ForgotPasswordScreen() {
                 <Text style={styles.helperText}>{ui.helperText}</Text>
               </View>
             </View>
-          </View>
-
-          <View style={styles.formPanel}>
-            <View style={styles.mailIcon}>
-              <Mail color="#e6c15c" size={26} />
-            </View>
-
-            <Text style={styles.formTitle}>{ui.title}</Text>
-            <Text style={styles.formSub}>{ui.subtitle}</Text>
 
             {successMessage ? (
               <View style={styles.successBox}>
-                <CheckCircle2 color="#22c55e" size={19} />
+                <CheckCircle2 color="#27835C" size={19} />
+
                 <View style={styles.messageTextBox}>
                   <Text style={styles.successTitle}>{ui.successTitle}</Text>
                   <Text style={styles.successText}>{successMessage}</Text>
@@ -250,7 +246,7 @@ export default function ForgotPasswordScreen() {
               </View>
             ) : null}
 
-            <View>
+            <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>{ui.emailLabel}</Text>
 
               <TextInput
@@ -260,26 +256,30 @@ export default function ForgotPasswordScreen() {
                   resetMessages();
                 }}
                 placeholder={ui.emailPlaceholder}
-                placeholderTextColor="#777777"
+                placeholderTextColor="#9A948B"
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
                 style={styles.input}
               />
             </View>
 
             <Pressable
-              style={[styles.primaryButton, loading && styles.primaryDisabled]}
+              style={[
+                styles.primaryButton,
+                loading && styles.primaryDisabled,
+              ]}
               disabled={loading}
               onPress={handleResetPassword}
             >
               {loading ? (
                 <>
-                  <ActivityIndicator color="#111111" />
+                  <ActivityIndicator color="#171717" />
                   <Text style={styles.primaryButtonText}>{ui.sending}</Text>
                 </>
               ) : (
                 <>
-                  <Send color="#111111" size={16} />
+                  <Send color="#171717" size={16} />
                   <Text style={styles.primaryButtonText}>{ui.sendButton}</Text>
                 </>
               )}
@@ -287,6 +287,7 @@ export default function ForgotPasswordScreen() {
 
             <View style={styles.loginRow}>
               <Text style={styles.loginQuestion}>{ui.remember} </Text>
+
               <Pressable onPress={() => router.push("/login" as any)}>
                 <Text style={styles.loginLink}>{ui.login}</Text>
               </Pressable>
@@ -310,259 +311,283 @@ function isValidEmail(value: string) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#050505",
+    backgroundColor: "#F7F5EF",
   },
+
   keyboard: {
     flex: 1,
   },
+
   scroll: {
     flex: 1,
-    backgroundColor: "#050505",
+    backgroundColor: "#F7F5EF",
   },
+
   content: {
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 34,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
+
   topRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 28,
     gap: 10,
   },
+
   backButton: {
+    minHeight: 40,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#333333",
-    backgroundColor: "#101010",
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    borderColor: "#E3DDD4",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 13,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
+
   backText: {
-    color: "#ffffff",
+    color: "#171717",
     fontSize: 11.5,
     fontWeight: "900",
   },
+
   langToggle: {
     flexDirection: "row",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#5b4a24",
+    borderColor: "#DCCB9A",
+    backgroundColor: "#FFFFFF",
     overflow: "hidden",
   },
+
   langButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
   },
+
   langButtonActive: {
-    backgroundColor: "#e6c15c",
+    backgroundColor: "#F0D889",
   },
+
   langText: {
-    color: "#e6c15c",
+    color: "#9A7624",
     fontSize: 10,
     fontWeight: "900",
   },
+
   langTextActive: {
-    color: "#111111",
+    color: "#171717",
   },
-  heroPanel: {
-    borderRadius: 26,
+
+  formPanel: {
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 17,
-    marginBottom: 14,
+    borderColor: "#E8E1D7",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 20,
+    paddingVertical: 24,
   },
+
   badge: {
-    alignSelf: "flex-start",
+    alignSelf: "center",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    paddingHorizontal: 10,
+    borderColor: "#DFC76E",
+    backgroundColor: "#FFF8DF",
+    paddingHorizontal: 11,
     paddingVertical: 6,
   },
+
   badgeText: {
-    color: "#e6c15c",
+    color: "#9A7624",
     fontSize: 9.5,
     fontWeight: "900",
     letterSpacing: 0.8,
     textTransform: "uppercase",
   },
-  title: {
-    color: "#ffffff",
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: "900",
-    letterSpacing: -0.6,
-    marginTop: 13,
-  },
-  subtitle: {
-    color: "#b8b8b8",
-    fontSize: 13,
-    lineHeight: 19,
-    fontWeight: "700",
-    marginTop: 8,
-  },
-  helperBox: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    padding: 13,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 11,
-    marginTop: 15,
-  },
-  helperIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
-    backgroundColor: "#151106",
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  helperTextBox: {
-    flex: 1,
-  },
-  helperTitle: {
-    color: "#ffffff",
-    fontSize: 13.5,
-    fontWeight: "900",
-  },
-  helperText: {
-    color: "#d6d6d6",
-    fontSize: 11.2,
-    lineHeight: 16,
-    fontWeight: "700",
-    marginTop: 4,
-  },
-  formPanel: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 16,
-    gap: 13,
-  },
+
   mailIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 22,
+    width: 62,
+    height: 62,
+    borderRadius: 21,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#171717",
+    borderColor: "#E5D9B6",
+    backgroundColor: "#FFF9EA",
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "center",
+    marginTop: 20,
   },
+
   formTitle: {
-    color: "#ffffff",
-    fontSize: 22,
+    color: "#171717",
+    fontSize: 26,
+    lineHeight: 31,
     fontWeight: "900",
+    letterSpacing: -0.5,
     textAlign: "center",
-    marginTop: 2,
+    marginTop: 18,
   },
+
   formSub: {
-    color: "#a9a9a9",
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "700",
+    color: "#777169",
+    fontSize: 12.5,
+    lineHeight: 19,
+    fontWeight: "600",
     textAlign: "center",
+    marginTop: 8,
   },
-  successBox: {
+
+  helperBox: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#14532d",
-    backgroundColor: "#052e16",
+    borderColor: "#E7DBB9",
+    backgroundColor: "#FFFAED",
+    padding: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    marginTop: 20,
+  },
+
+  helperIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "#FFF3CB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  helperTextBox: {
+    flex: 1,
+  },
+
+  helperTitle: {
+    color: "#38332E",
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+
+  helperText: {
+    color: "#777169",
+    fontSize: 10.8,
+    lineHeight: 15,
+    fontWeight: "600",
+    marginTop: 3,
+  },
+
+  successBox: {
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "#B9DEC8",
+    backgroundColor: "#EFFAF3",
     padding: 12,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 9,
+    marginTop: 16,
   },
+
   messageTextBox: {
     flex: 1,
   },
+
   successTitle: {
-    color: "#bbf7d0",
+    color: "#206B49",
     fontSize: 12.5,
     fontWeight: "900",
   },
+
   successText: {
-    color: "#bbf7d0",
-    fontSize: 11.5,
+    color: "#397A5B",
+    fontSize: 11,
     lineHeight: 16,
-    fontWeight: "700",
+    fontWeight: "600",
     marginTop: 2,
   },
+
   errorBox: {
-    borderRadius: 18,
+    borderRadius: 17,
     borderWidth: 1,
-    borderColor: "#7f1d1d",
-    backgroundColor: "#2a0d0d",
+    borderColor: "#EAC5C5",
+    backgroundColor: "#FFF2F2",
     padding: 12,
+    marginTop: 16,
   },
+
   errorText: {
-    color: "#fecaca",
+    color: "#A23C3C",
     fontSize: 11.5,
     lineHeight: 16,
     fontWeight: "700",
   },
+
+  inputGroup: {
+    marginTop: 20,
+  },
+
   inputLabel: {
-    color: "#ffffff",
-    fontSize: 12,
+    color: "#38332E",
+    fontSize: 11.5,
     fontWeight: "900",
     marginBottom: 7,
   },
+
   input: {
-    minHeight: 50,
+    minHeight: 52,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#050505",
-    color: "#ffffff",
-    paddingHorizontal: 13,
+    borderColor: "#DDD6CC",
+    backgroundColor: "#FAF9F6",
+    color: "#171717",
+    paddingHorizontal: 14,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
   },
+
   primaryButton: {
-    minHeight: 49,
+    minHeight: 52,
     borderRadius: 17,
-    backgroundColor: "#e6c15c",
+    backgroundColor: "#F0C957",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
     paddingHorizontal: 14,
+    marginTop: 14,
   },
+
   primaryDisabled: {
     opacity: 0.55,
   },
+
   primaryButtonText: {
-    color: "#111111",
-    fontSize: 13,
+    color: "#171717",
+    fontSize: 12.5,
     fontWeight: "900",
   },
+
   loginRow: {
     flexDirection: "row",
     justifyContent: "center",
     flexWrap: "wrap",
+    marginTop: 18,
   },
+
   loginQuestion: {
-    color: "#a9a9a9",
-    fontSize: 12,
-    fontWeight: "700",
+    color: "#8A847C",
+    fontSize: 11.5,
+    fontWeight: "600",
   },
+
   loginLink: {
-    color: "#e6c15c",
-    fontSize: 12,
+    color: "#9A7624",
+    fontSize: 11.5,
     fontWeight: "900",
     textDecorationLine: "underline",
   },
