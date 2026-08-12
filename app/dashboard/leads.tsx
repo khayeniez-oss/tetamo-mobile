@@ -13,10 +13,11 @@ import {
     UserCheck,
     XCircle,
 } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     Linking,
     Pressable,
     RefreshControl,
@@ -35,6 +36,8 @@ type LeadStatus = "new" | "contacted" | "viewing" | "interested" | "closed";
 type ViewingStatus = "scheduled" | "rescheduled" | "done" | "no_show" | null;
 type StatusFilter = "all" | LeadStatus;
 type SourceFilter = "all" | "whatsapp" | "viewing" | "general";
+
+const PAGE_SIZE = 20;
 
 type LeadRow = {
   id: string;
@@ -69,6 +72,14 @@ type PropertyRow = {
   province: string | null;
 };
 
+type PropertyImageRow = {
+  property_id: string;
+  image_url: string | null;
+  sort_order: number | null;
+  is_cover: boolean | null;
+  created_at: string | null;
+};
+
 type ProfileRow = {
   full_name: string | null;
   role: string | null;
@@ -81,6 +92,7 @@ type Lead = {
   propertyTitle: string;
   propertyPrice: string;
   propertyLocation: string;
+  propertyImage: string | null;
   buyerName: string;
   buyerPhone: string;
   buyerEmail: string;
@@ -372,14 +384,36 @@ export default function DashboardLeadsScreen() {
   const [errorMessage, setErrorMessage] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const [stats, setStats] = useState({
+    total: 0,
+    new: 0,
+    viewing: 0,
+  });
+
+  const nextOffsetRef = useRef(0);
+  const loadingMoreRef = useRef(false);
 
   const isId = language === "id";
 
   const roleFromUrl = useMemo(() => {
     return normalizeDashboardRole(readParam(params.role));
   }, [params.role]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const ui = useMemo(() => {
     const isAgent = role === "agent";
@@ -548,172 +582,849 @@ Are you still interested?`;
     [agentName, isId, role]
   );
 
-  const loadLeads = useCallback(async () => {
-    setErrorMessage("");
+  const fetchLeadStats = useCallback(
+    async (
+      userId: string,
+      finalRole: DashboardRole
+    ) => {
+      const makeCountQuery = () =>
+        supabase
+          .from("leads")
+          .select("id", {
+            count: "exact",
+            head: true,
+          })
+          .eq("receiver_user_id", userId)
+          .eq("receiver_role", finalRole);
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+      const [
+        totalResult,
+        newResult,
+        viewingResult,
+      ] = await Promise.all([
+        makeCountQuery(),
 
-    if (authError || !user) {
-      setLeads([]);
-      setLoading(false);
-      setRefreshing(false);
-      router.replace("/login" as any);
-      return;
-    }
+        makeCountQuery().eq(
+          "status",
+          "new"
+        ),
 
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("full_name, role")
-      .eq("id", user.id)
-      .maybeSingle();
+        makeCountQuery().in(
+          "status",
+          ["viewing", "scheduled"]
+        ),
+      ]);
 
-    const profile = (profileData || null) as ProfileRow | null;
+      const countError =
+        totalResult.error ||
+        newResult.error ||
+        viewingResult.error;
 
-    const finalRole =
-      roleFromUrl || normalizeDashboardRole(profile?.role) || "owner";
+      if (countError) {
+        throw countError;
+      }
 
-    setRole(finalRole);
+      return {
+        total: totalResult.count || 0,
+        new: newResult.count || 0,
+        viewing:
+          viewingResult.count || 0,
+      };
+    },
+    []
+  );
 
-    if (profile?.full_name) {
-      setAgentName(profile.full_name);
-    }
+  const fetchLeadPage = useCallback(
+    async (
+      userId: string,
+      finalRole: DashboardRole,
+      offset: number
+    ) => {
+      /*
+       * Request one extra row.
+       * 20 rows are displayed; row 21 tells us
+       * whether another page exists.
+       */
+      /*
+       * Search property fields separately so searching
+       * location/title/code can still find the matching
+       * lead even though property data lives in another table.
+       */
+      const rawSearch =
+        debouncedSearch.trim();
 
-    const { data: leadsData, error: leadsError } = await supabase
-      .from("leads")
-      .select(
-        "id, property_id, property_code, property_title, source, sender_name, sender_phone, sender_email, message, created_at, status, priority, notes, lead_type, viewing_date, viewing_time, viewing_status, receiver_user_id, receiver_role"
-      )
-      .eq("receiver_user_id", user.id)
-      .eq("receiver_role", finalRole)
-      .order("created_at", { ascending: false });
+      /*
+       * PostgREST .or() uses commas and parentheses as
+       * syntax, so remove those characters from user input
+       * before building the filter expression.
+       */
+      const safeSearch =
+        rawSearch
+          .replace(/[,%()*]/g, " ")
+          .replace(/\\/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
 
-    if (leadsError) {
-      setLeads([]);
-      setErrorMessage(leadsError.message || ui.updateError);
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
+      let matchingPropertyIds: string[] = [];
 
-    const leadRows = (leadsData || []) as LeadRow[];
-    const propertyIds = Array.from(
-      new Set(leadRows.map((item) => item.property_id).filter(Boolean))
-    ) as string[];
+      if (safeSearch) {
+        const {
+          data: matchingProperties,
+          error: propertySearchError,
+        } = await supabase
+          .from("properties")
+          .select("id")
+          .or(
+            [
+              `kode.ilike.%${safeSearch}%`,
+              `title.ilike.%${safeSearch}%`,
+              `title_id.ilike.%${safeSearch}%`,
+              `city.ilike.%${safeSearch}%`,
+              `area.ilike.%${safeSearch}%`,
+              `province.ilike.%${safeSearch}%`,
+            ].join(",")
+          )
+          .limit(500);
 
-    let propertyMap = new Map<string, PropertyRow>();
+        if (propertySearchError) {
+          console.error(
+            "Tetamo lead property search error:",
+            propertySearchError.message
+          );
+        } else {
+          matchingPropertyIds =
+            (matchingProperties || []).map(
+              (item: { id: string }) => item.id
+            );
+        }
+      }
 
-    if (propertyIds.length > 0) {
-      const { data: propertyData, error: propertyError } = await supabase
-        .from("properties")
-        .select("id, kode, title, title_id, price, city, area, province")
-        .in("id", propertyIds);
+      let leadsQuery = supabase
+        .from("leads")
+        .select(
+          "id, property_id, property_code, property_title, source, sender_name, sender_phone, sender_email, message, created_at, status, priority, notes, lead_type, viewing_date, viewing_time, viewing_status, receiver_user_id, receiver_role"
+        )
+        .eq(
+          "receiver_user_id",
+          userId
+        )
+        .eq(
+          "receiver_role",
+          finalRole
+        );
 
-      if (propertyError) {
+      /*
+       * STATUS FILTER
+       *
+       * Keep the same normalization rules already used
+       * by the UI:
+       *
+       * scheduled -> viewing
+       * completed -> closed
+       */
+      if (statusFilter === "new") {
+        leadsQuery =
+          leadsQuery.eq(
+            "status",
+            "new"
+          );
+      }
+
+      if (statusFilter === "contacted") {
+        leadsQuery =
+          leadsQuery.eq(
+            "status",
+            "contacted"
+          );
+      }
+
+      if (statusFilter === "viewing") {
+        leadsQuery =
+          leadsQuery.in(
+            "status",
+            [
+              "viewing",
+              "scheduled",
+            ]
+          );
+      }
+
+      if (statusFilter === "interested") {
+        leadsQuery =
+          leadsQuery.eq(
+            "status",
+            "interested"
+          );
+      }
+
+      if (statusFilter === "closed") {
+        leadsQuery =
+          leadsQuery.in(
+            "status",
+            [
+              "closed",
+              "completed",
+            ]
+          );
+      }
+
+      /*
+       * SOURCE FILTER
+       *
+       * Mirrors normalizeSourceType().
+       */
+      if (sourceFilter === "whatsapp") {
+        leadsQuery =
+          leadsQuery.or(
+            [
+              "lead_type.ilike.%whatsapp%",
+              "source.ilike.%whatsapp%",
+              "lead_type.eq.wa",
+              "source.eq.wa",
+              "lead_type.ilike.%chat%",
+              "source.ilike.%chat%",
+            ].join(",")
+          );
+      }
+
+      if (sourceFilter === "viewing") {
+        leadsQuery =
+          leadsQuery.or(
+            [
+              "lead_type.ilike.%viewing%",
+              "source.ilike.%viewing%",
+              "lead_type.ilike.%schedule%",
+              "source.ilike.%schedule%",
+              "lead_type.ilike.%appointment%",
+              "source.ilike.%appointment%",
+            ].join(",")
+          );
+      }
+
+      if (sourceFilter === "general") {
+        /*
+         * General = not WhatsApp/chat and not
+         * viewing/schedule/appointment.
+         *
+         * Include NULL values because older leads may
+         * not have source or lead_type populated.
+         */
+        leadsQuery =
+          leadsQuery
+            .or(
+              [
+                "lead_type.is.null",
+                [
+                  "and(",
+                  "lead_type.not.ilike.%whatsapp%,",
+                  "lead_type.neq.wa,",
+                  "lead_type.not.ilike.%chat%,",
+                  "lead_type.not.ilike.%viewing%,",
+                  "lead_type.not.ilike.%schedule%,",
+                  "lead_type.not.ilike.%appointment%",
+                  ")",
+                ].join(""),
+              ].join(",")
+            )
+            .or(
+              [
+                "source.is.null",
+                [
+                  "and(",
+                  "source.not.ilike.%whatsapp%,",
+                  "source.neq.wa,",
+                  "source.not.ilike.%chat%,",
+                  "source.not.ilike.%viewing%,",
+                  "source.not.ilike.%schedule%,",
+                  "source.not.ilike.%appointment%",
+                  ")",
+                ].join(""),
+              ].join(",")
+            );
+      }
+
+      /*
+       * SEARCH FILTER
+       *
+       * Search lead/contact fields directly, plus any
+       * property IDs found from the property search above.
+       */
+      if (safeSearch) {
+        const searchFilters = [
+          `sender_name.ilike.%${safeSearch}%`,
+          `sender_phone.ilike.%${safeSearch}%`,
+          `sender_email.ilike.%${safeSearch}%`,
+          `message.ilike.%${safeSearch}%`,
+          `property_title.ilike.%${safeSearch}%`,
+          `property_code.ilike.%${safeSearch}%`,
+          `source.ilike.%${safeSearch}%`,
+          `lead_type.ilike.%${safeSearch}%`,
+          `status.ilike.%${safeSearch}%`,
+          `priority.ilike.%${safeSearch}%`,
+          `notes.ilike.%${safeSearch}%`,
+        ];
+
+        if (matchingPropertyIds.length > 0) {
+          searchFilters.push(
+            `property_id.in.(${matchingPropertyIds.join(",")})`
+          );
+        }
+
+        leadsQuery =
+          leadsQuery.or(
+            searchFilters.join(",")
+          );
+      }
+
+      const {
+        data: leadsData,
+        error: leadsError,
+      } = await leadsQuery
+        .order("created_at", {
+          ascending: false,
+        })
+        .order("id", {
+          ascending: false,
+        })
+        .range(
+          offset,
+          offset + PAGE_SIZE
+        );
+
+      if (leadsError) {
+        throw leadsError;
+      }
+
+      const fetchedRows =
+        (leadsData || []) as LeadRow[];
+
+      const pageHasMore =
+        fetchedRows.length > PAGE_SIZE;
+
+      const leadRows =
+        fetchedRows.slice(
+          0,
+          PAGE_SIZE
+        );
+
+      const propertyIds =
+        Array.from(
+          new Set(
+            leadRows
+              .map(
+                (item) =>
+                  item.property_id
+              )
+              .filter(Boolean)
+          )
+        ) as string[];
+
+      let propertyMap =
+        new Map<
+          string,
+          PropertyRow
+        >();
+
+      let propertyImageMap =
+        new Map<
+          string,
+          string
+        >();
+
+      if (propertyIds.length > 0) {
+        const [
+          propertyResult,
+          imageResult,
+        ] = await Promise.all([
+          supabase
+            .from("properties")
+            .select(
+              "id, kode, title, title_id, price, city, area, province"
+            )
+            .in(
+              "id",
+              propertyIds
+            ),
+
+          supabase
+            .from(
+              "property_images"
+            )
+            .select(
+              "property_id, image_url, sort_order, is_cover, created_at"
+            )
+            .in(
+              "property_id",
+              propertyIds
+            ),
+        ]);
+
+        if (
+          propertyResult.error
+        ) {
+          throw propertyResult.error;
+        }
+
+        propertyMap =
+          new Map(
+            (
+              (
+                propertyResult.data ||
+                []
+              ) as PropertyRow[]
+            ).map(
+              (item) => [
+                item.id,
+                item,
+              ]
+            )
+          );
+
+        if (imageResult.error) {
+          console.error(
+            "Tetamo leads property image error:",
+            imageResult.error
+              .message
+          );
+        } else {
+          const imageRows =
+            (
+              imageResult.data ||
+              []
+            ) as PropertyImageRow[];
+
+          const sortedImages =
+            [...imageRows].sort(
+              (a, b) => {
+                if (
+                  Boolean(
+                    a.is_cover
+                  ) !==
+                  Boolean(
+                    b.is_cover
+                  )
+                ) {
+                  return a.is_cover
+                    ? -1
+                    : 1;
+                }
+
+                const aSort =
+                  typeof a.sort_order ===
+                  "number"
+                    ? a.sort_order
+                    : 999999;
+
+                const bSort =
+                  typeof b.sort_order ===
+                  "number"
+                    ? b.sort_order
+                    : 999999;
+
+                if (
+                  aSort !== bSort
+                ) {
+                  return (
+                    aSort - bSort
+                  );
+                }
+
+                return String(
+                  a.created_at || ""
+                ).localeCompare(
+                  String(
+                    b.created_at ||
+                      ""
+                  )
+                );
+              }
+            );
+
+          sortedImages.forEach(
+            (image) => {
+              const propertyId =
+                String(
+                  image.property_id ||
+                    ""
+                );
+
+              const url =
+                String(
+                  image.image_url ||
+                    ""
+                ).trim();
+
+              if (
+                propertyId &&
+                url &&
+                !propertyImageMap.has(
+                  propertyId
+                )
+              ) {
+                propertyImageMap.set(
+                  propertyId,
+                  url
+                );
+              }
+            }
+          );
+        }
+      }
+
+      const mapped: Lead[] =
+        leadRows.map(
+          (lead) => {
+            const property =
+              lead.property_id
+                ? propertyMap.get(
+                    lead.property_id
+                  )
+                : null;
+
+            const sourceType =
+              normalizeSourceType(
+                lead.lead_type,
+                lead.source
+              );
+
+            const viewingStatus =
+              normalizeViewingStatus(
+                lead.viewing_status,
+                sourceType
+              );
+
+            return {
+              id: lead.id,
+
+              propertyId:
+                lead.property_id,
+
+              listingKode:
+                property?.kode ||
+                lead.property_code ||
+                "-",
+
+              propertyTitle:
+                (language === "id"
+                  ? property?.title_id ||
+                    property?.title
+                  : property?.title ||
+                    property?.title_id) ||
+                lead.property_title ||
+                (isId
+                  ? "Properti"
+                  : "Property"),
+
+              propertyPrice:
+                formatCurrency(
+                  property?.price ||
+                    0
+                ),
+
+              propertyLocation:
+                buildPropertyLocation(
+                  property
+                ),
+
+              propertyImage:
+                lead.property_id
+                  ? propertyImageMap.get(
+                      lead.property_id
+                    ) || null
+                  : null,
+
+              buyerName:
+                lead.sender_name ||
+                (isId
+                  ? "Tanpa Nama"
+                  : "No Name"),
+
+              buyerPhone:
+                lead.sender_phone ||
+                "-",
+
+              buyerEmail:
+                lead.sender_email ||
+                "-",
+
+              message:
+                lead.message || "-",
+
+              createdAt:
+                formatDate(
+                  lead.created_at,
+                  language
+                ),
+
+              status:
+                normalizeLeadStatus(
+                  lead.status
+                ),
+
+              leadType:
+                lead.lead_type ||
+                "lead",
+
+              source:
+                lead.source || "-",
+
+              sourceType,
+
+              viewingDate:
+                lead.viewing_date,
+
+              viewingTime:
+                lead.viewing_time,
+
+              viewingStatus,
+
+              priority:
+                lead.priority ||
+                "-",
+
+              notes:
+                lead.notes || "-",
+            };
+          }
+        );
+
+      return {
+        items: mapped,
+        fetchedCount:
+          leadRows.length,
+        hasMore: pageHasMore,
+      };
+    },
+    [
+      debouncedSearch,
+      isId,
+      language,
+      sourceFilter,
+      statusFilter,
+    ]
+  );
+
+  const loadLeads = useCallback(
+    async (
+      showInitialLoader = true
+    ) => {
+      setErrorMessage("");
+
+      if (showInitialLoader) {
+        setLoading(true);
+      }
+
+      nextOffsetRef.current = 0;
+      loadingMoreRef.current =
+        false;
+
+      setLoadingMore(false);
+      setHasMore(true);
+
+      const {
+        data: { user },
+        error: authError,
+      } =
+        await supabase.auth.getUser();
+
+      if (
+        authError ||
+        !user
+      ) {
+        setCurrentUserId(null);
         setLeads([]);
-        setErrorMessage(propertyError.message || ui.updateError);
+        setStats({
+          total: 0,
+          new: 0,
+          viewing: 0,
+        });
+
         setLoading(false);
         setRefreshing(false);
+
+        router.replace(
+          "/login" as any
+        );
+
         return;
       }
 
-      propertyMap = new Map(
-        ((propertyData || []) as PropertyRow[]).map((item) => [item.id, item])
+      const {
+        data: profileData,
+      } = await supabase
+        .from("profiles")
+        .select(
+          "full_name, role"
+        )
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const profile =
+        (profileData ||
+          null) as ProfileRow | null;
+
+      const finalRole =
+        roleFromUrl ||
+        normalizeDashboardRole(
+          profile?.role
+        ) ||
+        "owner";
+
+      setRole(finalRole);
+      setCurrentUserId(
+        user.id
       );
-    }
 
-    const mapped: Lead[] = leadRows.map((lead) => {
-      const property = lead.property_id
-        ? propertyMap.get(lead.property_id)
-        : null;
+      if (
+        profile?.full_name
+      ) {
+        setAgentName(
+          profile.full_name
+        );
+      }
 
-      const sourceType = normalizeSourceType(lead.lead_type, lead.source);
-      const viewingStatus = normalizeViewingStatus(
-        lead.viewing_status,
-        sourceType
-      );
+      try {
+        const [
+          firstPage,
+          nextStats,
+        ] = await Promise.all([
+          fetchLeadPage(
+            user.id,
+            finalRole,
+            0
+          ),
 
-      return {
-        id: lead.id,
-        propertyId: lead.property_id,
-        listingKode: property?.kode || lead.property_code || "-",
-        propertyTitle:
-          (language === "id"
-            ? property?.title_id || property?.title
-            : property?.title || property?.title_id) ||
-          lead.property_title ||
-          (isId ? "Properti" : "Property"),
-        propertyPrice: formatCurrency(property?.price || 0),
-        propertyLocation: buildPropertyLocation(property),
-        buyerName: lead.sender_name || (isId ? "Tanpa Nama" : "No Name"),
-        buyerPhone: lead.sender_phone || "-",
-        buyerEmail: lead.sender_email || "-",
-        message: lead.message || "-",
-        createdAt: formatDate(lead.created_at, language),
-        status: normalizeLeadStatus(lead.status),
-        leadType: lead.lead_type || "lead",
-        source: lead.source || "-",
-        sourceType,
-        viewingDate: lead.viewing_date,
-        viewingTime: lead.viewing_time,
-        viewingStatus,
-        priority: lead.priority || "-",
-        notes: lead.notes || "-",
-      };
-    });
+          fetchLeadStats(
+            user.id,
+            finalRole
+          ),
+        ]);
 
-    setLeads(mapped);
-    setLoading(false);
-    setRefreshing(false);
-  }, [isId, language, roleFromUrl, router, ui.updateError]);
+        setLeads(
+          firstPage.items
+        );
+
+        setStats(nextStats);
+
+        nextOffsetRef.current =
+          firstPage.fetchedCount;
+
+        setHasMore(
+          firstPage.hasMore
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : ui.updateError;
+
+        setLeads([]);
+        setErrorMessage(
+          message ||
+            ui.updateError
+        );
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [
+      fetchLeadPage,
+      fetchLeadStats,
+      roleFromUrl,
+      router,
+      ui.updateError,
+    ]
+  );
 
   useEffect(() => {
-    void loadLeads();
+    void loadLeads(true);
   }, [loadLeads]);
 
-  const filteredLeads = useMemo(() => {
-    const q = search.trim().toLowerCase();
+  const loadMoreLeads =
+    useCallback(async () => {
+      if (
+        !currentUserId ||
+        loading ||
+        refreshing ||
+        !hasMore ||
+        loadingMoreRef.current
+      ) {
+        return;
+      }
 
-    return leads.filter((lead) => {
-      const matchesSource =
-        sourceFilter === "all" || lead.sourceType === sourceFilter;
+      loadingMoreRef.current =
+        true;
 
-      const matchesStatus =
-        statusFilter === "all" || lead.status === statusFilter;
+      setLoadingMore(true);
 
-      const searchable = `
-        ${lead.buyerName}
-        ${lead.buyerPhone}
-        ${lead.buyerEmail}
-        ${lead.message}
-        ${lead.propertyTitle}
-        ${lead.propertyLocation}
-        ${lead.listingKode}
-        ${lead.propertyPrice}
-        ${lead.leadType}
-        ${lead.source}
-        ${lead.sourceType}
-        ${lead.status}
-        ${lead.viewingStatus || ""}
-        ${lead.priority}
-        ${lead.notes}
-      `.toLowerCase();
+      try {
+        const offset =
+          nextOffsetRef.current;
 
-      const matchesSearch = !q || searchable.includes(q);
+        const nextPage =
+          await fetchLeadPage(
+            currentUserId,
+            role,
+            offset
+          );
 
-      return matchesSource && matchesStatus && matchesSearch;
-    });
-  }, [leads, search, sourceFilter, statusFilter]);
+        setLeads((previous) => {
+          const existingIds =
+            new Set(
+              previous.map(
+                (lead) =>
+                  lead.id
+              )
+            );
 
-  const stats = useMemo(() => {
-    return {
-      total: filteredLeads.length,
-      new: filteredLeads.filter((item) => item.status === "new").length,
-      viewing: filteredLeads.filter((item) => item.status === "viewing").length,
-    };
-  }, [filteredLeads]);
+          const newItems =
+            nextPage.items.filter(
+              (lead) =>
+                !existingIds.has(
+                  lead.id
+                )
+            );
+
+          return [
+            ...previous,
+            ...newItems,
+          ];
+        });
+
+        nextOffsetRef.current =
+          offset +
+          nextPage.fetchedCount;
+
+        setHasMore(
+          nextPage.hasMore
+        );
+      } catch (error) {
+        console.error(
+          "Tetamo load more leads error:",
+          error
+        );
+      } finally {
+        loadingMoreRef.current =
+          false;
+
+        setLoadingMore(false);
+      }
+    }, [
+      currentUserId,
+      fetchLeadPage,
+      hasMore,
+      loading,
+      refreshing,
+      role,
+    ]);
+
+  /*
+   * Search and filters are now applied by Supabase
+   * before pagination, so the cards on the phone are
+   * already the correct filtered result.
+   */
+  const filteredLeads = leads;
 
   const sourceOptions: Array<{ key: SourceFilter; label: string }> = [
     { key: "all", label: ui.sourceAll },
@@ -740,6 +1451,12 @@ Are you still interested?`;
   ) {
     setUpdatingId(id);
 
+    const previousLead =
+      leads.find(
+        (lead) =>
+          lead.id === id
+      );
+
     const { error } = await supabase.from("leads").update(payload).eq("id", id);
 
     if (error) {
@@ -763,7 +1480,82 @@ Are you still interested?`;
       })
     );
 
+    if (
+      previousLead &&
+      payload.status !== undefined
+    ) {
+      const previousStatus =
+        previousLead.status;
+
+      const nextStatus =
+        payload.status;
+
+      setStats((previous) => {
+        let newCount =
+          previous.new;
+
+        let viewingCount =
+          previous.viewing;
+
+        if (
+          previousStatus ===
+          "new"
+        ) {
+          newCount =
+            Math.max(
+              0,
+              newCount - 1
+            );
+        }
+
+        if (
+          previousStatus ===
+          "viewing"
+        ) {
+          viewingCount =
+            Math.max(
+              0,
+              viewingCount - 1
+            );
+        }
+
+        if (
+          nextStatus ===
+          "new"
+        ) {
+          newCount += 1;
+        }
+
+        if (
+          nextStatus ===
+          "viewing"
+        ) {
+          viewingCount += 1;
+        }
+
+        return {
+          ...previous,
+          new: newCount,
+          viewing:
+            viewingCount,
+        };
+      });
+    }
+
     setUpdatingId(null);
+
+    /*
+     * If this screen is currently filtered by status,
+     * changing the lead may mean it no longer belongs
+     * in the visible result set.
+     */
+    if (
+      statusFilter !== "all" &&
+      payload.status !== undefined
+    ) {
+      void loadLeads(false);
+    }
+
     return true;
   }
 
@@ -826,39 +1618,50 @@ Are you still interested?`;
 
   async function handleRefresh() {
     setRefreshing(true);
-    await loadLeads();
+    await loadLeads(false);
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
       <View style={styles.topBar}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft color="#ffffff" size={15} />
-          <Text style={styles.backText}>{ui.back}</Text>
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <ArrowLeft color="#171717" size={16} />
+          <Text style={styles.backText}>
+            {ui.back}
+          </Text>
         </Pressable>
 
         <View style={styles.langToggle}>
-          {(["en", "id"] as Language[]).map((item) => (
-            <Pressable
-              key={item}
-              style={[
-                styles.langButton,
-                language === item && styles.langButtonActive,
-              ]}
-              onPress={() => setLanguage(item)}
-            >
-              <Text
+          {(["en", "id"] as Language[]).map(
+            (item) => (
+              <Pressable
+                key={item}
                 style={[
-                  styles.langText,
-                  language === item && styles.langTextActive,
+                  styles.langButton,
+                  language === item &&
+                    styles.langButtonActive,
                 ]}
+                onPress={() =>
+                  setLanguage(item)
+                }
               >
-                {item.toUpperCase()}
-              </Text>
-            </Pressable>
-          ))}
+                <Text
+                  style={[
+                    styles.langText,
+                    language === item &&
+                      styles.langTextActive,
+                  ]}
+                >
+                  {item.toUpperCase()}
+                </Text>
+              </Pressable>
+            )
+          )}
         </View>
       </View>
 
@@ -866,225 +1669,557 @@ Are you still interested?`;
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        onScroll={({ nativeEvent }) => {
+          const {
+            layoutMeasurement,
+            contentOffset,
+            contentSize,
+          } = nativeEvent;
+
+          const distanceFromBottom =
+            contentSize.height -
+            (
+              layoutMeasurement.height +
+              contentOffset.y
+            );
+
+          if (
+            distanceFromBottom < 220
+          ) {
+            void loadMoreLeads();
+          }
+        }}
+        scrollEventThrottle={200}
         refreshControl={
           <RefreshControl
-            tintColor="#e6c15c"
+            tintColor="#B8892E"
             refreshing={refreshing}
             onRefresh={handleRefresh}
           />
         }
       >
-        <View style={styles.heroCard}>
-          <View style={styles.heroIcon}>
-            <UserCheck color="#111111" size={24} />
+        <View style={styles.headerBlock}>
+          <View style={styles.headerIcon}>
+            <UserCheck
+              color="#171717"
+              size={23}
+            />
           </View>
 
-          <Text style={styles.heroTitle}>{ui.title}</Text>
-          <Text style={styles.heroSubtitle}>{ui.subtitle}</Text>
+          <View style={styles.headerCopy}>
+            <Text style={styles.heroTitle}>
+              {ui.title}
+            </Text>
+
+            <Text style={styles.heroSubtitle}>
+              {ui.subtitle}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.statsGrid}>
-          <StatBox label={ui.statsTotal} value={String(stats.total)} />
-          <StatBox label={ui.statsNew} value={String(stats.new)} />
-          <StatBox label={ui.statsViewing} value={String(stats.viewing)} />
+          <StatBox
+            label={ui.statsTotal}
+            value={String(stats.total)}
+          />
+
+          <StatBox
+            label={ui.statsNew}
+            value={String(stats.new)}
+          />
+
+          <StatBox
+            label={ui.statsViewing}
+            value={String(stats.viewing)}
+          />
         </View>
 
         <View style={styles.searchBox}>
-          <Search color="#a9a9a9" size={17} />
+          <Search
+            color="#8B857C"
+            size={18}
+          />
 
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder={ui.searchPlaceholder}
-            placeholderTextColor="#777777"
+            placeholder={
+              ui.searchPlaceholder
+            }
+            placeholderTextColor="#9A948B"
             style={styles.searchInput}
             returnKeyType="search"
           />
         </View>
 
-        <FilterSection title={isId ? "Sumber Lead" : "Lead Source"}>
+        <FilterSection
+          title={
+            isId
+              ? "Sumber Lead"
+              : "Lead Source"
+          }
+        >
           {sourceOptions.map((item) => (
             <FilterPill
               key={item.key}
               label={item.label}
-              active={sourceFilter === item.key}
-              onPress={() => setSourceFilter(item.key)}
+              active={
+                sourceFilter === item.key
+              }
+              onPress={() =>
+                setSourceFilter(item.key)
+              }
             />
           ))}
         </FilterSection>
 
-        <FilterSection title={isId ? "Status Lead" : "Lead Status"}>
+        <FilterSection
+          title={
+            isId
+              ? "Status Lead"
+              : "Lead Status"
+          }
+        >
           {statusOptions.map((item) => (
             <FilterPill
               key={item.key}
               label={item.label}
-              active={statusFilter === item.key}
-              onPress={() => setStatusFilter(item.key)}
+              active={
+                statusFilter === item.key
+              }
+              onPress={() =>
+                setStatusFilter(item.key)
+              }
             />
           ))}
         </FilterSection>
 
         {loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator color="#e6c15c" />
-            <Text style={styles.loadingText}>{ui.loading}</Text>
+            <ActivityIndicator
+              color="#B8892E"
+            />
+
+            <Text style={styles.loadingText}>
+              {ui.loading}
+            </Text>
           </View>
         ) : null}
 
         {!loading && errorMessage ? (
           <View style={styles.errorBox}>
-            <XCircle color="#fecaca" size={18} />
-            <Text style={styles.errorText}>{errorMessage}</Text>
+            <XCircle
+              color="#B84A4A"
+              size={18}
+            />
+
+            <Text style={styles.errorText}>
+              {errorMessage}
+            </Text>
           </View>
         ) : null}
 
-        {!loading && !errorMessage && filteredLeads.length === 0 ? (
+        {!loading &&
+        !errorMessage &&
+        filteredLeads.length === 0 ? (
           <View style={styles.emptyBox}>
-            <UserCheck color="#a9a9a9" size={28} />
-            <Text style={styles.emptyText}>{ui.empty}</Text>
+            <UserCheck
+              color="#B8892E"
+              size={28}
+            />
+
+            <Text style={styles.emptyText}>
+              {ui.empty}
+            </Text>
           </View>
         ) : null}
 
         <View style={styles.leadList}>
           {filteredLeads.map((lead) => {
-            const sourceUI = getSourceUI(lead.sourceType, language);
-            const statusUI = getLeadStatusUI(lead.status, language);
-            const viewingUI = getViewingStatusUI(
-              lead.viewingStatus,
-              language
-            );
-            const isUpdating = updatingId === lead.id;
+            const sourceUI =
+              getSourceUI(
+                lead.sourceType,
+                language
+              );
+
+            const statusUI =
+              getLeadStatusUI(
+                lead.status,
+                language
+              );
+
+            const viewingUI =
+              getViewingStatusUI(
+                lead.viewingStatus,
+                language
+              );
+
+            const isUpdating =
+              updatingId === lead.id;
 
             return (
-              <View key={lead.id} style={styles.leadCard}>
-                <View style={styles.badgeRow}>
-                  <Badge ui={sourceUI} />
-                  <Badge ui={statusUI} />
-                  {viewingUI ? <Badge ui={viewingUI} /> : null}
-                </View>
+              <View
+                key={lead.id}
+                style={styles.leadCard}
+              >
+                <View
+                  style={
+                    styles.leadCardTop
+                  }
+                >
+                  <View
+                    style={styles.badgeRow}
+                  >
+                    <Badge ui={sourceUI} />
+                    <Badge ui={statusUI} />
 
-                <Text style={styles.dateText}>{lead.createdAt}</Text>
-
-                <Text style={styles.buyerName}>{lead.buyerName}</Text>
-                <Text style={styles.buyerContact}>{lead.buyerPhone}</Text>
-
-                {lead.buyerEmail !== "-" ? (
-                  <Text style={styles.buyerContact}>{lead.buyerEmail}</Text>
-                ) : null}
-
-                <View style={styles.messageBox}>
-                  <Text style={styles.messageLabel}>{ui.message}</Text>
-                  <Text style={styles.messageText}>{lead.message}</Text>
-                </View>
-
-                <View style={styles.propertyBox}>
-                  <View style={styles.propertyIcon}>
-                    <Home color="#e6c15c" size={19} />
+                    {viewingUI ? (
+                      <Badge
+                        ui={viewingUI}
+                      />
+                    ) : null}
                   </View>
 
-                  <View style={styles.propertyTextBox}>
-                    <Text style={styles.propertyTitle} numberOfLines={2}>
+                  <Text
+                    style={styles.dateText}
+                  >
+                    {lead.createdAt}
+                  </Text>
+                </View>
+
+                <Text
+                  style={styles.buyerName}
+                >
+                  {lead.buyerName}
+                </Text>
+
+                {lead.buyerPhone !== "-" ? (
+                  <Text
+                    style={
+                      styles.buyerContact
+                    }
+                  >
+                    {lead.buyerPhone}
+                  </Text>
+                ) : null}
+
+                {lead.buyerEmail !== "-" ? (
+                  <Text
+                    style={
+                      styles.buyerContact
+                    }
+                  >
+                    {lead.buyerEmail}
+                  </Text>
+                ) : null}
+
+                <Pressable
+                  style={styles.propertyBox}
+                  disabled={!lead.propertyId}
+                  onPress={() => {
+                    if (!lead.propertyId) {
+                      return;
+                    }
+
+                    router.push(
+                      `/properti/${lead.propertyId}` as any
+                    );
+                  }}
+                >
+                  {lead.propertyImage ? (
+                    <Image
+                      source={{
+                        uri: lead.propertyImage,
+                      }}
+                      style={
+                        styles.propertyImage
+                      }
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View
+                      style={
+                        styles.propertyImageFallback
+                      }
+                    >
+                      <Home
+                        color="#B8892E"
+                        size={24}
+                      />
+                    </View>
+                  )}
+
+                  <View
+                    style={
+                      styles.propertyTextBox
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.propertyTitle
+                      }
+                      numberOfLines={2}
+                    >
                       {lead.propertyTitle}
                     </Text>
 
-                    <View style={styles.propertyMetaRow}>
-                      <MapPin color="#a9a9a9" size={12} />
-                      <Text style={styles.propertyMeta} numberOfLines={1}>
-                        {lead.propertyLocation}
+                    <View
+                      style={
+                        styles.propertyMetaRow
+                      }
+                    >
+                      <MapPin
+                        color="#8B857C"
+                        size={12}
+                      />
+
+                      <Text
+                        style={
+                          styles.propertyMeta
+                        }
+                        numberOfLines={1}
+                      >
+                        {
+                          lead.propertyLocation
+                        }
                       </Text>
                     </View>
 
-                    <Text style={styles.propertyPrice}>
+                    <Text
+                      style={
+                        styles.propertyPrice
+                      }
+                    >
                       {lead.propertyPrice}
                     </Text>
 
-                    <Text style={styles.propertyCode}>
-                      {ui.code}: {lead.listingKode}
+                    <Text
+                      style={
+                        styles.propertyCode
+                      }
+                      numberOfLines={1}
+                    >
+                      {ui.code}:{" "}
+                      {lead.listingKode}
                     </Text>
                   </View>
-                </View>
+                </Pressable>
 
-                {lead.sourceType === "viewing" ? (
-                  <View style={styles.scheduleBox}>
-                    <CalendarDays color="#e6c15c" size={16} />
-                    <Text style={styles.scheduleText}>
+                {lead.message !== "-" ? (
+                  <View
+                    style={styles.messageBox}
+                  >
+                    <Text
+                      style={
+                        styles.messageLabel
+                      }
+                    >
+                      {ui.message}
+                    </Text>
+
+                    <Text
+                      style={
+                        styles.messageText
+                      }
+                    >
+                      {lead.message}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {lead.sourceType ===
+                "viewing" ? (
+                  <View
+                    style={styles.scheduleBox}
+                  >
+                    <CalendarDays
+                      color="#B8892E"
+                      size={16}
+                    />
+
+                    <Text
+                      style={
+                        styles.scheduleText
+                      }
+                    >
                       {ui.requestedSchedule}:{" "}
-                      {formatDate(lead.viewingDate, language)} •{" "}
-                      {formatTime(lead.viewingTime)}
+                      {formatDate(
+                        lead.viewingDate,
+                        language
+                      )}{" "}
+                      •{" "}
+                      {formatTime(
+                        lead.viewingTime
+                      )}
                     </Text>
                   </View>
                 ) : null}
 
                 {lead.notes !== "-" ? (
-                  <Text style={styles.extraText}>
+                  <Text
+                    style={styles.extraText}
+                  >
                     {ui.notes}: {lead.notes}
                   </Text>
                 ) : null}
 
                 {lead.priority !== "-" ? (
-                  <Text style={styles.extraText}>
-                    {ui.priority}: {lead.priority}
+                  <Text
+                    style={styles.extraText}
+                  >
+                    {ui.priority}:{" "}
+                    {lead.priority}
                   </Text>
                 ) : null}
 
-                <View style={styles.statusActionRow}>
-                  {lead.status !== "viewing" ? (
+                <Text
+                  style={
+                    styles.statusActionLabel
+                  }
+                >
+                  {isId
+                    ? "Update status"
+                    : "Update status"}
+                </Text>
+
+                <View
+                  style={
+                    styles.statusActionRow
+                  }
+                >
+                  {lead.status !==
+                  "viewing" ? (
                     <Pressable
-                      style={styles.smallActionButton}
+                      style={
+                        styles.smallActionButton
+                      }
                       disabled={isUpdating}
-                      onPress={() => updateLeadStatus(lead.id, "viewing")}
+                      onPress={() =>
+                        updateLeadStatus(
+                          lead.id,
+                          "viewing"
+                        )
+                      }
                     >
-                      <CalendarDays color="#e6c15c" size={14} />
-                      <Text style={styles.smallActionText}>
+                      <CalendarDays
+                        color="#B8892E"
+                        size={14}
+                      />
+
+                      <Text
+                        style={
+                          styles.smallActionText
+                        }
+                      >
                         {ui.markViewing}
                       </Text>
                     </Pressable>
                   ) : null}
 
-                  {lead.status !== "interested" ? (
+                  {lead.status !==
+                  "interested" ? (
                     <Pressable
-                      style={styles.smallActionButton}
+                      style={
+                        styles.smallActionButton
+                      }
                       disabled={isUpdating}
-                      onPress={() => updateLeadStatus(lead.id, "interested")}
+                      onPress={() =>
+                        updateLeadStatus(
+                          lead.id,
+                          "interested"
+                        )
+                      }
                     >
-                      <CheckCircle2 color="#22c55e" size={14} />
-                      <Text style={styles.smallActionText}>
+                      <CheckCircle2
+                        color="#27835C"
+                        size={14}
+                      />
+
+                      <Text
+                        style={
+                          styles.smallActionText
+                        }
+                      >
                         {ui.markInterested}
                       </Text>
                     </Pressable>
                   ) : null}
 
-                  {lead.status !== "closed" ? (
+                  {lead.status !==
+                  "closed" ? (
                     <Pressable
-                      style={styles.smallActionButton}
+                      style={
+                        styles.smallActionButton
+                      }
                       disabled={isUpdating}
-                      onPress={() => updateLeadStatus(lead.id, "closed")}
+                      onPress={() =>
+                        updateLeadStatus(
+                          lead.id,
+                          "closed"
+                        )
+                      }
                     >
-                      <XCircle color="#a9a9a9" size={14} />
-                      <Text style={styles.smallActionText}>
+                      <XCircle
+                        color="#777169"
+                        size={14}
+                      />
+
+                      <Text
+                        style={
+                          styles.smallActionText
+                        }
+                      >
                         {ui.markClosed}
                       </Text>
                     </Pressable>
                   ) : null}
                 </View>
 
-                <View style={styles.contactRow}>
+                <View
+                  style={styles.contactRow}
+                >
                   <Pressable
                     style={styles.callButton}
                     disabled={isUpdating}
-                    onPress={() => void handleCall(lead)}
+                    onPress={() =>
+                      void handleCall(lead)
+                    }
                   >
-                    <Phone color="#ffffff" size={15} />
-                    <Text style={styles.callButtonText}>{ui.contact}</Text>
+                    <Phone
+                      color="#FFFFFF"
+                      size={16}
+                    />
+
+                    <Text
+                      style={
+                        styles.callButtonText
+                      }
+                    >
+                      {ui.contact}
+                    </Text>
                   </Pressable>
 
                   <Pressable
-                    style={styles.whatsappButton}
+                    style={
+                      styles.whatsappButton
+                    }
                     disabled={isUpdating}
-                    onPress={() => void handleWhatsApp(lead)}
+                    onPress={() =>
+                      void handleWhatsApp(
+                        lead
+                      )
+                    }
                   >
-                    <MessageCircle color="#ffffff" size={15} />
-                    <Text style={styles.whatsappButtonText}>
+                    <MessageCircle
+                      color="#FFFFFF"
+                      size={16}
+                    />
+
+                    <Text
+                      style={
+                        styles.whatsappButtonText
+                      }
+                    >
                       {ui.whatsapp}
                     </Text>
                   </Pressable>
@@ -1093,6 +2228,45 @@ Are you still interested?`;
             );
           })}
         </View>
+
+        {loadingMore ? (
+          <View
+            style={
+              styles.paginationLoading
+            }
+          >
+            <ActivityIndicator
+              color="#B8892E"
+              size="small"
+            />
+
+            <Text
+              style={
+                styles.paginationLoadingText
+              }
+            >
+              {isId
+                ? "Memuat lead berikutnya..."
+                : "Loading more leads..."}
+            </Text>
+          </View>
+        ) : null}
+
+        {!loading &&
+        !loadingMore &&
+        !hasMore &&
+        leads.length > 0 ? (
+          <Text
+            style={
+              styles.paginationEnd
+            }
+          >
+            {isId
+              ? "Semua lead sudah dimuat."
+              : "All leads loaded."}
+          </Text>
+        ) : null}
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -1184,428 +2358,547 @@ function Badge({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#050505",
+    backgroundColor: "#F7F5EF",
   },
+
   topBar: {
     paddingHorizontal: 18,
-    paddingTop: 14,
+    paddingTop: 12,
     paddingBottom: 10,
-    backgroundColor: "#050505",
+    backgroundColor: "#F7F5EF",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
   },
+
   backButton: {
+    minHeight: 38,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#333333",
-    backgroundColor: "#101010",
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    borderColor: "#E5DED3",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
+
   backText: {
-    color: "#ffffff",
+    color: "#171717",
     fontSize: 11,
     fontWeight: "900",
   },
+
   langToggle: {
     flexDirection: "row",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#5b4a24",
+    borderColor: "#DCCB9A",
+    backgroundColor: "#FFFFFF",
     overflow: "hidden",
   },
+
   langButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
   },
+
   langButtonActive: {
-    backgroundColor: "#e6c15c",
+    backgroundColor: "#F0D889",
   },
+
   langText: {
-    color: "#e6c15c",
+    color: "#9A7624",
     fontSize: 9.5,
     fontWeight: "900",
   },
+
   langTextActive: {
-    color: "#111111",
+    color: "#171717",
   },
+
   scroll: {
     flex: 1,
-    backgroundColor: "#050505",
+    backgroundColor: "#F7F5EF",
   },
+
   content: {
     paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 38,
+    paddingTop: 6,
+    paddingBottom: 130,
   },
-  heroCard: {
-    borderRadius: 28,
+
+  headerBlock: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 18,
+    borderColor: "#E9E3DA",
+    padding: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 13,
     marginBottom: 12,
   },
-  heroIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 19,
-    backgroundColor: "#e6c15c",
+
+  headerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 17,
+    backgroundColor: "#F0D889",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 12,
   },
+
+  headerCopy: {
+    flex: 1,
+  },
+
   heroTitle: {
-    color: "#ffffff",
-    fontSize: 25,
-    lineHeight: 30,
+    color: "#171717",
+    fontSize: 23,
+    lineHeight: 28,
     fontWeight: "900",
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
   },
+
   heroSubtitle: {
-    color: "#b8b8b8",
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "700",
-    marginTop: 7,
+    color: "#777169",
+    fontSize: 11.5,
+    lineHeight: 17,
+    fontWeight: "600",
+    marginTop: 4,
   },
+
   statsGrid: {
     flexDirection: "row",
     gap: 9,
     marginBottom: 12,
   },
+
   statBox: {
     flex: 1,
-    borderRadius: 20,
+    minHeight: 72,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 12,
+    borderColor: "#E9E3DA",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+    justifyContent: "center",
   },
+
   statValue: {
-    color: "#ffffff",
-    fontSize: 20,
+    color: "#171717",
+    fontSize: 21,
     fontWeight: "900",
   },
+
   statLabel: {
-    color: "#a9a9a9",
-    fontSize: 10.5,
+    color: "#89837A",
+    fontSize: 10,
     fontWeight: "800",
     marginTop: 3,
   },
+
   searchBox: {
-    minHeight: 50,
-    borderRadius: 18,
+    minHeight: 52,
+    borderRadius: 17,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    paddingHorizontal: 13,
+    borderColor: "#E4DED5",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
     marginBottom: 12,
   },
+
   searchInput: {
     flex: 1,
-    color: "#ffffff",
+    color: "#171717",
     fontSize: 12.5,
-    fontWeight: "700",
+    fontWeight: "600",
     paddingVertical: 0,
   },
+
   filterSection: {
-    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
+    borderColor: "#E9E3DA",
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 10,
   },
+
   filterTitle: {
-    color: "#ffffff",
-    fontSize: 11.5,
+    color: "#38332E",
+    fontSize: 10.5,
     fontWeight: "900",
     marginBottom: 9,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
+
   filterRow: {
-    gap: 8,
+    gap: 7,
     paddingRight: 8,
   },
+
   filterPill: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#343434",
-    backgroundColor: "#050505",
+    borderColor: "#DED7CD",
+    backgroundColor: "#FAF8F4",
     paddingHorizontal: 11,
     paddingVertical: 8,
   },
+
   filterPillActive: {
-    borderColor: "#e6c15c",
-    backgroundColor: "#e6c15c",
+    borderColor: "#D8B84B",
+    backgroundColor: "#F0D889",
   },
+
   filterPillText: {
-    color: "#a9a9a9",
-    fontSize: 10.5,
+    color: "#777169",
+    fontSize: 10.2,
     fontWeight: "900",
   },
+
   filterPillTextActive: {
-    color: "#111111",
+    color: "#171717",
   },
+
   loadingBox: {
-    borderRadius: 24,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 18,
+    borderColor: "#E9E3DA",
+    backgroundColor: "#FFFFFF",
+    padding: 20,
     alignItems: "center",
     gap: 10,
   },
+
   loadingText: {
-    color: "#ffffff",
+    color: "#5F5A53",
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "700",
   },
+
   errorBox: {
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#7f1d1d",
-    backgroundColor: "#2a0d0d",
+    borderColor: "#E8C1C1",
+    backgroundColor: "#FFF1F1",
     padding: 13,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 9,
   },
+
   errorText: {
-    color: "#fecaca",
+    color: "#9E3838",
     fontSize: 11.8,
     lineHeight: 17,
     fontWeight: "700",
     flex: 1,
   },
+
   emptyBox: {
-    borderRadius: 24,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 22,
+    borderColor: "#E9E3DA",
+    backgroundColor: "#FFFFFF",
+    padding: 24,
     alignItems: "center",
     gap: 10,
   },
+
   emptyText: {
-    color: "#a9a9a9",
+    color: "#777169",
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "700",
     textAlign: "center",
   },
+
   leadList: {
     gap: 13,
+    marginTop: 3,
   },
+
   leadCard: {
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
+    borderColor: "#E6DFD5",
+    backgroundColor: "#FFFFFF",
     padding: 15,
   },
+
+  leadCardTop: {
+    gap: 8,
+  },
+
   badgeRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 7,
+    gap: 6,
   },
+
   badge: {
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 9,
-    paddingVertical: 6,
+    paddingVertical: 5,
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
   },
+
   badgeText: {
-    fontSize: 9.8,
+    fontSize: 9.5,
     fontWeight: "900",
   },
+
   dateText: {
-    color: "#777777",
-    fontSize: 10.5,
-    fontWeight: "800",
-    marginTop: 10,
+    color: "#9A948B",
+    fontSize: 10,
+    fontWeight: "700",
   },
+
   buyerName: {
-    color: "#ffffff",
-    fontSize: 15,
+    color: "#171717",
+    fontSize: 17,
+    lineHeight: 22,
     fontWeight: "900",
-    marginTop: 9,
+    marginTop: 13,
   },
+
   buyerContact: {
-    color: "#a9a9a9",
+    color: "#777169",
     fontSize: 11.5,
     lineHeight: 16,
-    fontWeight: "700",
-    marginTop: 3,
+    fontWeight: "600",
+    marginTop: 2,
   },
-  messageBox: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "#252525",
-    backgroundColor: "#050505",
-    padding: 12,
-    marginTop: 12,
-  },
-  messageLabel: {
-    color: "#777777",
-    fontSize: 10,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  messageText: {
-    color: "#ffffff",
-    fontSize: 12,
-    lineHeight: 17,
-    fontWeight: "700",
-    marginTop: 6,
-  },
+
   propertyBox: {
-    borderRadius: 18,
+    marginTop: 14,
+    borderRadius: 19,
     borderWidth: 1,
-    borderColor: "#5b4a24",
-    backgroundColor: "#211a0b",
-    padding: 12,
+    borderColor: "#E6DED0",
+    backgroundColor: "#FAF7F0",
+    padding: 9,
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "stretch",
     gap: 11,
-    marginTop: 12,
   },
-  propertyIcon: {
-    width: 40,
-    height: 40,
+
+  propertyImage: {
+    width: 96,
+    height: 96,
     borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#151106",
+    backgroundColor: "#EEEAE3",
+  },
+
+  propertyImageFallback: {
+    width: 96,
+    height: 96,
+    borderRadius: 15,
+    backgroundColor: "#F3EEE3",
     alignItems: "center",
     justifyContent: "center",
   },
+
   propertyTextBox: {
     flex: 1,
+    minHeight: 96,
+    justifyContent: "center",
+    paddingVertical: 2,
   },
+
   propertyTitle: {
-    color: "#ffffff",
-    fontSize: 13,
-    lineHeight: 18,
+    color: "#171717",
+    fontSize: 12.5,
+    lineHeight: 17,
     fontWeight: "900",
   },
+
   propertyMetaRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     marginTop: 5,
   },
+
   propertyMeta: {
-    color: "#d6d6d6",
-    fontSize: 11,
-    fontWeight: "700",
+    color: "#777169",
+    fontSize: 10.5,
+    fontWeight: "600",
     flex: 1,
   },
+
   propertyPrice: {
-    color: "#e6c15c",
+    color: "#A47B21",
     fontSize: 12,
     fontWeight: "900",
-    marginTop: 5,
+    marginTop: 6,
   },
+
   propertyCode: {
-    color: "#c9b56b",
-    fontSize: 10.5,
-    fontWeight: "800",
-    marginTop: 4,
+    color: "#9A948B",
+    fontSize: 9.8,
+    fontWeight: "700",
+    marginTop: 3,
   },
-  scheduleBox: {
+
+  messageBox: {
     borderRadius: 17,
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    padding: 11,
+    backgroundColor: "#F7F5EF",
+    padding: 12,
     marginTop: 12,
+  },
+
+  messageLabel: {
+    color: "#9A948B",
+    fontSize: 9.5,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+
+  messageText: {
+    color: "#38332E",
+    fontSize: 11.8,
+    lineHeight: 17,
+    fontWeight: "600",
+    marginTop: 6,
+  },
+
+  scheduleBox: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E2D3A3",
+    backgroundColor: "#FFF9E8",
+    padding: 11,
+    marginTop: 11,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
   },
+
   scheduleText: {
-    color: "#ffffff",
-    fontSize: 11.5,
-    lineHeight: 16,
-    fontWeight: "800",
-    flex: 1,
-  },
-  extraText: {
-    color: "#a9a9a9",
+    color: "#4F4632",
     fontSize: 11,
     lineHeight: 16,
     fontWeight: "700",
-    marginTop: 8,
+    flex: 1,
   },
+
+  extraText: {
+    color: "#777169",
+    fontSize: 10.8,
+    lineHeight: 16,
+    fontWeight: "600",
+    marginTop: 7,
+  },
+
+  statusActionLabel: {
+    color: "#9A948B",
+    fontSize: 9.5,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginTop: 14,
+  },
+
   statusActionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 13,
+    gap: 7,
+    marginTop: 8,
   },
+
   smallActionButton: {
     minHeight: 36,
-    borderRadius: 14,
+    borderRadius: 13,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#050505",
+    borderColor: "#DDD6CC",
+    backgroundColor: "#FFFFFF",
     paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
+
   smallActionText: {
-    color: "#ffffff",
-    fontSize: 10.5,
+    color: "#39342F",
+    fontSize: 10,
     fontWeight: "900",
   },
+
   contactRow: {
     flexDirection: "row",
     gap: 9,
-    marginTop: 13,
+    marginTop: 14,
   },
+
   callButton: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 46,
     borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "#343434",
-    backgroundColor: "#050505",
+    backgroundColor: "#171717",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
   },
+
   callButtonText: {
-    color: "#ffffff",
-    fontSize: 12,
+    color: "#FFFFFF",
+    fontSize: 11.5,
     fontWeight: "900",
   },
+
   whatsappButton: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 46,
     borderRadius: 15,
-    backgroundColor: "#16a34a",
+    backgroundColor: "#198754",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
   },
+
   whatsappButtonText: {
-    color: "#ffffff",
-    fontSize: 12,
+    color: "#FFFFFF",
+    fontSize: 11.5,
     fontWeight: "900",
   },
+
+  paginationLoading: {
+    minHeight: 58,
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+  },
+
+  paginationLoadingText: {
+    color: "#777169",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
+  paginationEnd: {
+    color: "#9A948B",
+    fontSize: 10.5,
+    lineHeight: 16,
+    fontWeight: "700",
+    textAlign: "center",
+    marginTop: 18,
+    marginBottom: 4,
+  },
+
 });
