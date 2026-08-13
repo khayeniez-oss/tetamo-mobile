@@ -246,14 +246,19 @@ export default function AdminHomeScreen() {
             }
             title="WhatsApp Campaign"
             description="Prepare and send approved WhatsApp campaigns."
+            onPress={() =>
+              router.push(
+                "/admin/campaigns" as any
+              )
+            }
           />
         </View>
 
         <Text
           style={styles.note}
         >
-          We'll connect these three
-          admin tools next.
+          Manage Tetamo's essential
+          admin tools from your phone.
         </Text>
       </ScrollView>
     </SafeAreaView>
