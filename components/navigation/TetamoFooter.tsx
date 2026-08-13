@@ -80,7 +80,7 @@ const FOOTER_ITEMS: FooterItem[] = [
   {
     label: "Profile",
     route: "/profile",
-    matchRoutes: ["/profile"],
+    matchRoutes: ["/profile", "/admin"],
     icon: (color, size) => (
       <UserRound
         color={color}
@@ -141,6 +141,10 @@ function shouldShowFooter(
   }
 
   if (pathname === "/profile") {
+    return true;
+  }
+
+  if (pathname === "/admin") {
     return true;
   }
 

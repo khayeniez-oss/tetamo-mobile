@@ -758,6 +758,30 @@ export default function ProfileScreen() {
           ) : null}
         </View>
 
+        {role === "admin" ? (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>
+                {isId ? "Admin Tetamo" : "Tetamo Admin"}
+              </Text>
+            </View>
+
+            <View style={styles.toolGrid}>
+              <ToolCard
+                icon={<ShieldCheck color="#111111" size={20} />}
+                title="Admin Essentials"
+                subtitle={
+                  isId
+                    ? "Listing, WhatsApp AI, Campaign & Revenue"
+                    : "Listings, WhatsApp AI, Campaigns & Revenue"
+                }
+                featured
+                onPress={() => router.push("/admin" as any)}
+              />
+            </View>
+          </>
+        ) : null}
+
         {role === "owner" ? (
           <>
             <View style={styles.sectionHeader}>
