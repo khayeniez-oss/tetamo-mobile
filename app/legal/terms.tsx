@@ -215,16 +215,20 @@ export default function TermsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
       <View style={styles.topBar}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft color="#ffffff" size={15} />
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.back()}
+          hitSlop={10}
+        >
+          <ArrowLeft color="#171717" size={18} />
           <Text style={styles.backText}>{content.back}</Text>
         </Pressable>
 
         <View style={styles.langToggle}>
-          <Languages color="#e6c15c" size={14} />
+          <Languages color="#A67C28" size={14} />
 
           {(["en", "id"] as Language[]).map((item) => (
             <Pressable
@@ -253,9 +257,9 @@ export default function TermsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.heroCard}>
+        <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Scale color="#111111" size={25} />
+            <Scale color="#171717" size={22} />
           </View>
 
           <Text style={styles.badge}>{content.badge}</Text>
@@ -265,33 +269,53 @@ export default function TermsScreen() {
         </View>
 
         <View style={styles.noticeCard}>
-          <Text style={styles.noticeTitle}>{content.noticeTitle}</Text>
-          <Text style={styles.noticeText}>{content.noticeText}</Text>
+          <View style={styles.noticeAccent} />
+
+          <View style={styles.noticeContent}>
+            <Text style={styles.noticeTitle}>{content.noticeTitle}</Text>
+            <Text style={styles.noticeText}>{content.noticeText}</Text>
+          </View>
         </View>
 
-        {content.sections.map((section) => (
-          <LegalSection
-            key={section.title}
-            icon={section.icon}
-            title={section.title}
-            body={section.body}
-          />
-        ))}
+        <View style={styles.sectionsCard}>
+          {content.sections.map((section, index) => (
+            <LegalSection
+              key={section.title}
+              index={index + 1}
+              icon={section.icon}
+              title={section.title}
+              body={section.body}
+              isLast={index === content.sections.length - 1}
+            />
+          ))}
+        </View>
 
         <View style={styles.actionCard}>
           <Pressable style={styles.primaryButton} onPress={openFullTerms}>
-            <ExternalLink color="#111111" size={17} />
+            <View style={styles.buttonIconGold}>
+              <ExternalLink color="#171717" size={16} />
+            </View>
+
             <Text style={styles.primaryButtonText}>
               {content.officialButton}
             </Text>
-            <ChevronRight color="#111111" size={16} />
+
+            <ChevronRight color="#171717" size={17} />
           </Pressable>
 
           <Pressable style={styles.secondaryButton} onPress={contactSupport}>
-            <Mail color="#ffffff" size={16} />
-            <Text style={styles.secondaryButtonText}>
-              {content.contactButton}
-            </Text>
+            <View style={styles.buttonIconLight}>
+              <Mail color="#171717" size={16} />
+            </View>
+
+            <View style={styles.supportTextBox}>
+              <Text style={styles.secondaryButtonText}>
+                {content.contactButton}
+              </Text>
+              <Text style={styles.supportEmail}>{SUPPORT_EMAIL}</Text>
+            </View>
+
+            <ChevronRight color="#888273" size={17} />
           </Pressable>
 
           <Text style={styles.urlText}>{FULL_TERMS_URL}</Text>
@@ -302,18 +326,27 @@ export default function TermsScreen() {
 }
 
 function LegalSection({
+  index,
   icon,
   title,
   body,
+  isLast,
 }: {
+  index: number;
   icon: ReactNode;
   title: string;
   body: string;
+  isLast: boolean;
 }) {
   return (
-    <View style={styles.sectionCard}>
-      <View style={styles.sectionHeader}>
+    <View style={[styles.sectionRow, !isLast && styles.sectionDivider]}>
+      <View style={styles.sectionTop}>
+        <Text style={styles.sectionNumber}>
+          {String(index).padStart(2, "0")}
+        </Text>
+
         <View style={styles.sectionIcon}>{icon}</View>
+
         <Text style={styles.sectionTitle}>{title}</Text>
       </View>
 
@@ -325,213 +358,303 @@ function LegalSection({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#050505",
+    backgroundColor: "#F7F5EF",
   },
+
   topBar: {
-    paddingHorizontal: 18,
-    paddingTop: 14,
+    paddingHorizontal: 20,
+    paddingTop: 10,
     paddingBottom: 10,
-    backgroundColor: "#050505",
+    backgroundColor: "#F7F5EF",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10,
   },
+
   backButton: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#333333",
-    backgroundColor: "#101010",
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    minHeight: 38,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 7,
   },
+
   backText: {
-    color: "#ffffff",
-    fontSize: 11,
-    fontWeight: "900",
+    color: "#171717",
+    fontSize: 13,
+    fontWeight: "700",
   },
+
   langToggle: {
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#5b4a24",
-    overflow: "hidden",
-    paddingLeft: 8,
+    borderColor: "#DDD7C9",
+    backgroundColor: "#FFFFFF",
+    paddingLeft: 10,
+    paddingRight: 3,
+    paddingVertical: 3,
+    gap: 2,
   },
+
   langButton: {
-    paddingHorizontal: 10,
+    minWidth: 36,
+    paddingHorizontal: 9,
     paddingVertical: 7,
+    borderRadius: 999,
+    alignItems: "center",
   },
+
   langButtonActive: {
-    backgroundColor: "#e6c15c",
+    backgroundColor: "#E6C15C",
   },
+
   langText: {
-    color: "#e6c15c",
-    fontSize: 9.5,
-    fontWeight: "900",
+    color: "#8A806C",
+    fontSize: 10,
+    fontWeight: "800",
   },
+
   langTextActive: {
-    color: "#111111",
+    color: "#171717",
   },
+
   scroll: {
     flex: 1,
-    backgroundColor: "#050505",
+    backgroundColor: "#F7F5EF",
   },
+
   content: {
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 38,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 44,
   },
-  heroCard: {
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 18,
-    marginBottom: 13,
+
+  hero: {
+    marginBottom: 24,
   },
+
   heroIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 19,
-    backgroundColor: "#e6c15c",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 13,
-  },
-  badge: {
-    color: "#e6c15c",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.2,
-  },
-  title: {
-    color: "#ffffff",
-    fontSize: 27,
-    lineHeight: 33,
-    fontWeight: "900",
-    letterSpacing: -0.6,
-    marginTop: 6,
-  },
-  subtitle: {
-    color: "#d6d6d6",
-    fontSize: 12.3,
-    lineHeight: 19,
-    fontWeight: "700",
-    marginTop: 8,
-  },
-  updated: {
-    color: "#9b9b9b",
-    fontSize: 10.8,
-    fontWeight: "800",
-    marginTop: 11,
-  },
-  noticeCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    padding: 13,
-    marginBottom: 13,
-  },
-  noticeTitle: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  noticeText: {
-    color: "#f5e6b7",
-    fontSize: 11.4,
-    lineHeight: 17,
-    fontWeight: "700",
-    marginTop: 5,
-  },
-  sectionCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 15,
-    marginBottom: 13,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    marginBottom: 10,
-  },
-  sectionIcon: {
-    width: 42,
-    height: 42,
+    width: 46,
+    height: 46,
     borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
+    backgroundColor: "#E6C15C",
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 18,
   },
-  sectionTitle: {
-    color: "#ffffff",
-    fontSize: 14.5,
-    lineHeight: 20,
-    fontWeight: "900",
-    flex: 1,
+
+  badge: {
+    color: "#9B7726",
+    fontSize: 10.5,
+    fontWeight: "800",
+    letterSpacing: 1.4,
   },
-  sectionBody: {
-    color: "#d6d6d6",
-    fontSize: 11.8,
-    lineHeight: 18,
-    fontWeight: "700",
+
+  title: {
+    color: "#171717",
+    fontSize: 31,
+    lineHeight: 37,
+    fontWeight: "800",
+    letterSpacing: -0.8,
+    marginTop: 7,
   },
-  actionCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 15,
-    gap: 10,
+
+  subtitle: {
+    color: "#615E57",
+    fontSize: 13.5,
+    lineHeight: 21,
+    fontWeight: "500",
+    marginTop: 9,
+    maxWidth: 345,
   },
-  primaryButton: {
-    minHeight: 50,
-    borderRadius: 17,
-    backgroundColor: "#e6c15c",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    paddingHorizontal: 14,
-  },
-  primaryButtonText: {
-    color: "#111111",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  secondaryButton: {
-    minHeight: 48,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: "#343434",
-    backgroundColor: "#050505",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    paddingHorizontal: 14,
-  },
-  secondaryButtonText: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-  urlText: {
-    color: "#9b9b9b",
+
+  updated: {
+    color: "#999287",
     fontSize: 10.8,
     lineHeight: 16,
-    fontWeight: "700",
+    fontWeight: "600",
+    marginTop: 12,
+  },
+
+  noticeCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E7DFC9",
+    backgroundColor: "#FFFDF8",
+    padding: 15,
+    flexDirection: "row",
+    marginBottom: 18,
+  },
+
+  noticeAccent: {
+    width: 3,
+    borderRadius: 999,
+    backgroundColor: "#E6C15C",
+    marginRight: 12,
+  },
+
+  noticeContent: {
+    flex: 1,
+  },
+
+  noticeTitle: {
+    color: "#171717",
+    fontSize: 13.5,
+    fontWeight: "800",
+  },
+
+  noticeText: {
+    color: "#6F695D",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "500",
+    marginTop: 4,
+  },
+
+  sectionsCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#E8E3D9",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    marginBottom: 18,
+    overflow: "hidden",
+  },
+
+  sectionRow: {
+    paddingVertical: 18,
+  },
+
+  sectionDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E9E5DC",
+  },
+
+  sectionTop: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  sectionNumber: {
+    width: 28,
+    color: "#B3AA99",
+    fontSize: 10.5,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+  },
+
+  sectionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#EADFBF",
+    backgroundColor: "#FBF6E8",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 11,
+  },
+
+  sectionTitle: {
+    flex: 1,
+    color: "#1C1B18",
+    fontSize: 14.5,
+    lineHeight: 20,
+    fontWeight: "800",
+  },
+
+  sectionBody: {
+    color: "#68645C",
+    fontSize: 12.4,
+    lineHeight: 19,
+    fontWeight: "500",
+    marginTop: 10,
+    marginLeft: 28,
+  },
+
+  actionCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#E8E3D9",
+    backgroundColor: "#FFFFFF",
+    padding: 14,
+    gap: 10,
+  },
+
+  primaryButton: {
+    minHeight: 56,
+    borderRadius: 16,
+    backgroundColor: "#E6C15C",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+
+  buttonIconGold: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.32)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  primaryButtonText: {
+    flex: 1,
+    color: "#171717",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "800",
+  },
+
+  secondaryButton: {
+    minHeight: 60,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E4DFD5",
+    backgroundColor: "#FAF9F6",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+
+  buttonIconLight: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E6E1D7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  supportTextBox: {
+    flex: 1,
+  },
+
+  secondaryButtonText: {
+    color: "#171717",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
+  supportEmail: {
+    color: "#8B8579",
+    fontSize: 10.8,
+    fontWeight: "500",
+    marginTop: 2,
+  },
+
+  urlText: {
+    color: "#AAA398",
+    fontSize: 10.2,
+    lineHeight: 15,
+    fontWeight: "500",
     textAlign: "center",
+    marginTop: 2,
   },
 });

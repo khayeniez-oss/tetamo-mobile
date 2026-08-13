@@ -386,16 +386,20 @@ export default function SupportScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
       <View style={styles.topBar}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft color="#ffffff" size={15} />
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.back()}
+          hitSlop={10}
+        >
+          <ArrowLeft color="#171717" size={18} />
           <Text style={styles.backText}>{ui.back}</Text>
         </Pressable>
 
         <View style={styles.langToggle}>
-          <Languages color="#e6c15c" size={14} />
+          <Languages color="#A67C28" size={14} />
 
           {(["en", "id"] as Language[]).map((item) => (
             <Pressable
@@ -425,9 +429,9 @@ export default function SupportScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.heroCard}>
+        <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <HelpCircle color="#111111" size={26} />
+            <HelpCircle color="#171717" size={23} />
           </View>
 
           <Text style={styles.badge}>{ui.badge}</Text>
@@ -437,19 +441,19 @@ export default function SupportScreen() {
 
         {loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator color="#e6c15c" />
+            <ActivityIndicator color="#A67C28" />
             <Text style={styles.loadingText}>{ui.loading}</Text>
           </View>
         ) : null}
 
         <View style={styles.contactCard}>
           <SectionHeader
-            icon={<MessageCircle color="#e6c15c" size={20} />}
+            icon={<MessageCircle color="#A67C28" size={18} />}
             title={ui.contactCardTitle}
           />
 
           <ContactButton
-            icon={<Mail color="#111111" size={17} />}
+            icon={<Mail color="#171717" size={17} />}
             title={ui.emailSupport}
             subtitle={SUPPORT_EMAIL}
             primary
@@ -457,7 +461,7 @@ export default function SupportScreen() {
           />
 
           <ContactButton
-            icon={<ExternalLink color="#ffffff" size={17} />}
+            icon={<ExternalLink color="#171717" size={17} />}
             title={ui.openWebsite}
             subtitle={WEBSITE_URL}
             onPress={openWebsite}
@@ -466,21 +470,21 @@ export default function SupportScreen() {
 
         <View style={styles.safetyCard}>
           <SectionHeader
-            icon={<ShieldAlert color="#e6c15c" size={20} />}
+            icon={<ShieldAlert color="#A67C28" size={18} />}
             title={ui.safetyReportsTitle}
           />
 
           <Text style={styles.safetyIntro}>{ui.safetyReportsSub}</Text>
 
           <ReportButton
-            icon={<Flag color="#e6c15c" size={18} />}
+            icon={<Flag color="#A67C28" size={17} />}
             title={ui.reportListingTitle}
             subtitle={ui.reportListingSub}
             onPress={openReportListing}
           />
 
           <ReportButton
-            icon={<UserRound color="#e6c15c" size={18} />}
+            icon={<UserRound color="#A67C28" size={17} />}
             title={ui.reportUserTitle}
             subtitle={ui.reportUserSub}
             onPress={openReportUser}
@@ -488,7 +492,10 @@ export default function SupportScreen() {
         </View>
 
         <View style={styles.warningCard}>
-          <AlertTriangle color="#e6c15c" size={20} />
+          <View style={styles.warningIcon}>
+            <AlertTriangle color="#9B7726" size={18} />
+          </View>
+
           <View style={styles.warningTextBox}>
             <Text style={styles.warningTitle}>{ui.importantTitle}</Text>
             <Text style={styles.warningText}>{ui.importantText}</Text>
@@ -497,7 +504,7 @@ export default function SupportScreen() {
 
         <View style={styles.formCard}>
           <SectionHeader
-            icon={<FileText color="#e6c15c" size={20} />}
+            icon={<FileText color="#A67C28" size={18} />}
             title={ui.formTitle}
           />
 
@@ -514,6 +521,7 @@ export default function SupportScreen() {
                 onPress={() => setCategory(item.key)}
               >
                 {item.icon}
+
                 <Text
                   style={[
                     styles.categoryText,
@@ -542,12 +550,15 @@ export default function SupportScreen() {
             placeholder={ui.subjectPlaceholder}
           />
 
-          <Text style={styles.inputLabel}>{ui.message}</Text>
+          <Text style={[styles.inputLabel, styles.messageLabel]}>
+            {ui.message}
+          </Text>
+
           <TextInput
             value={messageText}
             onChangeText={setMessageText}
             placeholder={ui.messagePlaceholder}
-            placeholderTextColor="#777777"
+            placeholderTextColor="#AAA398"
             multiline
             textAlignVertical="top"
             style={styles.messageInput}
@@ -564,9 +575,9 @@ export default function SupportScreen() {
             ]}
           >
             {noticeType === "success" ? (
-              <CheckCircle2 color="#22c55e" size={18} />
+              <CheckCircle2 color="#2E7D4F" size={18} />
             ) : (
-              <XCircle color="#fecaca" size={18} />
+              <XCircle color="#B64B4B" size={18} />
             )}
 
             <Text
@@ -589,9 +600,9 @@ export default function SupportScreen() {
             onPress={() => void submitSupportRequest()}
           >
             {submitting ? (
-              <ActivityIndicator color="#111111" />
+              <ActivityIndicator color="#171717" />
             ) : (
-              <Send color="#111111" size={17} />
+              <Send color="#171717" size={17} />
             )}
 
             <Text style={styles.primaryButtonText}>
@@ -599,8 +610,11 @@ export default function SupportScreen() {
             </Text>
           </Pressable>
 
-          <Pressable style={styles.secondaryButton} onPress={openEmailManually}>
-            <Mail color="#ffffff" size={16} />
+          <Pressable
+            style={styles.secondaryButton}
+            onPress={openEmailManually}
+          >
+            <Mail color="#171717" size={16} />
             <Text style={styles.secondaryButtonText}>{ui.sendEmail}</Text>
           </Pressable>
         </View>
@@ -633,19 +647,31 @@ function ContactButton({
 }) {
   return (
     <Pressable
-      style={[styles.contactButton, primary && styles.contactButtonPrimary]}
+      style={[
+        styles.contactButton,
+        primary && styles.contactButtonPrimary,
+      ]}
       onPress={onPress}
     >
-      <View style={[styles.contactIcon, primary && styles.contactIconPrimary]}>
+      <View
+        style={[
+          styles.contactIcon,
+          primary && styles.contactIconPrimary,
+        ]}
+      >
         {icon}
       </View>
 
       <View style={styles.contactTextBox}>
         <Text
-          style={[styles.contactTitle, primary && styles.contactTitlePrimary]}
+          style={[
+            styles.contactTitle,
+            primary && styles.contactTitlePrimary,
+          ]}
         >
           {title}
         </Text>
+
         <Text
           style={[
             styles.contactSubtitle,
@@ -656,6 +682,11 @@ function ContactButton({
           {subtitle}
         </Text>
       </View>
+
+      <ExternalLink
+        color={primary ? "#171717" : "#9A9388"}
+        size={15}
+      />
     </Pressable>
   );
 }
@@ -681,6 +712,8 @@ function ReportButton({
           {subtitle}
         </Text>
       </View>
+
+      <ExternalLink color="#A69F93" size={14} />
     </Pressable>
   );
 }
@@ -703,11 +736,12 @@ function FormInput({
   return (
     <View style={styles.inputGroup}>
       <Text style={styles.inputLabel}>{label}</Text>
+
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="#777777"
+        placeholderTextColor="#AAA398"
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         style={styles.input}
@@ -719,418 +753,491 @@ function FormInput({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#050505",
+    backgroundColor: "#F7F5EF",
   },
+
   topBar: {
-    paddingHorizontal: 18,
-    paddingTop: 14,
+    paddingHorizontal: 20,
+    paddingTop: 10,
     paddingBottom: 10,
-    backgroundColor: "#050505",
+    backgroundColor: "#F7F5EF",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10,
   },
+
   backButton: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#333333",
-    backgroundColor: "#101010",
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    minHeight: 38,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 7,
   },
+
   backText: {
-    color: "#ffffff",
-    fontSize: 11,
-    fontWeight: "900",
+    color: "#171717",
+    fontSize: 13,
+    fontWeight: "700",
   },
+
   langToggle: {
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#5b4a24",
-    overflow: "hidden",
-    paddingLeft: 8,
+    borderColor: "#DDD7C9",
+    backgroundColor: "#FFFFFF",
+    paddingLeft: 10,
+    paddingRight: 3,
+    paddingVertical: 3,
+    gap: 2,
   },
+
   langButton: {
-    paddingHorizontal: 10,
+    minWidth: 36,
+    paddingHorizontal: 9,
     paddingVertical: 7,
+    borderRadius: 999,
+    alignItems: "center",
   },
+
   langButtonActive: {
-    backgroundColor: "#e6c15c",
+    backgroundColor: "#E6C15C",
   },
+
   langText: {
-    color: "#e6c15c",
-    fontSize: 9.5,
-    fontWeight: "900",
-  },
-  langTextActive: {
-    color: "#111111",
-  },
-  scroll: {
-    flex: 1,
-    backgroundColor: "#050505",
-  },
-  content: {
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 38,
-  },
-  heroCard: {
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 18,
-    marginBottom: 13,
-  },
-  heroIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 19,
-    backgroundColor: "#e6c15c",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 13,
-  },
-  badge: {
-    color: "#e6c15c",
+    color: "#8A806C",
     fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.2,
-  },
-  title: {
-    color: "#ffffff",
-    fontSize: 27,
-    lineHeight: 33,
-    fontWeight: "900",
-    letterSpacing: -0.6,
-    marginTop: 6,
-  },
-  subtitle: {
-    color: "#d6d6d6",
-    fontSize: 12.3,
-    lineHeight: 19,
-    fontWeight: "700",
-    marginTop: 8,
-  },
-  loadingBox: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 18,
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 13,
-  },
-  loadingText: {
-    color: "#ffffff",
-    fontSize: 12,
     fontWeight: "800",
   },
+
+  langTextActive: {
+    color: "#171717",
+  },
+
+  scroll: {
+    flex: 1,
+    backgroundColor: "#F7F5EF",
+  },
+
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 44,
+  },
+
+  hero: {
+    marginBottom: 24,
+  },
+
+  heroIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    backgroundColor: "#E6C15C",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
+  },
+
+  badge: {
+    color: "#9B7726",
+    fontSize: 10.5,
+    fontWeight: "800",
+    letterSpacing: 1.4,
+  },
+
+  title: {
+    color: "#171717",
+    fontSize: 31,
+    lineHeight: 37,
+    fontWeight: "800",
+    letterSpacing: -0.8,
+    marginTop: 7,
+  },
+
+  subtitle: {
+    color: "#615E57",
+    fontSize: 13.5,
+    lineHeight: 21,
+    fontWeight: "500",
+    marginTop: 9,
+    maxWidth: 345,
+  },
+
+  loadingBox: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#E8E3D9",
+    backgroundColor: "#FFFFFF",
+    padding: 15,
+    alignItems: "center",
+    gap: 9,
+    marginBottom: 18,
+  },
+
+  loadingText: {
+    color: "#6C675D",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
   contactCard: {
-    borderRadius: 24,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
+    borderColor: "#E8E3D9",
+    backgroundColor: "#FFFFFF",
     padding: 15,
-    marginBottom: 13,
+    marginBottom: 18,
   },
+
   safetyCard: {
-    borderRadius: 24,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#12100a",
+    borderColor: "#E7DFC9",
+    backgroundColor: "#FFFDF8",
     padding: 15,
-    marginBottom: 13,
+    marginBottom: 18,
   },
-  safetyIntro: {
-    color: "#d8d8d8",
-    fontSize: 11.5,
-    lineHeight: 17,
-    fontWeight: "700",
-    marginTop: -4,
-    marginBottom: 12,
-  },
+
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 11,
-    marginBottom: 13,
+    marginBottom: 14,
   },
+
   sectionIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
+    borderColor: "#EADFBF",
+    backgroundColor: "#FBF6E8",
     alignItems: "center",
     justifyContent: "center",
   },
+
   sectionTitle: {
-    color: "#ffffff",
+    color: "#1C1B18",
     fontSize: 15,
-    fontWeight: "900",
+    lineHeight: 20,
+    fontWeight: "800",
     flex: 1,
   },
+
   contactButton: {
     minHeight: 64,
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#252525",
-    backgroundColor: "#050505",
+    borderColor: "#E5E0D6",
+    backgroundColor: "#FAF9F6",
     padding: 11,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     marginBottom: 10,
   },
+
   contactButtonPrimary: {
-    backgroundColor: "#e6c15c",
-    borderColor: "#e6c15c",
+    backgroundColor: "#E6C15C",
+    borderColor: "#E6C15C",
   },
+
   contactIcon: {
-    width: 39,
-    height: 39,
-    borderRadius: 14,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
+    borderColor: "#E5E0D6",
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
+
   contactIconPrimary: {
-    borderColor: "#111111",
+    borderColor: "rgba(23,23,23,0.12)",
     backgroundColor: "rgba(255,255,255,0.35)",
   },
+
   contactTextBox: {
     flex: 1,
   },
+
   contactTitle: {
-    color: "#ffffff",
-    fontSize: 12.5,
-    fontWeight: "900",
+    color: "#171717",
+    fontSize: 13,
+    fontWeight: "800",
   },
+
   contactTitlePrimary: {
-    color: "#111111",
+    color: "#171717",
   },
+
   contactSubtitle: {
-    color: "#a9a9a9",
+    color: "#8B8579",
     fontSize: 10.8,
     lineHeight: 15,
-    fontWeight: "700",
+    fontWeight: "500",
     marginTop: 3,
   },
+
   contactSubtitlePrimary: {
-    color: "#111111",
+    color: "#4F421F",
   },
+
+  safetyIntro: {
+    color: "#6F695D",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "500",
+    marginTop: -2,
+    marginBottom: 12,
+  },
+
   reportButton: {
-    minHeight: 64,
-    borderRadius: 18,
+    minHeight: 66,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(230,193,92,0.28)",
-    backgroundColor: "#050505",
+    borderColor: "#E7E1D6",
+    backgroundColor: "#FFFFFF",
     padding: 11,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     marginBottom: 10,
   },
+
   reportIcon: {
-    width: 39,
-    height: 39,
-    borderRadius: 14,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
+    borderColor: "#EADFBF",
+    backgroundColor: "#FBF6E8",
     alignItems: "center",
     justifyContent: "center",
   },
+
   reportTextBox: {
     flex: 1,
   },
+
   reportTitle: {
-    color: "#ffffff",
-    fontSize: 12.5,
-    fontWeight: "900",
+    color: "#1C1B18",
+    fontSize: 12.8,
+    fontWeight: "800",
   },
+
   reportSubtitle: {
-    color: "#bdbdbd",
-    fontSize: 10.5,
+    color: "#827C70",
+    fontSize: 10.8,
     lineHeight: 15,
-    fontWeight: "700",
+    fontWeight: "500",
     marginTop: 3,
   },
+
   warningCard: {
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    padding: 13,
+    borderColor: "#E7DFC9",
+    backgroundColor: "#FBF6E8",
+    padding: 14,
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 10,
-    marginBottom: 13,
+    gap: 11,
+    marginBottom: 18,
   },
+
+  warningIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: "#FFFDF8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   warningTextBox: {
     flex: 1,
   },
+
   warningTitle: {
-    color: "#ffffff",
+    color: "#332C1D",
     fontSize: 12.8,
-    fontWeight: "900",
+    fontWeight: "800",
   },
+
   warningText: {
-    color: "#f5e6b7",
-    fontSize: 11.4,
+    color: "#756949",
+    fontSize: 11.5,
     lineHeight: 17,
-    fontWeight: "700",
+    fontWeight: "500",
     marginTop: 4,
   },
+
   formCard: {
-    borderRadius: 24,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
+    borderColor: "#E8E3D9",
+    backgroundColor: "#FFFFFF",
     padding: 15,
-    marginBottom: 13,
+    marginBottom: 18,
   },
+
   inputGroup: {
-    marginTop: 12,
+    marginTop: 14,
   },
+
   inputLabel: {
-    color: "#ffffff",
-    fontSize: 11.5,
-    fontWeight: "900",
+    color: "#37342E",
+    fontSize: 11.8,
+    fontWeight: "700",
     marginBottom: 8,
   },
+
+  messageLabel: {
+    marginTop: 14,
+  },
+
   input: {
-    minHeight: 49,
-    borderRadius: 17,
+    minHeight: 50,
+    borderRadius: 15,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#050505",
-    color: "#ffffff",
+    borderColor: "#E1DDD4",
+    backgroundColor: "#FAF9F6",
+    color: "#171717",
     fontSize: 12.5,
-    fontWeight: "800",
-    paddingHorizontal: 12,
+    fontWeight: "500",
+    paddingHorizontal: 13,
   },
+
   messageInput: {
-    minHeight: 126,
-    borderRadius: 18,
+    minHeight: 132,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#050505",
-    color: "#ffffff",
+    borderColor: "#E1DDD4",
+    backgroundColor: "#FAF9F6",
+    color: "#171717",
     fontSize: 12.5,
-    lineHeight: 18,
-    fontWeight: "700",
-    padding: 12,
+    lineHeight: 19,
+    fontWeight: "500",
+    padding: 13,
   },
+
   categoryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 3,
   },
+
   categoryPill: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#050505",
+    borderColor: "#E3DED4",
+    backgroundColor: "#FAF9F6",
     paddingHorizontal: 10,
     paddingVertical: 8,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
+
   categoryPillActive: {
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
+    borderColor: "#DFC16B",
+    backgroundColor: "#FBF4DD",
   },
+
   categoryText: {
-    color: "#d6d6d6",
+    color: "#746E63",
     fontSize: 10.5,
-    fontWeight: "900",
+    fontWeight: "700",
   },
+
   categoryTextActive: {
-    color: "#e6c15c",
+    color: "#8A681F",
   },
+
   noticeBox: {
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 12,
-    marginBottom: 13,
+    padding: 13,
+    marginBottom: 18,
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 8,
+    gap: 9,
   },
+
   noticeBoxSuccess: {
-    borderColor: "#166534",
-    backgroundColor: "#052e16",
+    borderColor: "#CFE5D6",
+    backgroundColor: "#F1FAF4",
   },
+
   noticeBoxError: {
-    borderColor: "#7f1d1d",
-    backgroundColor: "#2a0d0d",
+    borderColor: "#E9CCCC",
+    backgroundColor: "#FFF5F5",
   },
+
   noticeText: {
     flex: 1,
     fontSize: 11.8,
     lineHeight: 17,
-    fontWeight: "800",
+    fontWeight: "600",
   },
+
   noticeTextSuccess: {
-    color: "#bbf7d0",
+    color: "#2E6B46",
   },
+
   noticeTextError: {
-    color: "#fecaca",
+    color: "#9A4141",
   },
+
   actionCard: {
-    borderRadius: 24,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 15,
+    borderColor: "#E8E3D9",
+    backgroundColor: "#FFFFFF",
+    padding: 14,
     gap: 10,
   },
+
   primaryButton: {
-    minHeight: 50,
-    borderRadius: 17,
-    backgroundColor: "#e6c15c",
+    minHeight: 54,
+    borderRadius: 16,
+    backgroundColor: "#E6C15C",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
     paddingHorizontal: 14,
   },
+
   primaryButtonText: {
-    color: "#111111",
+    color: "#171717",
     fontSize: 13,
-    fontWeight: "900",
+    fontWeight: "800",
   },
+
   secondaryButton: {
-    minHeight: 48,
-    borderRadius: 17,
+    minHeight: 52,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#343434",
-    backgroundColor: "#050505",
+    borderColor: "#E1DDD4",
+    backgroundColor: "#FAF9F6",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 7,
     paddingHorizontal: 14,
   },
+
   secondaryButtonText: {
-    color: "#ffffff",
+    color: "#171717",
     fontSize: 13,
-    fontWeight: "900",
+    fontWeight: "800",
   },
+
   disabledButton: {
     opacity: 0.55,
   },
