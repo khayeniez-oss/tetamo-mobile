@@ -1,42 +1,35 @@
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-  BadgeCheck,
+  BadgeDollarSign,
   Bath,
   BedDouble,
   Bell,
-  Bookmark,
-  BrainCircuit,
-  BriefcaseBusiness,
   Building2,
-  Calculator,
   CalendarDays,
-  Camera,
-  ChevronDown,
   ChevronRight,
-  Eye,
   Heart,
-  House,
+  Home,
+  KeyRound,
   Languages,
   MapPin,
   MessageCircle,
   Ruler,
   Search,
-  Share2,
-  ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  Star,
-  UserRound,
 } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import type { ImageStyle, StyleProp, ViewStyle } from "react-native";
+import type {
+  ImageStyle,
+  StyleProp,
+  ViewStyle,
+} from "react-native";
 import {
+  ActivityIndicator,
   Image,
-  ImageBackground,
   Linking,
-  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -46,10 +39,10 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+
 import { supabase } from "../../lib/supabase";
 import {
   fetchHomepageProperties,
-  fetchPropertiesByCodes,
   type TetamoProperty,
 } from "../../services/properties";
 
@@ -59,260 +52,110 @@ type Listing = TetamoProperty;
 
 const tetamoLogo = require("../../assets/images/tetamo-logo.png");
 
-const SCORPIO_GOLD = "#e6c15c";
-const TETAMO_FALLBACK_WHATSAPP = process.env.EXPO_PUBLIC_TETAMO_FALLBACK_WHATSAPP || "";
+const BLACK = "#111111";
+const CREAM = "#FBFAF7";
+const WHITE = "#FFFFFF";
 
-const HERO_PROPERTY_CODES = ["TTM TBB 81", "TTM0 - UB", "TTM TNH 83"];
+const GOLD = "#D8B46A";
+const GOLD_DARK = "#B8892E";
+const GOLD_SOFT = "#F3E7C5";
 
-const FEATURED_PROPERTY_CODES = [
-  "TTM BRW 85",
-  "TTM BRW 85Y",
-  "TTM-OK26",
-  "TTM0 -RTLO",
-  "TTM0 - BPB",
-  "TTM0 - SBI",
-  "TTM0 - E4R",
-  "TTM PDD 77",
-  "TTM0 -BALIFKB8",
-  "TTM0 - E2",
-];
+const BORDER = "#E9E2D8";
+const MUTED = "#777169";
+const SOFT = "#F5F1EA";
 
-const HERO_FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=1400&auto=format&fit=crop";
+const TETAMO_FALLBACK_WHATSAPP =
+  process.env.EXPO_PUBLIC_TETAMO_FALLBACK_WHATSAPP || "";
 
-const PROJECT_FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1000&auto=format&fit=crop";
-
-const ARTICLE_IMAGE_ONE =
-  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1000&auto=format&fit=crop";
-
-const ARTICLE_IMAGE_TWO =
-  "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?q=80&w=1000&auto=format&fit=crop";
-
+/*
+ * Display conversion only for now.
+ * We can connect this to live FX later.
+ */
 const currencyRates: Record<Currency, number> = {
   IDR: 1,
   USD: 0.000061,
   AUD: 0.000094,
 };
 
-const fallbackHeroListings: Listing[] = [
-  {
-    id: "fallback-hero-1",
-    kode: "FALLBACK HERO",
-    titleEn: "Luxury 4BR Villa in Canggu",
-    titleId: "Villa Mewah 4KT di Canggu",
-    descriptionEn: "",
-    descriptionId: "",
-    location: "Canggu, Badung, Bali",
-    area: "Canggu",
-    image: HERO_FALLBACK_IMAGE,
-    images: [HERO_FALLBACK_IMAGE],
-    priceIdr: 18500000000,
-    beds: 4,
-    baths: 4,
-    size: 450,
-    badge: "Spotlight",
-    viewCount: 2100,
-    likeCount: 0,
-    saveCount: 0,
-    ratingCount: 0,
-    ratingAverage: 0,
-    shareCount: 0,
-    listingType: "sale",
-    rentalType: "",
-    propertyType: "Villa",
-  },
-];
-
-const fallbackFeaturedListings: Listing[] = [
-  {
-    id: "fallback-featured-1",
-    kode: "FALLBACK FEATURED",
-    titleEn: "3BR Villa in Uluwatu",
-    titleId: "Villa 3KT di Uluwatu",
-    descriptionEn: "",
-    descriptionId: "",
-    location: "Uluwatu, Bali",
-    area: "Uluwatu",
-    image:
-      "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?q=80&w=900&auto=format&fit=crop",
-    images: [
-      "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?q=80&w=900&auto=format&fit=crop",
-    ],
-    priceIdr: 7950000000,
-    beds: 3,
-    baths: 3,
-    size: 250,
-    badge: "Featured",
-    viewCount: 845,
-    likeCount: 0,
-    saveCount: 0,
-    ratingCount: 0,
-    ratingAverage: 0,
-    shareCount: 0,
-    listingType: "sale",
-    rentalType: "",
-    propertyType: "Villa",
-  },
-];
-
-const fallbackProjects: Listing[] = [
-  {
-    id: "project-1",
-    titleEn: "The Banyan Residences",
-    titleId: "The Banyan Residences",
-    descriptionEn: "New project in Berawa, Canggu.",
-    descriptionId: "Proyek baru di Berawa, Canggu.",
-    location: "Berawa, Canggu",
-    area: "Canggu",
-    priceIdr: 2900000000,
-    image: PROJECT_FALLBACK_IMAGE,
-    images: [PROJECT_FALLBACK_IMAGE],
-    badge: "New Project",
-  },
-  {
-    id: "project-2",
-    titleEn: "Luma Ubud",
-    titleId: "Luma Ubud",
-    descriptionEn: "New project in Ubud, Bali.",
-    descriptionId: "Proyek baru di Ubud, Bali.",
-    location: "Ubud, Bali",
-    area: "Ubud",
-    priceIdr: 1750000000,
-    image:
-      "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=1000&auto=format&fit=crop",
-    images: [
-      "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?q=80&w=1000&auto=format&fit=crop",
-    ],
-    badge: "New Project",
-  },
-];
-
-const fallbackAreaNames = [
-  "Bali",
-  "Jakarta",
-  "Surabaya",
-  "Bandung",
-  "Seminyak",
-  "Canggu",
-  "Uluwatu",
-  "BSD City",
-];
-
 const copy = {
   en: {
-    subtitle: "Properti Marketplace",
-    search: "Search by city, area, or property",
+    subtitle: "Property Marketplace",
+
+    search: "Search city, area or property...",
     sale: "For Sale",
     rent: "For Rent",
-    monthly: "Monthly",
-    yearly: "Yearly",
-    daily: "Daily",
-    featured: "Featured",
-    boosted: "Boosted",
-    spotlight: "Spotlight",
-    verified: "Verified",
-    whatsapp: "WhatsApp",
-    schedule: "Schedule",
-    findPrefix: "Find your property with",
-    whyPrefix: "Why Choose",
-    whyListPrefix: "Why list with",
-    verifiedListings: "Verified Listings",
-    verifiedAgents: "Verified Agents",
-    verifiedOwners: "Verified Owners",
-    trustedPlatform: "Trusted Platform",
-    aiPowered: "AI Powered",
-    directInquiries: "Direct Inquiries",
-    smart: "Smart System for Smarter Buyers & Renters",
-    smartSub:
-      "AI-assisted bilingual listings, direct inquiries, viewing schedule, AI Powered tools, and commission system for agents.",
-    smartBilingual: "Bilingual",
-    smartMedia: "Media",
-    smartSeo: "SEO",
-    smartExposure: "Exposure",
-    smartAiPowered: "AI Powered",
-    smartCommission: "Commission System",
-    featuredListings: "Featured Listings",
-    popular: "Popular Areas",
-    newProjects: "New Projects",
-    directWhatsApp: "WhatsApp",
-    scheduling: "Schedule",
-    aiTitle: "AI Titles",
-    aiCaption: "AI Caption",
-    calculator: "Calculator",
-    owner: "Owner",
-    ownerSub: "Manage your property",
-    agent: "Agent",
-    agentSub: "Grow your business",
-    developer: "Developer",
-    developerSub: "Showcase projects",
-    buyRent: "Buy / Rent",
-    buyRentSub: "Find your place",
-    learn: "Learn with TETAMO",
-    articleOne: "How to Buy Property in Bali as a Foreigner",
-    articleTwo: "Top Areas in Bali for High ROI",
-    listCta: "List your property with TETAMO",
-    listCtaSub: "Reach serious buyers & renters across Indonesia",
-    getStarted: "Get Started",
+
+    featured: "Featured Property",
+    discoverIndonesia: "Explore Indonesia",
+    discover: "Discover Properties",
+
+    browseByGoal: "Browse by Goal",
+
+    saleTitle: "Properties for Sale",
+    saleSub: "Homes, land and investment opportunities",
+
+    rentTitle: "Properties for Rent",
+    rentSub: "Monthly and yearly rental properties",
+
+    trustTitle: "Property search made simpler",
+    directWhatsapp: "Direct WhatsApp",
+    scheduleViewing: "Schedule Viewing",
+    bilingualListings: "Bilingual Listings",
+
+    newOnTetamo: "New on TETAMO",
+
     seeAll: "See all",
-    photos: "Photos",
+    properties: "properties",
+
+    whatsapp: "WhatsApp",
+    viewing: "Viewing",
+
+    exploreAll: "Explore all properties",
+
+    loading: "Loading properties...",
+    empty: "No properties available right now.",
+
+    priceOnRequest: "Price on request",
   },
+
   id: {
     subtitle: "Properti Marketplace",
-    search: "Cari kota, area, atau properti",
+
+    search: "Cari kota, area atau properti...",
     sale: "Dijual",
-    rent: "Disewa",
-    monthly: "Bulanan",
-    yearly: "Tahunan",
-    daily: "Harian",
-    featured: "Unggulan",
-    boosted: "Boosted",
-    spotlight: "Spotlight",
-    verified: "Terverifikasi",
-    whatsapp: "WhatsApp",
-    schedule: "Jadwal",
-    findPrefix: "Temukan properti Anda dengan",
-    whyPrefix: "Mengapa Pilih",
-    whyListPrefix: "Kenapa listing dengan",
-    verifiedListings: "Listing Verified",
-    verifiedAgents: "Agen Verified",
-    verifiedOwners: "Pemilik Verified",
-    trustedPlatform: "Platform Aman",
-    aiPowered: "AI Powered",
-    directInquiries: "Inquiry Langsung",
-    smart: "Sistem Pintar untuk Buyer & Renter",
-    smartSub:
-      "Listing bilingual dengan AI, inquiry langsung, jadwal viewing, AI Powered tools, dan sistem komisi untuk agen.",
-    smartBilingual: "Bilingual",
-    smartMedia: "Media",
-    smartSeo: "SEO",
-    smartExposure: "Exposure",
-    smartAiPowered: "AI Powered",
-    smartCommission: "Sistem Komisi",
-    featuredListings: "Listing Unggulan",
-    popular: "Area Populer",
-    newProjects: "Proyek Baru",
-    directWhatsApp: "WhatsApp",
-    scheduling: "Jadwal",
-    aiTitle: "AI Judul",
-    aiCaption: "AI Caption",
-    calculator: "Kalkulator",
-    owner: "Pemilik",
-    ownerSub: "Kelola properti",
-    agent: "Agen",
-    agentSub: "Kembangkan bisnis",
-    developer: "Developer",
-    developerSub: "Tampilkan proyek",
-    buyRent: "Beli / Sewa",
-    buyRentSub: "Cari properti",
-    learn: "Belajar dengan TETAMO",
-    articleOne: "Cara Membeli Properti di Bali untuk WNA",
-    articleTwo: "Area Bali dengan ROI Tinggi",
-    listCta: "Listing properti Anda di TETAMO",
-    listCtaSub: "Jangkau pembeli & penyewa serius di Indonesia",
-    getStarted: "Mulai",
+    rent: "Disewakan",
+
+    featured: "Properti Unggulan",
+    discoverIndonesia: "Jelajahi Indonesia",
+    discover: "Temukan Properti",
+
+    browseByGoal: "Cari Sesuai Kebutuhan",
+
+    saleTitle: "Properti Dijual",
+    saleSub: "Rumah, tanah dan properti investasi",
+
+    rentTitle: "Properti Disewakan",
+    rentSub: "Properti sewa bulanan dan tahunan",
+
+    trustTitle: "Cari properti jadi lebih mudah",
+    directWhatsapp: "WhatsApp Langsung",
+    scheduleViewing: "Jadwal Viewing",
+    bilingualListings: "Listing Bilingual",
+
+    newOnTetamo: "Terbaru di TETAMO",
+
     seeAll: "Lihat semua",
-    photos: "Foto",
+    properties: "properti",
+
+    whatsapp: "WhatsApp",
+    viewing: "Viewing",
+
+    exploreAll: "Lihat semua properti",
+
+    loading: "Memuat properti...",
+    empty: "Belum ada properti tersedia saat ini.",
+
+    priceOnRequest: "Hubungi untuk harga",
   },
 };
 
@@ -322,2321 +165,3088 @@ export default function HomeScreen() {
 
   const [language, setLanguage] = useState<Language>("en");
   const [currency, setCurrency] = useState<Currency>("IDR");
+
   const [searchInput, setSearchInput] = useState("");
-  const [heroListings, setHeroListings] = useState<Listing[]>([]);
-  const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);
-  const [allProperties, setAllProperties] = useState<Listing[]>([]);
+  const [properties, setProperties] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [heroIndex, setHeroIndex] = useState(0);
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [unreadNotificationCount, setUnreadNotificationCount] =
+    useState(0);
 
   const t = copy[language];
-  const isIOS = Platform.OS === "ios";
-  const heroCardWidth = width - 36;
+
+  const heroCardWidth = Math.min(
+    Math.max(width - 48, 300),
+    430
+  );
+
+  /*
+   * ============================================
+   * REAL PROPERTY DATA
+   * ============================================
+   */
 
   useEffect(() => {
-    let isMounted = true;
+    let mounted = true;
 
-    async function loadHomepageData() {
+    async function loadHomepage() {
       try {
-        const [heroRows, featuredRows, areaRows] = await Promise.all([
-          fetchPropertiesByCodes(HERO_PROPERTY_CODES),
-          fetchPropertiesByCodes(FEATURED_PROPERTY_CODES),
-          fetchHomepageProperties(24),
-        ]);
+        setLoading(true);
 
-        if (!isMounted) return;
+        const rows = await fetchHomepageProperties(40);
 
-        setHeroListings(heroRows.length > 0 ? heroRows : fallbackHeroListings);
-        setFeaturedListings(
-          featuredRows.length > 0 ? featuredRows : fallbackFeaturedListings
-        );
-        setAllProperties(areaRows.length > 0 ? areaRows : featuredRows);
+        if (!mounted) return;
+
+        const realProperties = Array.isArray(rows)
+          ? rows
+          : [];
+
+        setProperties(realProperties);
+
+        /*
+         * Prefetch only the first property images.
+         * We don't preload the entire marketplace.
+         */
+        realProperties
+          .slice(0, 12)
+          .map((property) => property.image)
+          .filter(Boolean)
+          .forEach((uri) => {
+            if (!uri) return;
+
+            void Image.prefetch(uri).catch(() => {});
+          });
       } catch (error) {
-        console.log("Tetamo curated homepage fallback:", error);
+        console.log("Tetamo Home load error:", error);
 
-        if (!isMounted) return;
+        if (!mounted) return;
 
-        setHeroListings(fallbackHeroListings);
-        setFeaturedListings(fallbackFeaturedListings);
-        setAllProperties(fallbackFeaturedListings);
+        /*
+         * No fake fallback properties.
+         */
+        setProperties([]);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
-    loadHomepageData();
+    void loadHomepage();
 
     return () => {
-      isMounted = false;
+      mounted = false;
     };
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
+  /*
+ * ============================================
+ * NOTIFICATIONS
+ * ============================================
+ */
 
-    async function loadUnreadNotificationCount() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+useEffect(() => {
+  let mounted = true;
+  let channel: ReturnType<
+    typeof supabase.channel
+  > | null = null;
 
-      if (!isMounted) return;
+  async function setupNotifications() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-      if (!user?.id) {
-        setUnreadNotificationCount(0);
-        return;
-      }
+    if (!mounted) return;
 
-      const { count, error } = await supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .is("read_at", null);
+    const currentUserId = user?.id;
 
-      if (!isMounted) return;
-
-      if (error) {
-        setUnreadNotificationCount(0);
-        return;
-      }
-
-      setUnreadNotificationCount(count || 0);
-    }
-
-    void loadUnreadNotificationCount();
-
-    const interval = setInterval(() => {
-      void loadUnreadNotificationCount();
-    }, 60000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
-  const heroItems = useMemo(() => {
-    const base = heroListings.length > 0 ? heroListings : fallbackHeroListings;
-    const featuredBase =
-      featuredListings.length > 0 ? featuredListings : fallbackFeaturedListings;
-
-    const combined = [...base, ...featuredBase.slice(0, 3)];
-    const seen = new Set<string>();
-
-    return combined
-      .filter((item) => {
-        const key = String(item.kode || item.slug || item.id || item.titleEn);
-
-        if (seen.has(key)) return false;
-
-        seen.add(key);
-        return true;
-      })
-      .slice(0, 6);
-  }, [heroListings, featuredListings]);
-
-  const featuredItems =
-    featuredListings.length > 0 ? featuredListings : fallbackFeaturedListings;
-
-  const popularAreas = useMemo(() => {
-    const areas = allProperties
-      .map((property) => property.area || property.location)
-      .filter(Boolean)
-      .map((area) => String(area).split(",")[0].trim())
-      .filter(Boolean);
-
-    const merged = Array.from(new Set([...areas, ...fallbackAreaNames]));
-
-    return merged.slice(0, 8);
-  }, [allProperties]);
-
-  const formatPrice = useMemo(() => {
-    return (priceIdr: number, rentalType?: string | null) => {
-      const converted = priceIdr * currencyRates[currency];
-
-      if (!priceIdr || priceIdr <= 0) {
-        return currency === "IDR" ? "Price on Request" : "Contact Us";
-      }
-
-      let base =
-        currency === "IDR"
-          ? `IDR ${Math.round(converted).toLocaleString("en-US")}`
-          : `${currency} ${Math.round(converted).toLocaleString("en-US")}`;
-
-      const rentType = String(rentalType || "").toLowerCase();
-
-      if (rentType.includes("monthly") || rentType.includes("bulanan")) {
-        base += language === "id" ? " /bln" : " /mo";
-      }
-
-      if (
-        rentType.includes("yearly") ||
-        rentType.includes("annual") ||
-        rentType.includes("tahunan")
-      ) {
-        base += language === "id" ? " /thn" : " /yr";
-      }
-
-      if (rentType.includes("daily") || rentType.includes("harian")) {
-        base += language === "id" ? " /hari" : " /day";
-      }
-
-      return base;
-    };
-  }, [currency, language]);
-
-  const goSearch = (params?: Record<string, string>) => {
-    const query = new URLSearchParams();
-
-    Object.entries(params || {}).forEach(([key, value]) => {
-      if (value.trim()) query.set(key, value.trim());
-    });
-
-    const qs = query.toString();
-    router.push(qs ? (`/search?${qs}` as any) : ("/search" as any));
-  };
-
-  const submitSearch = () => {
-    const keyword = searchInput.trim();
-
-    if (keyword) {
-      goSearch({ query: keyword });
+    if (!currentUserId) {
+      setUnreadNotificationCount(0);
       return;
     }
 
-    goSearch();
+    async function loadUnreadNotifications() {
+      const { count, error } = await supabase
+        .from("notifications")
+        .select("id", {
+          count: "exact",
+          head: true,
+        })
+        .eq("user_id", currentUserId)
+        .or(
+          "is_read.eq.false,is_read.is.null"
+        );
+
+      if (!mounted) return;
+
+      if (error) {
+        console.error(
+          "Home notification count error:",
+          error
+        );
+
+        return;
+      }
+
+      setUnreadNotificationCount(
+        count || 0
+      );
+    }
+
+    /*
+     * Initial unread count
+     */
+    await loadUnreadNotifications();
+
+    if (!mounted) return;
+
+    /*
+     * Live notification updates
+     */
+    channel = supabase
+      .channel(
+        `home-notifications-${currentUserId}`
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        () => {
+          void loadUnreadNotifications();
+        }
+      )
+      .subscribe();
+  }
+
+  void setupNotifications().catch((error) => {
+  console.error(
+    "Home notification setup error:",
+    error
+  );
+
+  if (mounted) {
+    setUnreadNotificationCount(0);
+  }
+});
+
+  return () => {
+    mounted = false;
+
+    if (channel) {
+      void supabase.removeChannel(
+        channel
+      );
+    }
+  };
+}, []);
+
+
+  /*
+   * ============================================
+   * DISCOVERY GROUPS
+   * ============================================
+   */
+
+  const promotedProperties = useMemo(() => {
+    return properties
+      .filter(
+        (property) =>
+          getPromotionPriority(property) > 0
+      )
+      .sort(
+        (a, b) =>
+          getPromotionPriority(b) -
+          getPromotionPriority(a)
+      )
+      .slice(0, 5);
+  }, [properties]);
+
+  const heroProperties = useMemo(() => {
+    if (promotedProperties.length > 0) {
+      return promotedProperties;
+    }
+
+    return properties.slice(0, 5);
+  }, [promotedProperties, properties]);
+
+  const saleProperties = useMemo(() => {
+    return properties.filter(isSaleListing);
+  }, [properties]);
+
+  const rentProperties = useMemo(() => {
+    return properties.filter(isRentListing);
+  }, [properties]);
+
+  const discoverProperties = useMemo(() => {
+    const heroIds = new Set(
+      heroProperties.map(getPropertyKey)
+    );
+
+    return properties
+      .filter(
+        (property) =>
+          !heroIds.has(getPropertyKey(property))
+      )
+      .slice(0, 6);
+  }, [properties, heroProperties]);
+
+  const newProperties = useMemo(() => {
+    const used = new Set([
+      ...heroProperties.map(getPropertyKey),
+      ...discoverProperties.map(getPropertyKey),
+    ]);
+
+    const unused = properties.filter(
+      (property) =>
+        !used.has(getPropertyKey(property))
+    );
+
+    if (unused.length > 0) {
+      return unused.slice(0, 6);
+    }
+
+    return properties.slice(0, 6);
+  }, [
+    properties,
+    heroProperties,
+    discoverProperties,
+  ]);
+
+  /*
+   * Real location names + listing counts.
+   */
+  const locationStats = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    properties.forEach((property) => {
+      const location =
+        deriveBrowseLocation(property);
+
+      if (!location) return;
+
+      counts.set(
+        location,
+        (counts.get(location) || 0) + 1
+      );
+    });
+
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({
+        name,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+  }, [properties]);
+
+  /*
+   * ============================================
+   * PRICE
+   * ============================================
+   */
+
+  const formatPrice = (
+    priceIdr: number,
+    rentalType?: string | null
+  ) => {
+    const price = Number(priceIdr || 0);
+
+    if (!price || price <= 0) {
+      return t.priceOnRequest;
+    }
+
+    let result: string;
+
+    if (currency === "IDR") {
+      result = `IDR ${Math.round(
+        price
+      ).toLocaleString("en-US")}`;
+    } else {
+      const converted =
+        price * currencyRates[currency];
+
+      result = `≈ ${currency} ${Math.round(
+        converted
+      ).toLocaleString("en-US")}`;
+    }
+
+    const rental = String(
+      rentalType || ""
+    ).toLowerCase();
+
+    if (
+      rental.includes("month") ||
+      rental.includes("bulan")
+    ) {
+      result +=
+        language === "id" ? " /bln" : " /mo";
+    }
+
+    if (
+      rental.includes("year") ||
+      rental.includes("annual") ||
+      rental.includes("tahun")
+    ) {
+      result +=
+        language === "id" ? " /thn" : " /yr";
+    }
+
+    if (
+      rental.includes("daily") ||
+      rental.includes("hari")
+    ) {
+      result +=
+        language === "id" ? " /hari" : " /day";
+    }
+
+    return result;
   };
 
-  const goDetails = (property: Listing, schedule = false) => {
-    const pathKey = encodeURIComponent(property.slug || property.id);
-    router.push(`/properti/${pathKey}${schedule ? "?schedule=1" : ""}` as any);
+  /*
+   * ============================================
+   * NAVIGATION
+   * ============================================
+   */
+
+  const goSearch = (
+    params?: Record<string, string>
+  ) => {
+    const query = new URLSearchParams();
+
+    Object.entries(params || {}).forEach(
+      ([key, value]) => {
+        if (value.trim()) {
+          query.set(key, value.trim());
+        }
+      }
+    );
+
+    const queryString = query.toString();
+
+    router.push(
+      queryString
+        ? (`/search?${queryString}` as any)
+        : ("/search" as any)
+    );
   };
 
-  const goAddListing = (audience?: string) => {
-    if (Platform.OS === "ios") {
+  const submitSearch = () => {
+    const query = searchInput.trim();
+
+    if (!query) {
       goSearch();
       return;
     }
 
+    goSearch({
+      query,
+    });
+  };
+
+  const goDetails = (
+    property: Listing,
+    schedule = false
+  ) => {
+    const key = encodeURIComponent(
+      property.slug || property.id
+    );
+
     router.push(
-      audience
-        ? (`/add-listing?audience=${audience}` as any)
-        : ("/add-listing" as any)
+      `/properti/${key}${
+        schedule ? "?schedule=1" : ""
+      }` as any
     );
   };
 
   const goNotifications = () => {
-    router.push("/dashboard/notifications" as any);
-  };
-
-  const openWebsite = (path: string) => {
-    Linking.openURL(`https://www.tetamo.com${path}`);
+    router.push(
+      "/dashboard/notifications" as any
+    );
   };
 
   const openScorpioAssist = () => {
     router.push("/scorpio-assist" as any);
   };
 
+  /*
+   * ============================================
+   * WHATSAPP
+   * ============================================
+   */
+
   const openWhatsapp = (property: Listing) => {
     const phone =
-      normalizeWhatsappPhone(property.contactPhone) || TETAMO_FALLBACK_WHATSAPP;
-    const title = language === "en" ? property.titleEn : property.titleId;
-    const receiverName = property.contactName || "Tetamo";
+      normalizeWhatsappPhone(
+        property.contactPhone
+      ) || TETAMO_FALLBACK_WHATSAPP;
+
+    if (!phone) return;
+
+    const title = getPropertyTitle(
+      property,
+      language
+    );
+
+    const receiver =
+      property.contactName || "Tetamo";
 
     const message =
       language === "id"
-        ? `Halo ${receiverName}, saya tertarik dengan properti ini di TETAMO.
+        ? `Halo ${receiver}, saya tertarik dengan properti ini di TETAMO.
 
 Properti: ${title}
 Kode: ${property.kode || "-"}
-Lokasi: ${property.location}
-Harga: ${formatPrice(property.priceIdr, property.rentalType)}
+Lokasi: ${property.location || "-"}
+Harga: ${formatPrice(
+            property.priceIdr,
+            property.rentalType
+          )}
 
 Apakah properti ini masih tersedia?`
-        : `Hello ${receiverName}, I'm interested in this property on TETAMO.
+        : `Hello ${receiver}, I'm interested in this property on TETAMO.
 
 Property: ${title}
 Code: ${property.kode || "-"}
-Location: ${property.location}
-Price: ${formatPrice(property.priceIdr, property.rentalType)}
+Location: ${property.location || "-"}
+Price: ${formatPrice(
+            property.priceIdr,
+            property.rentalType
+          )}
 
 Is this property still available?`;
 
     void Linking.openURL(
-      `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+      `https://wa.me/${phone}?text=${encodeURIComponent(
+        message
+      )}`
     );
-  };
-
-  const handleHeroScrollEnd = (event: any) => {
-    const nextIndex = Math.round(
-      event.nativeEvent.contentOffset.x / heroCardWidth
-    );
-
-    setHeroIndex(Math.max(0, Math.min(nextIndex, heroItems.length - 1)));
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
+        {/* ===================================
+            HEADER
+        =================================== */}
+
         <View style={styles.header}>
           <View style={styles.brandRow}>
-            <Image
-              source={tetamoLogo}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
+            <View style={styles.logoBox}>
+              <Image
+                source={tetamoLogo}
+                style={styles.logoImage}
+                resizeMode="cover"
+              />
+            </View>
 
-            <View>
-              <Text style={styles.brandText}>TETAMO</Text>
-              <Text style={styles.brandSub}>{t.subtitle}</Text>
+            <View style={styles.brandCopy}>
+              <Text style={styles.brandText}>
+                TETAMO
+              </Text>
+
+              <Text style={styles.brandSub}>
+                {t.subtitle}
+              </Text>
             </View>
           </View>
 
-          <View style={styles.headerControls}>
-            <View style={styles.locationBellRow}>
-              <Pressable
-                style={styles.locationPill}
-                onPress={() => goSearch({ query: "Indonesia" })}
+          <View style={styles.headerRight}>
+            <Pressable
+              style={styles.indonesiaButton}
+              onPress={() =>
+                goSearch({
+                  query: "Indonesia",
+                })
+              }
+            >
+              <MapPin
+                color={GOLD_DARK}
+                size={12}
+              />
+
+              <Text
+                style={styles.indonesiaText}
               >
-                <MapPin color={SCORPIO_GOLD} size={12} />
-                <Text style={styles.pillText}>Indonesia</Text>
-                <ChevronDown color={SCORPIO_GOLD} size={12} />
-              </Pressable>
+                Indonesia
+              </Text>
+            </Pressable>
 
-              <Pressable
-                style={styles.notificationBellButton}
-                onPress={goNotifications}
-              >
-                <Bell color={SCORPIO_GOLD} size={17} />
+            <Pressable
+              style={styles.notificationButton}
+              onPress={goNotifications}
+            >
+              <Bell
+                color={BLACK}
+                size={18}
+              />
 
-                {unreadNotificationCount > 0 ? (
-                  <View style={styles.notificationBadge}>
-                    <Text style={styles.notificationBadgeText}>
-                      {formatUnreadCount(unreadNotificationCount)}
-                    </Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            </View>
-
-            <View style={styles.toggleLine}>
-              <View style={styles.toggleRow}>
-                {(["en", "id"] as Language[]).map((item) => (
-                  <Pressable
-                    key={item}
-                    onPress={() => setLanguage(item)}
-                    style={[
-                      styles.smallToggle,
-                      language === item && styles.activeToggle,
-                    ]}
+              {unreadNotificationCount > 0 ? (
+                <View
+                  style={styles.notificationBadge}
+                >
+                  <Text
+                    style={
+                      styles.notificationBadgeText
+                    }
                   >
-                    <Text
-                      style={[
-                        styles.smallToggleText,
-                        language === item && styles.activeToggleText,
-                      ]}
-                    >
-                      {item.toUpperCase()}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <View style={styles.currencyRow}>
-                {(["IDR", "USD", "AUD"] as Currency[]).map((item) => (
-                  <Pressable
-                    key={item}
-                    onPress={() => setCurrency(item)}
-                    style={[
-                      styles.currencyToggle,
-                      currency === item && styles.activeToggle,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.currencyText,
-                        currency === item && styles.activeToggleText,
-                      ]}
-                    >
-                      {item}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
+                    {formatUnreadCount(
+                      unreadNotificationCount
+                    )}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
           </View>
         </View>
 
-        <View style={styles.searchGlowWrap}>
-          <View style={styles.searchBar}>
-            <Search color={SCORPIO_GOLD} size={20} />
+        {/* ===================================
+            LANGUAGE + CURRENCY
+        =================================== */}
+
+        <View style={styles.utilityBar}>
+          <View style={styles.languageControl}>
+            <Languages
+              color={GOLD_DARK}
+              size={16}
+            />
+
+            {(
+              ["en", "id"] as Language[]
+            ).map((item) => {
+              const active =
+                language === item;
+
+              return (
+                <Pressable
+                  key={item}
+                  style={[
+                    styles.languageButton,
+                    active &&
+                      styles.utilityActive,
+                  ]}
+                  onPress={() =>
+                    setLanguage(item)
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.utilityText,
+                      active &&
+                        styles.utilityTextActive,
+                    ]}
+                  >
+                    {item.toUpperCase()}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={styles.utilityDivider} />
+
+          <View style={styles.currencyControl}>
+            <BadgeDollarSign
+              color={GOLD_DARK}
+              size={16}
+            />
+
+            {(
+              [
+                "IDR",
+                "USD",
+                "AUD",
+              ] as Currency[]
+            ).map((item) => {
+              const active =
+                currency === item;
+
+              return (
+                <Pressable
+                  key={item}
+                  style={[
+                    styles.currencyButton,
+                    active &&
+                      styles.utilityActive,
+                  ]}
+                  onPress={() =>
+                    setCurrency(item)
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.currencyText,
+                      active &&
+                        styles.utilityTextActive,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* ===================================
+            SEARCH
+        =================================== */}
+
+        <View style={styles.searchRow}>
+          <View style={styles.searchBox}>
+            <Search
+              color={GOLD_DARK}
+              size={19}
+            />
 
             <TextInput
               value={searchInput}
               onChangeText={setSearchInput}
               placeholder={t.search}
-              placeholderTextColor="#8f8f8f"
+              placeholderTextColor="#99938A"
               style={styles.searchInput}
               returnKeyType="search"
               onSubmitEditing={submitSearch}
             />
-
-            <Pressable style={styles.filterButton} onPress={() => goSearch()}>
-              <SlidersHorizontal color="#111111" size={19} />
-            </Pressable>
           </View>
-        </View>
 
-        <ScrollView
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={handleHeroScrollEnd}
-          scrollEventThrottle={16}
-          style={styles.heroCarousel}
-        >
-          {heroItems.map((hero, index) => (
-            <Pressable
-              key={`${hero.id}-${index}`}
-              style={[styles.heroSlide, { width: heroCardWidth }]}
-              onPress={() => goDetails(hero)}
-            >
-              <SafeImageBackground
-                uri={hero.image}
-                fallback={HERO_FALLBACK_IMAGE}
-                style={styles.heroCard}
-                imageStyle={styles.heroImage}
-              >
-                <View style={styles.heroShade} />
-
-                <View style={styles.heroTop}>
-                  <View style={styles.badgeRow}>
-                    {getStatusBadges(hero, language).map((badge) => (
-                      <Badge
-                        key={`${hero.id}-${badge.label}`}
-                        label={badge.label}
-                        color={badge.color}
-                        textColor={badge.textColor}
-                      />
-                    ))}
-                  </View>
-
-                  <View style={styles.counterBadge}>
-                    <Text style={styles.counterText}>
-                      {index + 1} / {heroItems.length}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.heroBottom}>
-                  <View style={styles.heroPriceLocationRow}>
-                    <View style={styles.heroPriceBox}>
-                      <Text style={styles.heroPrice}>
-                        {formatPrice(hero.priceIdr, hero.rentalType)}
-                      </Text>
-
-                      {currency === "IDR" && hero.priceIdr > 0 && (
-                        <Text style={styles.heroConverted}>
-                          ≈ USD{" "}
-                          {Math.round(
-                            hero.priceIdr * currencyRates.USD
-                          ).toLocaleString("en-US")}{" "}
-                          · AUD{" "}
-                          {Math.round(
-                            hero.priceIdr * currencyRates.AUD
-                          ).toLocaleString("en-US")}
-                        </Text>
-                      )}
-
-                      {currency !== "IDR" && hero.priceIdr > 0 && (
-                        <Text style={styles.heroConverted}>
-                          IDR {hero.priceIdr.toLocaleString("en-US")}
-                        </Text>
-                      )}
-                    </View>
-
-                    <View style={styles.heroLocationPill}>
-                      <MapPin color={SCORPIO_GOLD} size={12} />
-                      <Text style={styles.heroLocation} numberOfLines={2}>
-                        {hero.location}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <Text style={styles.heroTitle} numberOfLines={2}>
-                    {language === "en" ? hero.titleEn : hero.titleId}
-                  </Text>
-
-                  <EngagementMetrics
-                    listing={hero}
-                    photosLabel={t.photos}
-                    variant="dark"
-                  />
-
-                  <PropertyActionRow
-                    whatsappLabel={t.whatsapp}
-                    scheduleLabel={t.schedule}
-                    onWhatsapp={(event) => {
-                      event?.stopPropagation?.();
-                      openWhatsapp(hero);
-                    }}
-                    onSchedule={(event) => {
-                      event?.stopPropagation?.();
-                      goDetails(hero, true);
-                    }}
-                  />
-                </View>
-              </SafeImageBackground>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        <View style={styles.dots}>
-          {heroItems.map((_, dot) => (
-            <View
-              key={dot}
-              style={[styles.dot, dot === heroIndex && styles.activeDot]}
+          <Pressable
+            style={styles.filterButton}
+            onPress={() => goSearch()}
+          >
+            <SlidersHorizontal
+              color={BLACK}
+              size={19}
             />
-          ))}
-        </View>
-
-        <CompactFeaturePanel titlePrefix={t.findPrefix}>
-          <CompactFeatureCard
-            icon={<BadgeCheck color="#111111" size={13} />}
-            title={t.verifiedListings}
-          />
-          <CompactFeatureCard
-            icon={<UserRound color="#111111" size={13} />}
-            title={t.verifiedAgents}
-          />
-          <CompactFeatureCard
-            icon={<House color="#111111" size={13} />}
-            title={t.verifiedOwners}
-          />
-          <CompactFeatureCard
-            icon={<ShieldCheck color="#111111" size={13} />}
-            title={t.trustedPlatform}
-          />
-          <CompactFeatureCard
-            icon={<BrainCircuit color="#111111" size={13} />}
-            title={t.aiPowered}
-          />
-          <CompactFeatureCard
-            icon={<MessageCircle color="#111111" size={13} />}
-            title={t.directInquiries}
-          />
-        </CompactFeaturePanel>
-
-        <SectionHeader
-          title={t.featuredListings}
-          action={t.seeAll}
-          onPress={() => goSearch()}
-        />
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.listingRow}
-        >
-          {featuredItems.map((listing) => (
-            <PropertyCard
-              key={listing.id}
-              listing={listing}
-              currency={currency}
-              language={language}
-              formatPrice={formatPrice}
-              photosLabel={t.photos}
-              whatsappLabel={t.whatsapp}
-              scheduleLabel={t.schedule}
-              onWhatsapp={() => openWhatsapp(listing)}
-              onSchedule={() => goDetails(listing, true)}
-              onPress={() => goDetails(listing)}
-            />
-          ))}
-        </ScrollView>
-
-        <View style={styles.ctaBanner}>
-          <View style={styles.ctaIconBubble}>
-            <House color="#111111" size={23} />
-          </View>
-
-          <View style={styles.ctaTextBox}>
-            <Text style={styles.ctaTitle}>
-              {isIOS
-                ? language === "id"
-                  ? "Cari properti di TETAMO"
-                  : "Search properties on TETAMO"
-                : t.listCta}
-            </Text>
-            <Text style={styles.ctaSub}>
-              {isIOS
-                ? language === "id"
-                  ? "Temukan properti terverifikasi, hubungi via WhatsApp, dan jadwalkan viewing."
-                  : "Find verified properties, contact via WhatsApp, and schedule viewings."
-                : t.listCtaSub}
-            </Text>
-          </View>
-
-          <Pressable onPress={() => goAddListing()} style={styles.ctaButton}>
-            <Text style={styles.ctaButtonText}>
-              {isIOS ? (language === "id" ? "Cari" : "Search") : t.getStarted}
-            </Text>
-            <ChevronRight color="#111111" size={15} />
           </Pressable>
         </View>
 
-        <CompactFeaturePanel titlePrefix={t.whyPrefix}>
-          <CompactFeatureCard
-            icon={<MessageCircle color="#111111" size={13} />}
-            title={t.directWhatsApp}
-          />
-          <CompactFeatureCard
-            icon={<CalendarDays color="#111111" size={13} />}
-            title={t.scheduling}
-          />
-          <CompactFeatureCard
-            icon={<Sparkles color="#111111" size={13} />}
-            title={t.aiTitle}
-          />
-          <CompactFeatureCard
-            icon={<Languages color="#111111" size={13} />}
-            title={t.smartBilingual}
-          />
-          <CompactFeatureCard
-            icon={<Calculator color="#111111" size={13} />}
-            title={t.calculator}
-          />
-          <CompactFeatureCard
-            icon={<Share2 color="#111111" size={13} />}
-            title={t.smartExposure}
-          />
-        </CompactFeaturePanel>
+        {/* ===================================
+            SALE / RENT
+        =================================== */}
 
-        <View style={styles.smartBanner}>
-          <View style={styles.smartIconBox}>
-            <BrainCircuit color={SCORPIO_GOLD} size={26} />
-          </View>
+        <View style={styles.quickRow}>
+          <Pressable
+            style={styles.saleButton}
+            onPress={() =>
+              goSearch({
+                listingType: "sale",
+              })
+            }
+          >
+            <Home
+              color={WHITE}
+              size={16}
+            />
 
-          <View style={styles.smartContent}>
-            <Text style={styles.smartText}>{t.smart}</Text>
-            <Text style={styles.smartSub}>{t.smartSub}</Text>
+            <Text style={styles.saleButtonText}>
+              {t.sale}
+            </Text>
+          </Pressable>
 
-            <View style={styles.smartChipRow}>
-              <SmartChip
-                icon={<Languages color={SCORPIO_GOLD} size={11} />}
-                label={t.smartBilingual}
-              />
-              <SmartChip
-                icon={<Camera color={SCORPIO_GOLD} size={11} />}
-                label={t.smartMedia}
-              />
-              <SmartChip
-                icon={<Search color={SCORPIO_GOLD} size={11} />}
-                label={t.smartSeo}
-              />
-              <SmartChip
-                icon={<Share2 color={SCORPIO_GOLD} size={11} />}
-                label={t.smartExposure}
-              />
-              <SmartChip
-                icon={<Sparkles color={SCORPIO_GOLD} size={11} />}
-                label={t.smartAiPowered}
-              />
-              <SmartChip
-                icon={<Calculator color={SCORPIO_GOLD} size={11} />}
-                label={t.smartCommission}
-              />
-            </View>
-          </View>
+          <Pressable
+            style={styles.rentButton}
+            onPress={() =>
+              goSearch({
+                listingType: "rent",
+              })
+            }
+          >
+            <KeyRound
+              color={BLACK}
+              size={16}
+            />
+
+            <Text style={styles.rentButtonText}>
+              {t.rent}
+            </Text>
+          </Pressable>
         </View>
 
-        <View style={styles.panel}>
-          <SectionHeader title={t.newProjects} compact />
+        {/* ===================================
+            LOADING / EMPTY
+        =================================== */}
 
-          {fallbackProjects.map((project) => (
-            <View key={project.id} style={styles.projectRow}>
-              <SafeImage
-                uri={project.image}
-                fallback={PROJECT_FALLBACK_IMAGE}
-                style={styles.projectImage}
+        {loading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator
+              color={GOLD_DARK}
+            />
+
+            <Text style={styles.loadingText}>
+              {t.loading}
+            </Text>
+          </View>
+        ) : null}
+
+        {!loading &&
+        properties.length === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIcon}>
+              <Building2
+                color={GOLD_DARK}
+                size={25}
               />
-
-              <View style={styles.projectTextBox}>
-                <Text style={styles.projectTitle} numberOfLines={1}>
-                  {language === "en" ? project.titleEn : project.titleId}
-                </Text>
-                <Text style={styles.projectLocation} numberOfLines={1}>
-                  {project.location}
-                </Text>
-                <Text style={styles.projectPrice} numberOfLines={1}>
-                  From {formatPrice(project.priceIdr)}
-                </Text>
-              </View>
             </View>
-          ))}
-        </View>
 
-        <CompactFeaturePanel titlePrefix={t.whyListPrefix}>
-          <CompactFeatureCard
-            icon={<MessageCircle color="#111111" size={13} />}
-            title={t.directWhatsApp}
-          />
-          <CompactFeatureCard
-            icon={<CalendarDays color="#111111" size={13} />}
-            title={t.scheduling}
-          />
-          <CompactFeatureCard
-            icon={<Sparkles color="#111111" size={13} />}
-            title={t.aiTitle}
-          />
-          <CompactFeatureCard
-            icon={<Languages color="#111111" size={13} />}
-            title={t.aiCaption}
-          />
-          <CompactFeatureCard
-            icon={<Calculator color="#111111" size={13} />}
-            title={t.calculator}
-          />
-          <CompactFeatureCard
-            icon={<Share2 color="#111111" size={13} />}
-            title={t.smartExposure}
-          />
-        </CompactFeaturePanel>
+            <Text style={styles.emptyText}>
+              {t.empty}
+            </Text>
+          </View>
+        ) : null}
 
-        <View style={styles.entryGrid}>
-          {!isIOS ? (
-            <>
-              <EntryCard
-                icon={<UserRound color={SCORPIO_GOLD} size={24} />}
-                title={t.owner}
-                subtitle={t.ownerSub}
-                onPress={() => goAddListing("owner")}
-              />
-              <EntryCard
-                icon={<BriefcaseBusiness color={SCORPIO_GOLD} size={24} />}
-                title={t.agent}
-                subtitle={t.agentSub}
-                onPress={() => goAddListing("agent")}
-              />
-              <EntryCard
-                icon={<Building2 color={SCORPIO_GOLD} size={24} />}
-                title={t.developer}
-                subtitle={t.developerSub}
-                onPress={() => goAddListing("developer")}
-              />
-            </>
-          ) : null}
+        {/* ===================================
+            FEATURED DISCOVERY
+        =================================== */}
 
-          <EntryCard
-            icon={<House color={SCORPIO_GOLD} size={24} />}
-            title={t.buyRent}
-            subtitle={t.buyRentSub}
-            onPress={() => goSearch()}
-          />
-
-          {isIOS ? (
-            <EntryCard
-              icon={<Search color={SCORPIO_GOLD} size={24} />}
-              title={language === "id" ? "Cari Properti" : "Search Property"}
-              subtitle={
-                language === "id"
-                  ? "Jelajahi listing"
-                  : "Browse listings"
-              }
+        {!loading &&
+        heroProperties.length > 0 ? (
+          <>
+            <SectionHeader
+              title={t.featured}
+              action={t.seeAll}
               onPress={() => goSearch()}
             />
-          ) : null}
-        </View>
 
-        <SectionHeader
-          title={t.learn}
-          action={t.seeAll}
-          onPress={() => openWebsite("/education")}
-        />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={
+                heroCardWidth + 12
+              }
+              decelerationRate="fast"
+              contentContainerStyle={
+                styles.heroScroll
+              }
+              onMomentumScrollEnd={(event) => {
+                const next = Math.round(
+                  event.nativeEvent.contentOffset.x /
+                    (heroCardWidth + 12)
+                );
 
-        <View style={styles.articleRow}>
-          <ArticleCard
-            image={ARTICLE_IMAGE_ONE}
-            fallback={ARTICLE_IMAGE_ONE}
-            tag={language === "en" ? "Buying Guide" : "Panduan Beli"}
-            title={t.articleOne}
-            readTime="5 min read"
-            onPress={() => openWebsite("/blog")}
-          />
+                setHeroIndex(
+                  Math.max(
+                    0,
+                    Math.min(
+                      next,
+                      heroProperties.length - 1
+                    )
+                  )
+                );
+              }}
+            >
+              {heroProperties.map(
+                (property) => (
+                  <FeaturedCard
+                    key={getPropertyKey(property)}
+                    property={property}
+                    width={heroCardWidth}
+                    language={language}
+                    formatPrice={formatPrice}
+                    whatsappLabel={t.whatsapp}
+                    viewingLabel={t.viewing}
+                    onPress={() =>
+                      goDetails(property)
+                    }
+                    onWhatsapp={() =>
+                      openWhatsapp(property)
+                    }
+                    onViewing={() =>
+                      goDetails(property, true)
+                    }
+                  />
+                )
+              )}
+            </ScrollView>
 
-          <ArticleCard
-            image={ARTICLE_IMAGE_TWO}
-            fallback={ARTICLE_IMAGE_TWO}
-            tag={language === "en" ? "Investment Tips" : "Tips Investasi"}
-            title={t.articleTwo}
-            readTime="6 min read"
-            onPress={() => openWebsite("/blog")}
-          />
-        </View>
+            {heroProperties.length > 1 ? (
+              <View style={styles.dots}>
+                {heroProperties.map(
+                  (_, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.dot,
+                        index === heroIndex &&
+                          styles.activeDot,
+                      ]}
+                    />
+                  )
+                )}
+              </View>
+            ) : (
+              <View
+                style={styles.heroBottomSpacing}
+              />
+            )}
+          </>
+        ) : null}
 
-        <View style={styles.popularBottomPanel}>
-          <SectionHeader
-            title={t.popular}
-            action={t.seeAll}
-            onPress={() => goSearch()}
-            compact
-          />
+        {/* ===================================
+            EXPLORE INDONESIA
+        =================================== */}
 
-          <View style={styles.areaGrid}>
-            {popularAreas.map((area) => (
+        {!loading &&
+        locationStats.length > 0 ? (
+          <>
+            <SectionHeader
+              title={t.discoverIndonesia}
+            />
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={
+                styles.locationScroll
+              }
+            >
+              {locationStats.map(
+                (location) => (
+                  <Pressable
+                    key={location.name}
+                    style={styles.locationCard}
+                    onPress={() =>
+                      goSearch({
+                        area: location.name,
+                      })
+                    }
+                  >
+                    <View
+                      style={styles.locationIcon}
+                    >
+                      <MapPin
+                        color={GOLD_DARK}
+                        size={17}
+                      />
+                    </View>
+
+                    <Text
+                      style={styles.locationTitle}
+                      numberOfLines={1}
+                    >
+                      {location.name}
+                    </Text>
+
+                    <Text
+                      style={styles.locationCount}
+                    >
+                      {location.count}{" "}
+                      {t.properties}
+                    </Text>
+                  </Pressable>
+                )
+              )}
+            </ScrollView>
+          </>
+        ) : null}
+
+        {/* ===================================
+            DISCOVER PROPERTIES
+        =================================== */}
+
+        {!loading &&
+        discoverProperties.length > 0 ? (
+          <>
+            <SectionHeader
+              title={t.discover}
+              action={t.seeAll}
+              onPress={() => goSearch()}
+            />
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={
+                styles.propertyScroll
+              }
+            >
+              {discoverProperties.map(
+                (property) => (
+                  <DiscoveryCard
+                    key={getPropertyKey(property)}
+                    property={property}
+                    language={language}
+                    formatPrice={formatPrice}
+                    onPress={() =>
+                      goDetails(property)
+                    }
+                  />
+                )
+              )}
+            </ScrollView>
+          </>
+        ) : null}
+
+        {/* ===================================
+            BROWSE BY GOAL
+        =================================== */}
+
+        {!loading &&
+        properties.length > 0 ? (
+          <>
+            <SectionHeader
+              title={t.browseByGoal}
+            />
+
+            <View style={styles.goalStack}>
               <Pressable
-                key={area}
-                style={styles.areaCard}
-                onPress={() => goSearch({ area })}
+                style={styles.goalCard}
+                onPress={() =>
+                  goSearch({
+                    listingType: "sale",
+                  })
+                }
               >
-                <View style={styles.areaIconCircle}>
-                  <MapPin color="#111111" size={12} />
+                <View style={styles.goalGoldIcon}>
+                  <Home
+                    color={BLACK}
+                    size={21}
+                  />
                 </View>
-                <Text style={styles.areaText} numberOfLines={1}>
-                  {area}
-                </Text>
+
+                <View style={styles.goalCopy}>
+                  <Text style={styles.goalTitle}>
+                    {t.saleTitle}
+                  </Text>
+
+                  <Text
+                    style={styles.goalDescription}
+                    numberOfLines={2}
+                  >
+                    {t.saleSub}
+                  </Text>
+
+                  <Text style={styles.goalCount}>
+                    {saleProperties.length}{" "}
+                    {t.properties}
+                  </Text>
+                </View>
+
+                <ChevronRight
+                  color={GOLD_DARK}
+                  size={18}
+                />
               </Pressable>
-            ))}
+
+              <Pressable
+                style={styles.goalCard}
+                onPress={() =>
+                  goSearch({
+                    listingType: "rent",
+                  })
+                }
+              >
+                <View style={styles.goalSoftIcon}>
+                  <KeyRound
+                    color={BLACK}
+                    size={21}
+                  />
+                </View>
+
+                <View style={styles.goalCopy}>
+                  <Text style={styles.goalTitle}>
+                    {t.rentTitle}
+                  </Text>
+
+                  <Text
+                    style={styles.goalDescription}
+                    numberOfLines={2}
+                  >
+                    {t.rentSub}
+                  </Text>
+
+                  <Text style={styles.goalCount}>
+                    {rentProperties.length}{" "}
+                    {t.properties}
+                  </Text>
+                </View>
+
+                <ChevronRight
+                  color={GOLD_DARK}
+                  size={18}
+                />
+              </Pressable>
+            </View>
+          </>
+        ) : null}
+
+        {/* ===================================
+            TETAMO BRAND SECTION
+        =================================== */}
+
+        {!loading &&
+        properties.length > 0 ? (
+          <View style={styles.trustPanel}>
+            <Text style={styles.trustEyebrow}>
+              TETAMO
+            </Text>
+
+            <Text style={styles.trustTitle}>
+              {t.trustTitle}
+            </Text>
+
+            <View style={styles.trustItems}>
+              <TrustItem
+                icon={
+                  <MessageCircle
+                    color={GOLD}
+                    size={17}
+                  />
+                }
+                label={t.directWhatsapp}
+              />
+
+              <TrustItem
+                icon={
+                  <CalendarDays
+                    color={GOLD}
+                    size={17}
+                  />
+                }
+                label={t.scheduleViewing}
+              />
+
+              <TrustItem
+                icon={
+                  <Languages
+                    color={GOLD}
+                    size={17}
+                  />
+                }
+                label={t.bilingualListings}
+              />
+            </View>
           </View>
-        </View>
+        ) : null}
+
+        {/* ===================================
+            NEW ON TETAMO
+        =================================== */}
+
+        {!loading &&
+        newProperties.length > 0 ? (
+          <>
+            <SectionHeader
+              title={t.newOnTetamo}
+              action={t.seeAll}
+              onPress={() => goSearch()}
+            />
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={
+                styles.propertyScroll
+              }
+            >
+              {newProperties.map(
+                (property) => (
+                  <DiscoveryCard
+                    key={`new-${getPropertyKey(
+                      property
+                    )}`}
+                    property={property}
+                    language={language}
+                    formatPrice={formatPrice}
+                    onPress={() =>
+                      goDetails(property)
+                    }
+                  />
+                )
+              )}
+            </ScrollView>
+          </>
+        ) : null}
+
+        {/* ===================================
+            PROPERTY TYPE EXPLORER
+        =================================== */}
+
+        {!loading &&
+        properties.length > 0 ? (
+          <>
+            <SectionHeader
+              title={
+                language === "id"
+                  ? "Jelajahi Berdasarkan Tipe Properti"
+                  : "Explore by Property Type"
+              }
+            />
+
+            <View style={styles.propertyTypeGrid}>
+              <Pressable
+                style={styles.propertyTypeCard}
+                onPress={() =>
+                  goSearch({
+                    query: "House",
+                  })
+                }
+              >
+                <View style={styles.propertyTypeIcon}>
+                  <Home
+                    color={GOLD_DARK}
+                    size={21}
+                  />
+                </View>
+
+                <View style={styles.propertyTypeCopy}>
+                  <Text style={styles.propertyTypeTitle}>
+                    {language === "id"
+                      ? "Rumah"
+                      : "House"}
+                  </Text>
+
+                  <Text style={styles.propertyTypeSub}>
+                    {language === "id"
+                      ? "Cari rumah"
+                      : "Explore houses"}
+                  </Text>
+                </View>
+
+                <ChevronRight
+                  color={GOLD_DARK}
+                  size={15}
+                />
+              </Pressable>
+
+              <Pressable
+                style={styles.propertyTypeCard}
+                onPress={() =>
+                  goSearch({
+                    query: "Villa",
+                  })
+                }
+              >
+                <View style={styles.propertyTypeIcon}>
+                  <Home
+                    color={GOLD_DARK}
+                    size={21}
+                  />
+                </View>
+
+                <View style={styles.propertyTypeCopy}>
+                  <Text style={styles.propertyTypeTitle}>
+                    Villa
+                  </Text>
+
+                  <Text style={styles.propertyTypeSub}>
+                    {language === "id"
+                      ? "Cari villa"
+                      : "Explore villas"}
+                  </Text>
+                </View>
+
+                <ChevronRight
+                  color={GOLD_DARK}
+                  size={15}
+                />
+              </Pressable>
+
+              <Pressable
+                style={styles.propertyTypeCard}
+                onPress={() =>
+                  goSearch({
+                    query: "Apartment",
+                  })
+                }
+              >
+                <View style={styles.propertyTypeIcon}>
+                  <Building2
+                    color={GOLD_DARK}
+                    size={21}
+                  />
+                </View>
+
+                <View style={styles.propertyTypeCopy}>
+                  <Text style={styles.propertyTypeTitle}>
+                    {language === "id"
+                      ? "Apartemen"
+                      : "Apartment"}
+                  </Text>
+
+                  <Text style={styles.propertyTypeSub}>
+                    {language === "id"
+                      ? "Cari apartemen"
+                      : "Explore apartments"}
+                  </Text>
+                </View>
+
+                <ChevronRight
+                  color={GOLD_DARK}
+                  size={15}
+                />
+              </Pressable>
+
+              <Pressable
+                style={styles.propertyTypeCard}
+                onPress={() =>
+                  goSearch({
+                    query: "Land",
+                  })
+                }
+              >
+                <View style={styles.propertyTypeIcon}>
+                  <MapPin
+                    color={GOLD_DARK}
+                    size={21}
+                  />
+                </View>
+
+                <View style={styles.propertyTypeCopy}>
+                  <Text style={styles.propertyTypeTitle}>
+                    {language === "id"
+                      ? "Tanah"
+                      : "Land"}
+                  </Text>
+
+                  <Text style={styles.propertyTypeSub}>
+                    {language === "id"
+                      ? "Cari tanah"
+                      : "Explore land"}
+                  </Text>
+                </View>
+
+                <ChevronRight
+                  color={GOLD_DARK}
+                  size={15}
+                />
+              </Pressable>
+            </View>
+          </>
+        ) : null}
+
+        {/* ===================================
+            ENTER FULL PROPERTY MARKETPLACE
+        =================================== */}
+
+        {!loading &&
+        properties.length > 0 ? (
+          <Pressable
+            style={styles.exploreButton}
+            onPress={() =>
+              router.push("/property" as any)
+            }
+          >
+            <Text
+              style={styles.exploreButtonText}
+            >
+              {t.exploreAll}
+            </Text>
+
+            <ChevronRight
+              color={WHITE}
+              size={17}
+            />
+          </Pressable>
+        ) : null}
       </ScrollView>
 
-      <Pressable style={styles.scorpioFloatingButton} onPress={openScorpioAssist}>
-        <View style={styles.scorpioGoldGlow} />
+      {/* ===================================
+          SCORPIO ASSIST
+      =================================== */}
 
-        <View style={styles.scorpioIconCircle}>
-          <Sparkles color="#111111" size={18} />
-        </View>
-
-        <View style={styles.scorpioTextBox}>
-          <Text style={styles.scorpioButtonText}>Need Help?</Text>
-          <Text style={styles.scorpioButtonSub}>Scorpio Assist</Text>
-        </View>
+      <Pressable
+        style={styles.scorpioButton}
+        onPress={openScorpioAssist}
+        accessibilityLabel="Scorpio Assist"
+      >
+        <Sparkles
+          color={BLACK}
+          size={18}
+        />
       </Pressable>
     </SafeAreaView>
   );
 }
 
-function normalizeWhatsappPhone(value?: string | null) {
-  const digits = String(value || "").replace(/[^\d]/g, "");
+/*
+ * ==================================================
+ * FEATURED PROPERTY CARD
+ * ==================================================
+ */
 
-  if (!digits) return "";
-  if (digits.startsWith("62")) return digits;
-  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
-  if (digits.startsWith("8")) return `62${digits}`;
-
-  return digits;
-}
-
-function formatUnreadCount(value: number) {
-  if (value > 99) return "99+";
-  return String(value);
-}
-
-function getPhotoCount(listing: Listing) {
-  if (listing.images?.length) return listing.images.length;
-  if (listing.image) return 1;
-  return 0;
-}
-
-function formatCompactNumber(value?: number) {
-  const count = Number(value || 0);
-
-  if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
-  if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
-
-  return String(count);
-}
-
-function formatRating(listing: Listing) {
-  const average = Number(listing.ratingAverage || 0);
-  const count = Number(listing.ratingCount || 0);
-
-  if (average > 0) {
-    return `${average.toFixed(1)} (${formatCompactNumber(count)})`;
-  }
-
-  return "0";
-}
-
-function getStatusBadges(listing: Listing, language: Language) {
-  const t = copy[language];
-
-  const listingType = String(listing.listingType || "").toLowerCase();
-  const rentalType = String(listing.rentalType || "").toLowerCase();
-  const badge = String(listing.badge || "").toLowerCase();
-
-  const badges: { label: string; color: string; textColor: string }[] = [];
-
-  if (
-    listingType.includes("sale") ||
-    listingType.includes("sell") ||
-    listingType.includes("jual")
-  ) {
-    badges.push({
-      label: t.sale,
-      color: "#ffffff",
-      textColor: "#111111",
-    });
-  }
-
-  if (
-    listingType.includes("rent") ||
-    listingType.includes("sewa") ||
-    rentalType.length > 0
-  ) {
-    badges.push({
-      label: t.rent,
-      color: "#2563eb",
-      textColor: "#ffffff",
-    });
-  }
-
-  if (rentalType.includes("month") || rentalType.includes("bulan")) {
-    badges.push({
-      label: t.monthly,
-      color: "#16a34a",
-      textColor: "#ffffff",
-    });
-  }
-
-  if (
-    rentalType.includes("year") ||
-    rentalType.includes("annual") ||
-    rentalType.includes("tahun")
-  ) {
-    badges.push({
-      label: t.yearly,
-      color: "#f59e0b",
-      textColor: "#111111",
-    });
-  }
-
-  if (rentalType.includes("daily") || rentalType.includes("hari")) {
-    badges.push({
-      label: t.daily,
-      color: "#ec4899",
-      textColor: "#ffffff",
-    });
-  }
-
-  if (badge.includes("spotlight")) {
-    badges.push({
-      label: t.spotlight,
-      color: "#7c3aed",
-      textColor: "#ffffff",
-    });
-  } else if (badge.includes("boost")) {
-    badges.push({
-      label: t.boosted,
-      color: "#0284c7",
-      textColor: "#ffffff",
-    });
-  } else if (badge.includes("featured")) {
-    badges.push({
-      label: t.featured,
-      color: "#f59e0b",
-      textColor: "#111111",
-    });
-  } else if (badge.includes("verified")) {
-    badges.push({
-      label: t.verified,
-      color: "#111111",
-      textColor: "#ffffff",
-    });
-  }
-
-  if (badges.length === 0) {
-    badges.push({
-      label: t.verified,
-      color: "#111111",
-      textColor: "#ffffff",
-    });
-  }
-
-  return badges.slice(0, 4);
-}
-
-function SafeImage({
-  uri,
-  fallback,
-  style,
-}: {
-  uri?: string;
-  fallback: string;
-  style: StyleProp<ImageStyle>;
-}) {
-  const [imageUri, setImageUri] = useState(uri || fallback);
-
-  useEffect(() => {
-    setImageUri(uri || fallback);
-  }, [uri, fallback]);
-
-  return (
-    <Image
-      source={{ uri: imageUri }}
-      style={style}
-      onError={() => setImageUri(fallback)}
-    />
-  );
-}
-
-function SafeImageBackground({
-  uri,
-  fallback,
-  style,
-  imageStyle,
-  children,
-}: {
-  uri?: string;
-  fallback: string;
-  style: StyleProp<ViewStyle>;
-  imageStyle: StyleProp<ImageStyle>;
-  children: ReactNode;
-}) {
-  const [imageUri, setImageUri] = useState(uri || fallback);
-
-  useEffect(() => {
-    setImageUri(uri || fallback);
-  }, [uri, fallback]);
-
-  return (
-    <ImageBackground
-      source={{ uri: imageUri }}
-      style={style}
-      imageStyle={imageStyle}
-      onError={() => setImageUri(fallback)}
-    >
-      {children}
-    </ImageBackground>
-  );
-}
-
-function Badge({
-  label,
-  color,
-  textColor,
-}: {
-  label: string;
-  color: string;
-  textColor: string;
-}) {
-  return (
-    <View style={[styles.badge, { backgroundColor: color }]}>
-      <Text style={[styles.badgeText, { color: textColor }]}>{label}</Text>
-    </View>
-  );
-}
-
-function PropertyActionRow({
+function FeaturedCard({
+  property,
+  width,
+  language,
+  formatPrice,
   whatsappLabel,
-  scheduleLabel,
+  viewingLabel,
+  onPress,
   onWhatsapp,
-  onSchedule,
+  onViewing,
 }: {
+  property: Listing;
+  width: number;
+  language: Language;
+  formatPrice: (
+    price: number,
+    rentalType?: string | null
+  ) => string;
   whatsappLabel: string;
-  scheduleLabel: string;
-  onWhatsapp: (event?: any) => void;
-  onSchedule: (event?: any) => void;
+  viewingLabel: string;
+  onPress: () => void;
+  onWhatsapp: () => void;
+  onViewing: () => void;
+}) {
+  const promotion =
+    getPromotionBadge(property);
+
+  return (
+    <Pressable
+      style={[
+        styles.featuredCard,
+        {
+          width,
+        },
+      ]}
+      onPress={onPress}
+    >
+      <View style={styles.featuredImageWrap}>
+        <PropertyImage
+          uri={property.image}
+          style={styles.featuredImage}
+        />
+
+        {/* LEFT BADGES */}
+        <View style={styles.featuredBadges}>
+          <ListingTypeBadge
+            property={property}
+            language={language}
+          />
+
+          {promotion ? (
+            <View
+              style={[
+                styles.promotionBadge,
+                {
+                  backgroundColor:
+                    promotion.background,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.promotionBadgeText,
+                  {
+                    color:
+                      promotion.textColor,
+                  },
+                ]}
+              >
+                {promotion.label}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* HEART — NO COUNT */}
+        <View style={styles.featuredHeart}>
+          <Heart
+            color={BLACK}
+            size={17}
+            strokeWidth={2}
+          />
+        </View>
+
+        {/* TETAMO BRANDING */}
+        <ImageBrand large />
+      </View>
+
+      <View style={styles.featuredBody}>
+        <Text
+          style={styles.featuredPrice}
+          numberOfLines={1}
+        >
+          {formatPrice(
+            property.priceIdr,
+            property.rentalType
+          )}
+        </Text>
+
+        <Text
+          style={styles.featuredTitle}
+          numberOfLines={2}
+        >
+          {getPropertyTitle(
+            property,
+            language
+          )}
+        </Text>
+
+        <View style={styles.propertyLocationRow}>
+          <MapPin
+            color={GOLD_DARK}
+            size={13}
+          />
+
+          <Text
+            style={styles.featuredLocation}
+            numberOfLines={1}
+          >
+            {property.location ||
+              property.area ||
+              "-"}
+          </Text>
+        </View>
+
+        <PropertyMeta
+          property={property}
+        />
+
+        <View style={styles.featuredActions}>
+          <Pressable
+            style={styles.whatsappButton}
+            onPress={(event) => {
+              event.stopPropagation();
+              onWhatsapp();
+            }}
+          >
+            <MessageCircle
+              color="#14834B"
+              size={15}
+            />
+
+            <Text
+              style={styles.whatsappText}
+            >
+              {whatsappLabel}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.viewingButton}
+            onPress={(event) => {
+              event.stopPropagation();
+              onViewing();
+            }}
+          >
+            <CalendarDays
+              color={BLACK}
+              size={15}
+            />
+
+            <Text
+              style={styles.viewingText}
+            >
+              {viewingLabel}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+/*
+ * ==================================================
+ * DISCOVERY CARD
+ * ==================================================
+ */
+
+function DiscoveryCard({
+  property,
+  language,
+  formatPrice,
+  onPress,
+}: {
+  property: Listing;
+  language: Language;
+  formatPrice: (
+    price: number,
+    rentalType?: string | null
+  ) => string;
+  onPress: () => void;
+}) {
+  const promotion =
+    getPromotionBadge(property);
+
+  return (
+    <Pressable
+      style={styles.discoveryCard}
+      onPress={onPress}
+    >
+      <View style={styles.discoveryImageWrap}>
+        <PropertyImage
+          uri={property.image}
+          style={styles.discoveryImage}
+        />
+
+        {promotion ? (
+          <View
+            style={[
+              styles.discoveryPromotionBadge,
+              {
+                backgroundColor:
+                  promotion.background,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.discoveryPromotionText,
+                {
+                  color:
+                    promotion.textColor,
+                },
+              ]}
+            >
+              {promotion.label}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* HEART */}
+        <View style={styles.discoveryHeart}>
+          <Heart
+            color={BLACK}
+            size={15}
+            strokeWidth={2}
+          />
+        </View>
+
+        {/* TETAMO BRAND */}
+        <ImageBrand />
+      </View>
+
+      <View style={styles.discoveryBody}>
+        <Text
+          style={styles.discoveryPrice}
+          numberOfLines={1}
+        >
+          {formatPrice(
+            property.priceIdr,
+            property.rentalType
+          )}
+        </Text>
+
+        <Text
+          style={styles.discoveryTitle}
+          numberOfLines={2}
+        >
+          {getPropertyTitle(
+            property,
+            language
+          )}
+        </Text>
+
+        <View style={styles.discoveryLocationRow}>
+          <MapPin
+            color={GOLD_DARK}
+            size={11}
+          />
+
+          <Text
+            style={styles.discoveryLocation}
+            numberOfLines={1}
+          >
+            {property.location ||
+              property.area ||
+              "-"}
+          </Text>
+        </View>
+
+        <PropertyMeta
+          property={property}
+          compact
+        />
+      </View>
+    </Pressable>
+  );
+}
+
+/*
+ * ==================================================
+ * IMAGE BRANDING
+ * ==================================================
+ */
+
+function ImageBrand({
+  large = false,
+}: {
+  large?: boolean;
 }) {
   return (
-    <View style={styles.propertyActionRow}>
-      <Pressable style={styles.propertyActionButton} onPress={onWhatsapp}>
-        <MessageCircle color="#25D366" size={13} />
-        <Text style={styles.propertyActionText}>{whatsappLabel}</Text>
-      </Pressable>
+    <View
+      style={[
+        styles.imageBrand,
+        large && styles.imageBrandLarge,
+      ]}
+    >
+      <Image
+        source={tetamoLogo}
+        resizeMode="cover"
+        style={[
+          styles.imageBrandLogo,
+          large &&
+            styles.imageBrandLogoLarge,
+        ]}
+      />
 
-      <Pressable style={styles.propertyActionButton} onPress={onSchedule}>
-        <CalendarDays color={SCORPIO_GOLD} size={13} />
-        <Text style={styles.propertyActionText}>{scheduleLabel}</Text>
-      </Pressable>
+      <Text
+        style={[
+          styles.imageBrandText,
+          large &&
+            styles.imageBrandTextLarge,
+        ]}
+      >
+        TETAMO
+      </Text>
     </View>
   );
 }
 
-function EngagementMetrics({
-  listing,
-  photosLabel,
-  variant,
-  hidePhotos = false,
+/*
+ * ==================================================
+ * LISTING TYPE
+ * ==================================================
+ */
+
+function ListingTypeBadge({
+  property,
+  language,
+}: {
+  property: Listing;
+  language: Language;
+}) {
+  const rent = isRentListing(property);
+
+  return (
+    <View style={styles.typeBadge}>
+      <Text style={styles.typeBadgeText}>
+        {rent
+          ? language === "id"
+            ? "Disewakan"
+            : "For Rent"
+          : language === "id"
+            ? "Dijual"
+            : "For Sale"}
+      </Text>
+    </View>
+  );
+}
+
+/*
+ * ==================================================
+ * PROPERTY META
+ * ==================================================
+ */
+
+function PropertyMeta({
+  property,
   compact = false,
 }: {
-  listing: Listing;
-  photosLabel: string;
-  variant: "dark" | "light";
-  hidePhotos?: boolean;
+  property: Listing;
   compact?: boolean;
 }) {
-  const isLight = variant === "light";
+  const beds = Number(property.beds || 0);
+  const baths = Number(property.baths || 0);
+  const size = Number(property.size || 0);
+
+  if (!beds && !baths && !size) {
+    return null;
+  }
 
   return (
     <View
       style={[
-        styles.engagementRow,
-        isLight && styles.engagementRowLight,
-        compact && styles.engagementRowCompact,
+        styles.metaRow,
+        compact && styles.metaRowCompact,
       ]}
     >
-      <EngagementMetric
-        icon={
-          <Heart color={isLight ? "#111111" : "#ffffff"} size={compact ? 10 : 11} />
-        }
-        value={formatCompactNumber(listing.likeCount)}
-        variant={variant}
-        compact={compact}
-      />
-
-      <EngagementMetric
-        icon={
-          <Bookmark
-            color={isLight ? "#111111" : "#ffffff"}
-            size={compact ? 10 : 11}
+      {beds > 0 ? (
+        <View style={styles.metaItem}>
+          <BedDouble
+            color={GOLD_DARK}
+            size={compact ? 12 : 14}
           />
-        }
-        value={formatCompactNumber(listing.saveCount)}
-        variant={variant}
-        compact={compact}
-      />
 
-      <EngagementMetric
-        icon={<Star color={SCORPIO_GOLD} size={compact ? 10 : 11} />}
-        value={formatRating(listing)}
-        variant={variant}
-        compact={compact}
-      />
+          <Text
+            style={[
+              styles.metaText,
+              compact &&
+                styles.metaTextCompact,
+            ]}
+          >
+            {beds}
+          </Text>
+        </View>
+      ) : null}
 
-      <EngagementMetric
-        icon={
-          <Share2
-            color={isLight ? "#111111" : "#ffffff"}
-            size={compact ? 10 : 11}
+      {baths > 0 ? (
+        <View style={styles.metaItem}>
+          <Bath
+            color={GOLD_DARK}
+            size={compact ? 12 : 14}
           />
-        }
-        value={formatCompactNumber(listing.shareCount)}
-        variant={variant}
-        compact={compact}
-      />
 
-      <EngagementMetric
-        icon={
-          <Eye color={isLight ? "#111111" : "#ffffff"} size={compact ? 10 : 11} />
-        }
-        value={formatCompactNumber(listing.viewCount)}
-        variant={variant}
-        compact={compact}
-      />
+          <Text
+            style={[
+              styles.metaText,
+              compact &&
+                styles.metaTextCompact,
+            ]}
+          >
+            {baths}
+          </Text>
+        </View>
+      ) : null}
 
-      {!hidePhotos ? (
-        <EngagementMetric
-          icon={
-            <Camera
-              color={isLight ? "#111111" : "#ffffff"}
-              size={compact ? 10 : 11}
-            />
-          }
-          value={`${getPhotoCount(listing)} ${photosLabel}`}
-          variant={variant}
-          compact={compact}
-        />
+      {size > 0 ? (
+        <View style={styles.metaItem}>
+          <Ruler
+            color={GOLD_DARK}
+            size={compact ? 12 : 14}
+          />
+
+          <Text
+            style={[
+              styles.metaText,
+              compact &&
+                styles.metaTextCompact,
+            ]}
+          >
+            {size} m²
+          </Text>
+        </View>
       ) : null}
     </View>
   );
 }
 
-function EngagementMetric({
+/*
+ * ==================================================
+ * TRUST ITEM
+ * ==================================================
+ */
+
+function TrustItem({
   icon,
-  value,
-  variant,
-  compact = false,
+  label,
 }: {
   icon: ReactNode;
-  value: string;
-  variant: "dark" | "light";
-  compact?: boolean;
-}) {
-  const isLight = variant === "light";
-
-  return (
-    <View
-      style={[
-        styles.engagementMetric,
-        isLight && styles.engagementMetricLight,
-        compact && styles.engagementMetricCompact,
-      ]}
-    >
-      {icon}
-      <Text
-        style={[
-          styles.engagementMetricText,
-          isLight && styles.engagementMetricTextLight,
-          compact && styles.engagementMetricTextCompact,
-        ]}
-        numberOfLines={1}
-      >
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function CompactFeaturePanel({
-  titlePrefix,
-  children,
-}: {
-  titlePrefix: string;
-  children: ReactNode;
+  label: string;
 }) {
   return (
-    <View style={styles.compactFeaturePanel}>
-      <View style={styles.compactFeatureTitleRow}>
-        <Text style={styles.compactFeatureTitleText}>{titlePrefix} </Text>
-        <Text style={styles.compactFeatureTitleGold}>TETAMO</Text>
+    <View style={styles.trustItem}>
+      <View style={styles.trustIcon}>
+        {icon}
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.compactFeatureRow}
-      >
-        {children}
-      </ScrollView>
-    </View>
-  );
-}
-
-function CompactFeatureCard({
-  icon,
-  title,
-}: {
-  icon: ReactNode;
-  title: string;
-}) {
-  return (
-    <View style={styles.compactFeatureCard}>
-      <View style={styles.compactFeatureIconCircle}>{icon}</View>
-      <Text style={styles.compactFeatureCardText} numberOfLines={2}>
-        {title}
+      <Text style={styles.trustItemText}>
+        {label}
       </Text>
     </View>
   );
 }
+
+/*
+ * ==================================================
+ * SECTION HEADER
+ * ==================================================
+ */
 
 function SectionHeader({
   title,
   action,
-  compact = false,
   onPress,
 }: {
   title: string;
   action?: string;
-  compact?: boolean;
   onPress?: () => void;
 }) {
   return (
-    <View style={[styles.sectionHeader, compact && styles.sectionHeaderCompact]}>
-      <Text style={[styles.sectionTitle, compact && styles.compactTitle]}>
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>
         {title}
       </Text>
 
       {action ? (
-        <Pressable style={styles.seeAllRow} onPress={onPress}>
-          <Text style={styles.seeAllText}>{action}</Text>
-          <ChevronRight color={SCORPIO_GOLD} size={13} />
+        <Pressable
+          style={styles.seeAll}
+          onPress={onPress}
+        >
+          <Text style={styles.seeAllText}>
+            {action}
+          </Text>
+
+          <ChevronRight
+            color={GOLD_DARK}
+            size={14}
+          />
         </Pressable>
       ) : null}
     </View>
   );
 }
 
-function SmartChip({ icon, label }: { icon: ReactNode; label: string }) {
-  return (
-    <View style={styles.smartChip}>
-      {icon}
-      <Text style={styles.smartChipText}>{label}</Text>
-    </View>
-  );
-}
+/*
+ * ==================================================
+ * REMOTE IMAGE
+ * ==================================================
+ */
 
-function PropertyCard({
-  listing,
-  currency,
-  language,
-  formatPrice,
-  photosLabel,
-  whatsappLabel,
-  scheduleLabel,
-  onWhatsapp,
-  onSchedule,
-  onPress,
+function PropertyImage({
+  uri,
+  style,
 }: {
-  listing: Listing;
-  currency: Currency;
-  language: Language;
-  formatPrice: (priceIdr: number, rentalType?: string | null) => string;
-  photosLabel: string;
-  whatsappLabel: string;
-  scheduleLabel: string;
-  onWhatsapp: () => void;
-  onSchedule: () => void;
-  onPress: () => void;
+  uri?: string;
+  style: StyleProp<ImageStyle>;
 }) {
-  return (
-    <Pressable style={styles.propertyCard} onPress={onPress}>
-      <SafeImageBackground
-        uri={listing.image}
-        fallback={HERO_FALLBACK_IMAGE}
-        style={styles.propertyImage}
-        imageStyle={styles.propertyImageRadius}
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [uri]);
+
+  if (!uri || failed) {
+    return (
+      <View
+        style={[
+          style as StyleProp<ViewStyle>,
+          styles.imageFallback,
+        ]}
       >
-        <View style={styles.propertyImageShade} />
-
-        <View style={styles.propertyBadge}>
-          <Text style={styles.propertyBadgeText}>{listing.badge}</Text>
-        </View>
-
-        <View style={styles.favoriteBubble}>
-          <Heart color="#ffffff" size={16} />
-        </View>
-      </SafeImageBackground>
-
-      <View style={styles.propertyBody}>
-        <Text style={styles.propertyPrice}>
-          {formatPrice(listing.priceIdr, listing.rentalType)}
-        </Text>
-
-        {currency !== "IDR" && listing.priceIdr > 0 && (
-          <Text style={styles.propertySubPrice}>
-            IDR {listing.priceIdr.toLocaleString("en-US")}
-          </Text>
-        )}
-
-        {currency === "IDR" && listing.priceIdr > 0 && (
-          <Text style={styles.propertySubPrice}>
-            ≈ USD{" "}
-            {Math.round(listing.priceIdr * currencyRates.USD).toLocaleString(
-              "en-US"
-            )}
-          </Text>
-        )}
-
-        <Text style={styles.propertyTitle} numberOfLines={1}>
-          {language === "en" ? listing.titleEn : listing.titleId}
-        </Text>
-
-        <View style={styles.propertyLocationRow}>
-          <MapPin color={SCORPIO_GOLD} size={11} />
-          <Text style={styles.propertyLocation} numberOfLines={1}>
-            {listing.location}
-          </Text>
-        </View>
-
-        <View style={styles.propertyMeta}>
-          <View style={styles.metaItem}>
-            <BedDouble color={SCORPIO_GOLD} size={12} />
-            <Text style={styles.metaText}>{listing.beds || 0}</Text>
-          </View>
-
-          <View style={styles.metaItem}>
-            <Bath color={SCORPIO_GOLD} size={12} />
-            <Text style={styles.metaText}>{listing.baths || 0}</Text>
-          </View>
-
-          <View style={styles.metaItem}>
-            <Ruler color={SCORPIO_GOLD} size={12} />
-            <Text style={styles.metaText}>{listing.size || 0} m²</Text>
-          </View>
-        </View>
-
-        <EngagementMetrics
-          listing={listing}
-          photosLabel={photosLabel}
-          variant="dark"
-          hidePhotos
-          compact
-        />
-
-        <PropertyActionRow
-          whatsappLabel={whatsappLabel}
-          scheduleLabel={scheduleLabel}
-          onWhatsapp={(event) => {
-            event?.stopPropagation?.();
-            onWhatsapp();
-          }}
-          onSchedule={(event) => {
-            event?.stopPropagation?.();
-            onSchedule();
-          }}
+        <Building2
+          color="#C4BDB3"
+          size={30}
         />
       </View>
-    </Pressable>
-  );
-}
+    );
+  }
 
-function EntryCard({
-  icon,
-  title,
-  subtitle,
-  onPress,
-}: {
-  icon: ReactNode;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-}) {
   return (
-    <Pressable style={styles.entryCard} onPress={onPress}>
-      <View style={styles.entryIcon}>{icon}</View>
-      <View style={styles.entryTextBox}>
-        <Text style={styles.entryTitle}>{title}</Text>
-        <Text style={styles.entrySubtitle}>{subtitle}</Text>
-      </View>
-      <ChevronRight color={SCORPIO_GOLD} size={17} />
-    </Pressable>
+    <Image
+      source={{
+        uri,
+        cache: "force-cache",
+      }}
+      style={style}
+      resizeMode="cover"
+      fadeDuration={100}
+      onError={() => setFailed(true)}
+    />
   );
 }
 
-function ArticleCard({
-  image,
-  fallback,
-  tag,
-  title,
-  readTime,
-  onPress,
-}: {
-  image: string;
-  fallback: string;
-  tag: string;
-  title: string;
-  readTime: string;
-  onPress: () => void;
-}) {
+/*
+ * ==================================================
+ * HELPERS
+ * ==================================================
+ */
+
+function getPropertyKey(property: Listing) {
+  return String(
+    property.id ||
+      property.slug ||
+      property.kode
+  );
+}
+
+function getPropertyTitle(
+  property: Listing,
+  language: Language
+) {
+  if (language === "id") {
+    return (
+      property.titleId ||
+      property.titleEn ||
+      "Properti"
+    );
+  }
+
   return (
-    <Pressable style={styles.articleCard} onPress={onPress}>
-      <SafeImage uri={image} fallback={fallback} style={styles.articleImage} />
-
-      <View style={styles.articleTextBox}>
-        <Text style={styles.articleTag}>{tag}</Text>
-        <Text style={styles.articleTitle} numberOfLines={2}>
-          {title}
-        </Text>
-        <Text style={styles.articleTime}>{readTime}</Text>
-      </View>
-    </Pressable>
+    property.titleEn ||
+    property.titleId ||
+    "Property"
   );
 }
+
+function isRentListing(property: Listing) {
+  const listingType = String(
+    property.listingType || ""
+  ).toLowerCase();
+
+  const rentalType = String(
+    property.rentalType || ""
+  ).toLowerCase();
+
+  return (
+    listingType.includes("rent") ||
+    listingType.includes("sewa") ||
+    rentalType.length > 0
+  );
+}
+
+function isSaleListing(property: Listing) {
+  const listingType = String(
+    property.listingType || ""
+  ).toLowerCase();
+
+  if (
+    listingType.includes("sale") ||
+    listingType.includes("sell") ||
+    listingType.includes("jual")
+  ) {
+    return true;
+  }
+
+  return !isRentListing(property);
+}
+
+function getPromotionPriority(
+  property: Listing
+) {
+  const badge = String(
+    property.badge || ""
+  ).toLowerCase();
+
+  if (badge.includes("spotlight")) {
+    return 3;
+  }
+
+  if (badge.includes("featured")) {
+    return 2;
+  }
+
+  if (badge.includes("boost")) {
+    return 1;
+  }
+
+  return 0;
+}
+
+function getPromotionBadge(
+  property: Listing
+):
+  | {
+      label: string;
+      background: string;
+      textColor: string;
+    }
+  | null {
+  const badge = String(
+    property.badge || ""
+  ).toLowerCase();
+
+  if (badge.includes("spotlight")) {
+    return {
+      label: "SPOTLIGHT",
+      background: "#D8F1F5",
+      textColor: "#17616C",
+    };
+  }
+
+  if (badge.includes("featured")) {
+    return {
+      label: "FEATURED",
+      background: "#E5C568",
+      textColor: BLACK,
+    };
+  }
+
+  if (badge.includes("boost")) {
+    return {
+      label: "BOOST",
+      background: "#F0C397",
+      textColor: "#704014",
+    };
+  }
+
+  return null;
+}
+
+function deriveBrowseLocation(
+  property: Listing
+) {
+  const area = String(
+    property.area || ""
+  ).trim();
+
+  const location = String(
+    property.location || ""
+  ).trim();
+
+  const looksLikePropertyTitle = (
+    value: string
+  ) =>
+    /villa|house|rumah|land|tanah|kavling|residence|residences|cluster|apartment|apartemen|hotel|building|gedung|ruko|project|proyek|perumahan/i.test(
+      value
+    );
+
+  if (
+    area &&
+    area.length <= 24 &&
+    !looksLikePropertyTitle(area)
+  ) {
+    return area;
+  }
+
+  const segments = location
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  for (const segment of segments) {
+    if (
+      segment.length <= 24 &&
+      !looksLikePropertyTitle(segment)
+    ) {
+      return segment;
+    }
+  }
+
+  return "";
+}
+
+function normalizeWhatsappPhone(
+  value?: string | null
+) {
+  const digits = String(
+    value || ""
+  ).replace(/[^\d]/g, "");
+
+  if (!digits) return "";
+
+  if (digits.startsWith("62")) {
+    return digits;
+  }
+
+  if (digits.startsWith("0")) {
+    return `62${digits.slice(1)}`;
+  }
+
+  if (digits.startsWith("8")) {
+    return `62${digits}`;
+  }
+
+  return digits;
+}
+
+function formatUnreadCount(value: number) {
+  if (value > 99) {
+    return "99+";
+  }
+
+  return String(value);
+}
+
+/*
+ * ==================================================
+ * STYLES
+ * ==================================================
+ */
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#050505",
+    backgroundColor: CREAM,
   },
+
   scroll: {
     flex: 1,
-    backgroundColor: "#050505",
+    backgroundColor: CREAM,
   },
+
   content: {
     paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 38,
+    paddingTop: 9,
+    paddingBottom: 130,
   },
+
+  /*
+   * HEADER
+   */
+
   header: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "flex-start",
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 11,
   },
+
   brandRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
   },
+
+  logoBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: WHITE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+
   logoImage: {
-    width: 38,
-    height: 38,
+    width: 32,
+    height: 32,
   },
+
+  brandCopy: {
+    flexShrink: 1,
+  },
+
   brandText: {
-    color: "#ffffff",
-    fontSize: 20,
-    letterSpacing: 4,
-    fontWeight: "700",
-  },
-  brandSub: {
-    color: "#c9c9c9",
-    marginTop: 1,
-    fontSize: 10.5,
-    letterSpacing: 0.7,
-  },
-  headerControls: {
-    alignItems: "flex-end",
-    gap: 7,
-  },
-  locationBellRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-  },
-  locationPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    borderWidth: 1,
-    borderColor: "#5f4b17",
-    backgroundColor: "#101010",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  pillText: {
-    color: "#ffffff",
-    fontSize: 11,
-    fontWeight: "800",
-  },
-  notificationBellButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: SCORPIO_GOLD,
-    backgroundColor: "#101010",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: -6,
-    right: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#050505",
-    backgroundColor: SCORPIO_GOLD,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-  },
-  notificationBadgeText: {
-    color: "#111111",
-    fontSize: 9,
+    color: BLACK,
+    fontSize: 19,
     fontWeight: "900",
+    letterSpacing: 3.5,
   },
-  toggleLine: {
+
+  brandSub: {
+    marginTop: 1,
+    color: MUTED,
+    fontSize: 9.5,
+    fontWeight: "500",
+    letterSpacing: 0.35,
+  },
+
+  headerRight: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-  toggleRow: {
-    flexDirection: "row",
-    borderWidth: 1,
-    borderColor: "#343434",
+
+  indonesiaButton: {
+    height: 37,
+    paddingHorizontal: 9,
     borderRadius: 999,
-    overflow: "hidden",
-    backgroundColor: "#090909",
-  },
-  smallToggle: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  smallToggleText: {
-    color: "#9c9c9c",
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  activeToggle: {
-    backgroundColor: SCORPIO_GOLD,
-  },
-  activeToggleText: {
-    color: "#111111",
-  },
-  currencyRow: {
-    flexDirection: "row",
-    borderWidth: 1,
-    borderColor: "#343434",
-    borderRadius: 999,
-    overflow: "hidden",
-    backgroundColor: "#090909",
-  },
-  currencyToggle: {
-    paddingHorizontal: 6,
-    paddingVertical: 5,
-  },
-  currencyText: {
-    color: "#9c9c9c",
-    fontSize: 9,
-    fontWeight: "800",
-  },
-  searchGlowWrap: {
-    borderRadius: 23,
-    marginBottom: 14,
-    shadowColor: SCORPIO_GOLD,
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.24,
-    shadowRadius: 22,
-    elevation: 12,
-  },
-  searchBar: {
-    height: 56,
-    borderRadius: 23,
-    borderWidth: 1,
-    borderColor: SCORPIO_GOLD,
-    backgroundColor: "#0c0c0c",
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: 16,
-    paddingRight: 7,
-    gap: 11,
+    gap: 4,
+    backgroundColor: WHITE,
+    borderWidth: 1,
+    borderColor: BORDER,
   },
-  searchInput: {
+
+  indonesiaText: {
+    color: BLACK,
+    fontSize: 9.5,
+    fontWeight: "800",
+  },
+
+  notificationButton: {
+    width: 37,
+    height: 37,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: WHITE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+
+  notificationBadge: {
+    position: "absolute",
+    top: -3,
+    right: -3,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 999,
+    paddingHorizontal: 3,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: GOLD,
+    borderWidth: 1.5,
+    borderColor: CREAM,
+  },
+
+  notificationBadgeText: {
+    color: BLACK,
+    fontSize: 7.5,
+    fontWeight: "900",
+  },
+
+  /*
+   * LANGUAGE / CURRENCY
+   */
+
+  utilityBar: {
+    minHeight: 42,
+    marginBottom: 12,
+    paddingHorizontal: 7,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: WHITE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+
+  languageControl: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  currencyControl: {
     flex: 1,
-    color: "#ffffff",
-    fontSize: 14,
-    paddingVertical: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
   },
-  filterButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 18,
-    backgroundColor: SCORPIO_GOLD,
+
+  utilityDivider: {
+    width: 1,
+    height: 22,
+    marginHorizontal: 7,
+    backgroundColor: "#E6DFD5",
+  },
+
+  languageButton: {
+    width: 36,
+    height: 28,
+    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
   },
-  heroCarousel: {
-    overflow: "visible",
-  },
-  heroSlide: {
-    paddingRight: 0,
-  },
-  heroCard: {
-    height: 424,
-    borderRadius: 27,
-    overflow: "hidden",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#101010",
-  },
-  heroImage: {
-    borderRadius: 27,
-  },
-  heroShade: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.15)",
-  },
-  heroTop: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 8,
-    padding: 13,
-  },
-  badgeRow: {
-    flexDirection: "row",
-    gap: 5,
+
+  currencyButton: {
     flex: 1,
-    flexWrap: "wrap",
+    height: 28,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 999,
+
+  utilityActive: {
+    backgroundColor: "#F0D889",
   },
-  badgeText: {
+
+  utilityText: {
+    color: "#938D84",
     fontSize: 9.5,
-    fontWeight: "900",
-  },
-  counterBadge: {
-    backgroundColor: "rgba(0,0,0,0.76)",
-    borderWidth: 1,
-    borderColor: "rgba(230,193,92,0.45)",
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  counterText: {
-    color: "#ffffff",
-    fontSize: 10.5,
-    fontWeight: "900",
-  },
-  heroBottom: {
-    borderTopWidth: 1,
-    borderTopColor: "rgba(230,193,92,0.35)",
-    backgroundColor: "rgba(5,5,5,0.92)",
-    padding: 15,
-  },
-  heroPriceLocationRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-  },
-  heroPriceBox: {
-    flex: 1,
-  },
-  heroPrice: {
-    color: SCORPIO_GOLD,
-    fontSize: 21,
-    fontWeight: "900",
-    letterSpacing: -0.4,
-  },
-  heroConverted: {
-    color: "#d8d8d8",
-    fontSize: 11.3,
-    marginTop: 2,
-    fontWeight: "700",
-  },
-  heroLocationPill: {
-    maxWidth: 122,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(230,193,92,0.35)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    paddingHorizontal: 9,
-    paddingVertical: 7,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 5,
-  },
-  heroLocation: {
-    color: "#ffffff",
-    fontSize: 10.8,
-    lineHeight: 14,
     fontWeight: "800",
-    flex: 1,
   },
-  heroTitle: {
-    color: "#ffffff",
+
+  currencyText: {
+    color: "#938D84",
+    fontSize: 8.7,
+    fontWeight: "800",
+  },
+
+  utilityTextActive: {
+    color: BLACK,
+    fontWeight: "900",
+  },
+
+  /*
+   * SEARCH
+   */
+
+  searchRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 10,
+  },
+
+  searchBox: {
+    flex: 1,
+    height: 51,
+    paddingHorizontal: 14,
+    borderRadius: 17,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    backgroundColor: WHITE,
+    borderWidth: 1,
+    borderColor: "#DDD6CB",
+  },
+
+  searchInput: {
+    flex: 1,
+    paddingVertical: 0,
+    color: BLACK,
+    fontSize: 12.5,
+    fontWeight: "500",
+  },
+
+  filterButton: {
+    width: 51,
+    height: 51,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F0D889",
+    borderWidth: 1,
+    borderColor: "#DFC566",
+  },
+
+  /*
+   * QUICK SEARCH
+   */
+
+  quickRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 23,
+  },
+
+  saleButton: {
+    flex: 1,
+    height: 40,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: BLACK,
+  },
+
+  saleButtonText: {
+    color: WHITE,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  rentButton: {
+    flex: 1,
+    height: 40,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: WHITE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+
+  rentButtonText: {
+    color: BLACK,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  /*
+   * STATES
+   */
+
+  loadingState: {
+    minHeight: 150,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+  },
+
+  loadingText: {
+    color: MUTED,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+
+  emptyState: {
+    minHeight: 170,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 11,
+    padding: 20,
+    backgroundColor: WHITE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+
+  emptyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: GOLD_SOFT,
+  },
+
+  emptyText: {
+    color: MUTED,
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
+  /*
+   * SECTION HEADER
+   */
+
+  sectionHeader: {
+    marginTop: 3,
+    marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  sectionTitle: {
+    flex: 1,
+    color: BLACK,
     fontSize: 17,
     lineHeight: 21,
     fontWeight: "900",
-    marginTop: 8,
+    letterSpacing: -0.3,
   },
-  dots: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 7,
-    marginTop: 11,
-    marginBottom: 21,
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 99,
-    backgroundColor: "#3a3a3a",
-  },
-  activeDot: {
-    width: 20,
-    backgroundColor: SCORPIO_GOLD,
-  },
-  compactFeaturePanel: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#0d0d0d",
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 2,
-    marginBottom: 22,
-  },
-  compactFeatureTitleRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  compactFeatureTitleText: {
-    color: "#ffffff",
-    fontSize: 14.2,
-    fontWeight: "900",
-    letterSpacing: -0.2,
-  },
-  compactFeatureTitleGold: {
-    color: SCORPIO_GOLD,
-    fontSize: 14.2,
-    fontWeight: "900",
-    letterSpacing: -0.2,
-  },
-  compactFeatureRow: {
-    gap: 8,
-    paddingBottom: 12,
-  },
-  compactFeatureCard: {
-    width: 78,
-    minHeight: 68,
-    borderWidth: 1,
-    borderColor: "#5f4b17",
-    borderRadius: 16,
-    backgroundColor: "#171200",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 5,
-    paddingVertical: 7,
-  },
-  compactFeatureIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 999,
-    backgroundColor: SCORPIO_GOLD,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 6,
-  },
-  compactFeatureCardText: {
-    color: "#ffffff",
-    fontSize: 8.8,
-    lineHeight: 11,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 11,
-  },
-  sectionHeaderCompact: {
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "900",
-    letterSpacing: -0.2,
-  },
-  compactTitle: {
-    fontSize: 15,
-  },
-  seeAllRow: {
+
+  seeAll: {
+    marginLeft: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
   },
+
   seeAllText: {
-    color: SCORPIO_GOLD,
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  listingRow: {
-    gap: 12,
-    paddingBottom: 20,
-  },
-  propertyCard: {
-    width: 218,
-    backgroundColor: "#101010",
-    borderRadius: 21,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#303030",
-  },
-  propertyImage: {
-    height: 124,
-    justifyContent: "space-between",
-    padding: 9,
-    overflow: "hidden",
-  },
-  propertyImageRadius: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  propertyImageShade: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.08)",
-  },
-  propertyBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: SCORPIO_GOLD,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  propertyBadgeText: {
-    color: "#111111",
+    color: GOLD_DARK,
     fontSize: 10,
+    fontWeight: "800",
+  },
+
+  /*
+   * HERO
+   */
+
+  heroScroll: {
+    paddingRight: 18,
+    gap: 12,
+  },
+
+  featuredCard: {
+    overflow: "hidden",
+    borderRadius: 22,
+    backgroundColor: WHITE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+
+  featuredImageWrap: {
+    height: 184,
+    position: "relative",
+    backgroundColor: "#EEEAE3",
+  },
+
+  featuredImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  featuredBadges: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    flexDirection: "row",
+    gap: 5,
+  },
+
+  typeBadge: {
+    minHeight: 24,
+    paddingHorizontal: 9,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: BLACK,
+  },
+
+  typeBadgeText: {
+    color: WHITE,
+    fontSize: 8,
     fontWeight: "900",
   },
-  favoriteBubble: {
-    position: "absolute",
-    right: 9,
-    top: 9,
-    width: 31,
-    height: 31,
-    borderRadius: 13,
-    backgroundColor: "rgba(0,0,0,0.58)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
+
+  promotionBadge: {
+    minHeight: 24,
+    paddingHorizontal: 9,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
   },
-  propertyBody: {
-    padding: 12,
-  },
-  propertyPrice: {
-    color: SCORPIO_GOLD,
-    fontSize: 14.5,
+
+  promotionBadgeText: {
+    fontSize: 8,
     fontWeight: "900",
   },
-  propertySubPrice: {
-    color: "#b2b2b2",
-    fontSize: 10,
-    marginTop: 2,
-    fontWeight: "700",
+
+  featuredHeart: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 33,
+    height: 33,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.95)",
   },
-  propertyTitle: {
-    color: "#ffffff",
+
+  /*
+   * IMAGE BRAND
+   */
+
+  imageBrand: {
+    position: "absolute",
+    left: 8,
+    bottom: 8,
+    height: 23,
+    paddingLeft: 4,
+    paddingRight: 7,
+    borderRadius: 999,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(17,17,17,0.80)",
+  },
+
+  imageBrandLarge: {
+    left: 10,
+    bottom: 10,
+    height: 27,
+    paddingLeft: 5,
+    paddingRight: 9,
+    gap: 5,
+  },
+
+  imageBrandLogo: {
+    width: 15,
+    height: 15,
+  },
+
+  imageBrandLogoLarge: {
+    width: 18,
+    height: 18,
+  },
+
+  imageBrandText: {
+    color: WHITE,
+    fontSize: 6.8,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+
+  imageBrandTextLarge: {
+    fontSize: 8,
+    letterSpacing: 1,
+  },
+
+  featuredBody: {
+    padding: 13,
+  },
+
+  featuredPrice: {
+    color: BLACK,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: "900",
+    letterSpacing: -0.15,
+  },
+
+  featuredTitle: {
+    marginTop: 4,
+    color: "#292622",
+    fontSize: 13.5,
+    lineHeight: 18,
+    fontWeight: "800",
+  },
+
+  propertyLocationRow: {
+    marginTop: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  featuredLocation: {
+    flex: 1,
+    color: MUTED,
+    fontSize: 10.5,
+    fontWeight: "600",
+  },
+
+  featuredActions: {
+    marginTop: 11,
+    flexDirection: "row",
+    gap: 7,
+  },
+
+  whatsappButton: {
+    flex: 1,
+    height: 38,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    backgroundColor: "#F2FAF4",
+    borderWidth: 1,
+    borderColor: "#D4E9DB",
+  },
+
+  whatsappText: {
+    color: "#175B32",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  viewingButton: {
+    flex: 1,
+    height: 38,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    backgroundColor: "#F0D889",
+  },
+
+  viewingText: {
+    color: BLACK,
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  dots: {
+    height: 31,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+  },
+
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "#D7D1C7",
+  },
+
+  activeDot: {
+    width: 19,
+    backgroundColor: GOLD,
+  },
+
+  heroBottomSpacing: {
+    height: 18,
+  },
+
+  /*
+   * LOCATION
+   */
+
+  locationScroll: {
+    paddingRight: 18,
+    gap: 9,
+    marginBottom: 23,
+  },
+
+  locationCard: {
+    width: 125,
+    minHeight: 92,
+    padding: 11,
+    borderRadius: 18,
+    backgroundColor: WHITE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+
+  locationIcon: {
+    width: 31,
+    height: 31,
+    marginBottom: 9,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: GOLD_SOFT,
+  },
+
+  locationTitle: {
+    color: BLACK,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+
+  locationCount: {
+    marginTop: 3,
+    color: MUTED,
+    fontSize: 8.7,
+    fontWeight: "600",
+  },
+
+  /*
+   * DISCOVERY CARDS
+   */
+
+  propertyScroll: {
+    paddingRight: 18,
+    gap: 10,
+    marginBottom: 23,
+  },
+
+  discoveryCard: {
+    width: 218,
+    overflow: "hidden",
+    borderRadius: 18,
+    backgroundColor: WHITE,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+
+  discoveryImageWrap: {
+    height: 126,
+    position: "relative",
+    backgroundColor: "#EEEAE3",
+  },
+
+  discoveryImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  discoveryPromotionBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    minHeight: 21,
+    paddingHorizontal: 7,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  discoveryPromotionText: {
+    fontSize: 7,
+    fontWeight: "900",
+  },
+
+  discoveryHeart: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 29,
+    height: 29,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.95)",
+  },
+
+  discoveryBody: {
+    padding: 10,
+  },
+
+  discoveryPrice: {
+    color: BLACK,
     fontSize: 12.5,
     fontWeight: "900",
-    marginTop: 5,
   },
-  propertyLocationRow: {
+
+  discoveryTitle: {
+    marginTop: 4,
+    minHeight: 31,
+    color: "#302D29",
+    fontSize: 11,
+    lineHeight: 15.5,
+    fontWeight: "800",
+  },
+
+  discoveryLocationRow: {
+    marginTop: 6,
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    marginTop: 5,
   },
-  propertyLocation: {
-    color: "#d8d8d8",
-    fontSize: 10.5,
+
+  discoveryLocation: {
     flex: 1,
-    fontWeight: "700",
+    color: MUTED,
+    fontSize: 9,
+    fontWeight: "600",
   },
-  propertyMeta: {
+
+  /*
+   * META
+   */
+
+  metaRow: {
+    marginTop: 9,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginTop: 9,
+    flexWrap: "wrap",
+    gap: 12,
   },
+
+  metaRowCompact: {
+    marginTop: 8,
+    gap: 9,
+  },
+
   metaItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
   },
+
   metaText: {
-    color: "#ffffff",
-    fontSize: 9.5,
-    fontWeight: "900",
-  },
-  engagementRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 11,
-  },
-  engagementRowLight: {
-    marginTop: 10,
-    gap: 5,
-  },
-  engagementRowCompact: {
-    flexWrap: "nowrap",
-    justifyContent: "space-between",
-    gap: 3,
-    marginTop: 10,
-  },
-  engagementMetric: {
-    minHeight: 27,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(230,193,92,0.24)",
-    backgroundColor: "rgba(255,255,255,0.055)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  engagementMetricLight: {
-    backgroundColor: "#f2f2f2",
-    borderColor: "#e2e2e2",
-    minHeight: 25,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-  },
-  engagementMetricCompact: {
-    minHeight: 24,
-    paddingHorizontal: 5,
-    paddingVertical: 4,
-    gap: 2,
-    flex: 1,
-  },
-  engagementMetricText: {
-    color: "#ffffff",
-    fontSize: 9.5,
-    fontWeight: "900",
-  },
-  engagementMetricTextLight: {
-    color: "#111111",
-    fontSize: 8.6,
-  },
-  engagementMetricTextCompact: {
-    fontSize: 7.8,
-  },
-  propertyActionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    marginTop: 10,
-  },
-  propertyActionButton: {
-    flex: 1,
-    minHeight: 31,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(230,193,92,0.28)",
-    backgroundColor: "rgba(255,255,255,0.075)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingHorizontal: 7,
-  },
-  propertyActionText: {
-    color: "#ffffff",
-    fontSize: 9.2,
-    fontWeight: "900",
-  },
-  ctaBanner: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: SCORPIO_GOLD,
-    backgroundColor: "#12100a",
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 24,
-  },
-  ctaIconBubble: {
-    width: 46,
-    height: 46,
-    borderRadius: 18,
-    backgroundColor: SCORPIO_GOLD,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ctaTextBox: {
-    flex: 1,
-  },
-  ctaTitle: {
-    color: SCORPIO_GOLD,
-    fontSize: 16.5,
-    lineHeight: 21,
-    fontWeight: "900",
-    letterSpacing: -0.25,
-  },
-  ctaSub: {
-    color: "#d6d6d6",
-    fontSize: 11.2,
-    lineHeight: 16,
-    marginTop: 5,
+    color: "#59544D",
+    fontSize: 10,
     fontWeight: "700",
   },
-  ctaButton: {
-    backgroundColor: SCORPIO_GOLD,
-    borderRadius: 17,
-    paddingHorizontal: 13,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-  },
-  ctaButtonText: {
-    color: "#111111",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  smartBanner: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    backgroundColor: "#211a0b",
-    padding: 15,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    marginBottom: 24,
-  },
-  smartIconBox: {
-    width: 50,
-    height: 50,
-    borderRadius: 18,
-    backgroundColor: "#151106",
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  smartContent: {
-    flex: 1,
-  },
-  smartText: {
-    color: "#ffffff",
-    fontSize: 15.5,
-    lineHeight: 19,
-    fontWeight: "900",
-    letterSpacing: -0.25,
-  },
-  smartSub: {
-    color: "#d8d8d8",
-    fontSize: 10.7,
-    lineHeight: 16,
-    fontWeight: "700",
-    marginTop: 5,
-  },
-  smartChipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 10,
-  },
-  smartChip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#705d2c",
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-  smartChipText: {
-    color: "#ffffff",
+
+  metaTextCompact: {
     fontSize: 8.7,
-    fontWeight: "800",
   },
-  panel: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#0f0f0f",
+
+  /*
+   * BROWSE BY GOAL
+   */
+
+  goalStack: {
+    gap: 8,
+    marginBottom: 23,
+  },
+
+  goalCard: {
+    minHeight: 91,
     padding: 12,
-    marginBottom: 14,
-  },
-  projectRow: {
+    borderRadius: 18,
     flexDirection: "row",
     alignItems: "center",
     gap: 11,
-    marginBottom: 12,
-  },
-  projectImage: {
-    width: 150,
-    height: 82,
-    borderRadius: 15,
-  },
-  projectTextBox: {
-    flex: 1,
-    justifyContent: "center",
-    minWidth: 0,
-  },
-  projectTitle: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "900",
-  },
-  projectLocation: {
-    color: "#b0b0b0",
-    fontSize: 10.5,
-    marginTop: 2,
-  },
-  projectPrice: {
-    color: "#ffffff",
-    fontSize: 10.5,
-    fontWeight: "800",
-    marginTop: 3,
-  },
-  entryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 24,
-  },
-  entryCard: {
-    width: "48.5%",
-    borderRadius: 20,
+    backgroundColor: WHITE,
     borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 13,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
+    borderColor: BORDER,
   },
-  entryIcon: {
-    width: 36,
-    height: 36,
+
+  goalGoldIcon: {
+    width: 46,
+    height: 46,
     borderRadius: 14,
-    backgroundColor: "#211a0b",
-    borderWidth: 1,
-    borderColor: "#5f4b17",
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#F0D889",
   },
-  entryTextBox: {
+
+  goalSoftIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: SOFT,
+  },
+
+  goalCopy: {
     flex: 1,
   },
-  entryTitle: {
-    color: "#ffffff",
+
+  goalTitle: {
+    color: BLACK,
     fontSize: 12.5,
     fontWeight: "900",
   },
-  entrySubtitle: {
-    color: "#9d9d9d",
+
+  goalDescription: {
+    marginTop: 3,
+    color: MUTED,
     fontSize: 9.5,
-    marginTop: 2,
+    lineHeight: 13.5,
+    fontWeight: "600",
   },
-  articleRow: {
-    gap: 12,
-    marginBottom: 20,
+
+  goalCount: {
+    marginTop: 5,
+    color: GOLD_DARK,
+    fontSize: 9,
+    fontWeight: "800",
   },
-  articleCard: {
+
+  /*
+   * TETAMO TRUST / BRAND PANEL
+   */
+
+  trustPanel: {
+    marginBottom: 24,
+    padding: 16,
     borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#101010",
-    padding: 10,
+    backgroundColor: BLACK,
+  },
+
+  trustEyebrow: {
+    color: GOLD,
+    fontSize: 8.5,
+    fontWeight: "900",
+    letterSpacing: 1.8,
+  },
+
+  trustTitle: {
+    marginTop: 5,
+    color: WHITE,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: "900",
+  },
+
+  trustItems: {
+    marginTop: 14,
+    gap: 8,
+  },
+
+  trustItem: {
+    minHeight: 41,
+    paddingHorizontal: 10,
+    borderRadius: 12,
     flexDirection: "row",
-    gap: 12,
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#1A1A1A",
+    borderWidth: 1,
+    borderColor: "#292929",
   },
-  articleImage: {
-    width: 146,
-    height: 86,
-    borderRadius: 16,
+
+  trustIcon: {
+    width: 27,
+    alignItems: "center",
   },
-  articleTextBox: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  articleTag: {
-    alignSelf: "flex-start",
-    color: "#111111",
-    backgroundColor: SCORPIO_GOLD,
-    borderRadius: 999,
-    overflow: "hidden",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    fontSize: 9.5,
-    fontWeight: "900",
-    marginBottom: 7,
-  },
-  articleTitle: {
-    color: "#ffffff",
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "900",
-  },
-  articleTime: {
-    color: "#9b9b9b",
+
+  trustItemText: {
+    color: "#F5F5F5",
     fontSize: 10.5,
-    marginTop: 7,
     fontWeight: "700",
   },
-  popularBottomPanel: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#303030",
-    backgroundColor: "#0f0f0f",
-    padding: 11,
-    marginBottom: 24,
-  },
-  areaGrid: {
+
+  /*
+   * PROPERTY TYPE EXPLORER
+   */
+
+  propertyTypeGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 7,
+    justifyContent: "space-between",
+    gap: 9,
+    marginBottom: 24,
   },
-  areaCard: {
-    width: "23.3%",
-    minHeight: 58,
+
+  propertyTypeCard: {
+    width: "48.6%",
+    minHeight: 88,
+    paddingHorizontal: 11,
+    paddingVertical: 12,
+    borderRadius: 17,
+    backgroundColor: WHITE,
     borderWidth: 1,
-    borderColor: SCORPIO_GOLD,
-    borderRadius: 16,
-    backgroundColor: "#171200",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-    paddingVertical: 7,
-  },
-  areaIconCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 999,
-    backgroundColor: SCORPIO_GOLD,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 5,
-  },
-  areaText: {
-    color: "#ffffff",
-    fontSize: 8.7,
-    lineHeight: 11,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  scorpioFloatingButton: {
-    position: "absolute",
-    right: 16,
-    bottom: 76,
-    zIndex: 99,
-    minHeight: 58,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "#fff1a8",
-    backgroundColor: SCORPIO_GOLD,
-    paddingLeft: 10,
-    paddingRight: 17,
+    borderColor: BORDER,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    overflow: "hidden",
-    shadowColor: SCORPIO_GOLD,
-    shadowOffset: {
-      width: 0,
-      height: 12,
-    },
-    shadowOpacity: 0.55,
-    shadowRadius: 22,
-    elevation: 18,
+    gap: 8,
   },
-  scorpioGoldGlow: {
-    position: "absolute",
-    top: -26,
-    right: -18,
-    width: 76,
-    height: 76,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.36)",
-  },
-  scorpioIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(17,17,17,0.14)",
-    backgroundColor: "rgba(255,255,255,0.42)",
+
+  propertyTypeIcon: {
+    width: 37,
+    height: 37,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: GOLD_SOFT,
   },
-  scorpioTextBox: {
-    paddingRight: 2,
+
+  propertyTypeCopy: {
+    flex: 1,
+    minWidth: 0,
   },
-  scorpioButtonText: {
-    color: "#111111",
-    fontSize: 12.5,
+
+  propertyTypeTitle: {
+    color: BLACK,
+    fontSize: 11.5,
     fontWeight: "900",
-    lineHeight: 15,
-    letterSpacing: -0.1,
   },
-  scorpioButtonSub: {
-    color: "#3a2a00",
-    fontSize: 10.5,
-    fontWeight: "900",
-    lineHeight: 13,
-    letterSpacing: 0.2,
+
+  propertyTypeSub: {
+    marginTop: 3,
+    color: MUTED,
+    fontSize: 8.5,
+    lineHeight: 11.5,
+    fontWeight: "600",
+  },
+
+  /*
+   * EXPLORE MARKETPLACE
+   */
+
+  exploreButton: {
+    height: 49,
+    marginBottom: 10,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    backgroundColor: BLACK,
+  },
+
+  exploreButtonText: {
+    color: WHITE,
+    fontSize: 11.5,
+    fontWeight: "800",
+  },
+
+  /*
+   * IMAGE FALLBACK
+   */
+
+  imageFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EEEAE3",
+  },
+
+  /*
+   * SCORPIO
+   */
+
+  scorpioButton: {
+    position: "absolute",
+
+    right: 16,
+
+    /*
+     * TetamoFooter sits below it.
+     * This avoids covering Viewing/buttons.
+     */
+    bottom: 96,
+
+    zIndex: 50,
+
+    width: 43,
+    height: 43,
+    borderRadius: 999,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "#F0D889",
+
+    borderWidth: 2,
+    borderColor: "#FFF8E8",
+
+    shadowColor: "#000000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+
+    elevation: 5,
   },
 });
