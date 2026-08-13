@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
+  BadgeDollarSign,
   Building2,
   LogOut,
   Megaphone,
@@ -249,6 +250,22 @@ export default function AdminHomeScreen() {
             onPress={() =>
               router.push(
                 "/admin/campaigns" as any
+              )
+            }
+          />
+
+          <AdminCard
+            icon={
+              <BadgeDollarSign
+                color="#171717"
+                size={23}
+              />
+            }
+            title="Revenue Analytics"
+            description="View verified Stripe and HitPay revenue from your phone."
+            onPress={() =>
+              router.push(
+                "/admin/revenue" as any
               )
             }
           />
