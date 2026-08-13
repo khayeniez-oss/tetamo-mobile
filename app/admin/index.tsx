@@ -199,7 +199,7 @@ export default function AdminHomeScreen() {
           style={styles.subtitle}
         >
           Hi {name}. Manage the parts of
-          Tetamo you need while you're
+          Tetamo you need while you’re
           away from your laptop.
         </Text>
 
@@ -274,7 +274,7 @@ export default function AdminHomeScreen() {
         <Text
           style={styles.note}
         >
-          Manage Tetamo's essential
+          Manage Tetamo’s essential
           admin tools from your phone.
         </Text>
       </ScrollView>
