@@ -738,7 +738,7 @@ export default function ScorpioAssistScreen() {
     }).format(date);
   }
 
-  function useStarterQuestion(question: string) {
+  function handleStarterQuestion(question: string) {
     setInput(question);
   }
 
@@ -1004,7 +1004,7 @@ export default function ScorpioAssistScreen() {
                     <Pressable
                       key={question}
                       style={styles.starterPill}
-                      onPress={() => useStarterQuestion(question)}
+                      onPress={() => handleStarterQuestion(question)}
                     >
                       <Text style={styles.starterPillText}>{question}</Text>
                     </Pressable>
