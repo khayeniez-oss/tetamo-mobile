@@ -32,6 +32,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 type Language = "en" | "id";
 type AllowedRole = "owner" | "agent" | "developer" | "admin";
+type SignupRole = "owner" | "agent" | "developer";
 
 function normalizeRole(value: unknown): AllowedRole | null {
   const v = String(value || "").toLowerCase();
@@ -107,7 +108,14 @@ export default function LoginScreen() {
 
   const isId = language === "id";
 
-  const roleFromUrl = normalizeRole(readParam(params.role));
+  const requestedRoleFromUrl = normalizeRole(readParam(params.role));
+
+  const roleFromUrl: SignupRole | null =
+    requestedRoleFromUrl === "owner" ||
+    requestedRoleFromUrl === "agent" ||
+    requestedRoleFromUrl === "developer"
+      ? requestedRoleFromUrl
+      : null;
   const rawNext = readParam(params.next);
   const safeNext = isSafeInternalPath(rawNext) ? rawNext : "";
 
@@ -192,7 +200,7 @@ export default function LoginScreen() {
   function getDefaultRedirect(role: AllowedRole | null) {
     if (Platform.OS === "ios") {
       if (role === "developer") return "/developer-license";
-      if (role === "admin") return "/(tabs)/profile";
+      if (role === "admin") return "/admin";
 
       return "/(tabs)/property";
     }
@@ -200,7 +208,7 @@ export default function LoginScreen() {
     if (role === "owner") return "/owner/packages";
     if (role === "agent") return "/agent/packages";
     if (role === "developer") return "/developer-license";
-    if (role === "admin") return "/(tabs)/profile";
+    if (role === "admin") return "/admin";
 
     return "/(tabs)/property";
   }
@@ -277,7 +285,7 @@ export default function LoginScreen() {
   }: {
     userId: string;
     allowCreateProfile: boolean;
-    requestedRole?: AllowedRole | null;
+    requestedRole?: SignupRole | null;
     fallbackEmail?: string;
     fallbackFullName?: string;
   }) {
