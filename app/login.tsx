@@ -32,6 +32,7 @@ import {
   View,
 } from "react-native";
 
+import { signInWithNativeGoogle } from "../lib/google-native-auth";
 import { supabase } from "../lib/supabase";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -42,12 +43,10 @@ type AllowedRole =
   | "owner"
   | "agent"
   | "developer"
+  | "buyer"
   | "admin";
 
-type SignupRole =
-  | "owner"
-  | "agent"
-  | "developer";
+type SignupRole = "buyer";
 
 const BLACK = "#111111";
 const WHITE = "#FFFFFF";
@@ -77,15 +76,26 @@ function normalizeRole(
   if (role === "owner") return "owner";
   if (role === "agent") return "agent";
   if (role === "developer") return "developer";
+  if (role === "buyer") return "buyer";
   if (role === "admin") return "admin";
 
   return null;
 }
 
 function isSafeInternalPath(value: string) {
+  if (
+    !value.startsWith("/") ||
+    value.startsWith("//")
+  ) {
+    return false;
+  }
+
   return (
-    value.startsWith("/") &&
-    !value.startsWith("//")
+    value === "/(tabs)/property" ||
+    value === "/(tabs)/saved" ||
+    value === "/dashboard/saved" ||
+    value === "/dashboard/liked" ||
+    value.startsWith("/properti/")
   );
 }
 
@@ -218,10 +228,8 @@ export default function LoginScreen() {
    * /login?role=admin must never create or promote an admin.
    */
   const roleFromUrl: SignupRole | null =
-    requestedRoleFromUrl === "owner" ||
-    requestedRoleFromUrl === "agent" ||
-    requestedRoleFromUrl === "developer"
-      ? requestedRoleFromUrl
+    requestedRoleFromUrl === "buyer"
+      ? "buyer"
       : null;
 
   const rawNext = readParam(params.next);
@@ -425,30 +433,6 @@ export default function LoginScreen() {
   function getDefaultRedirect(
     role: AllowedRole | null
   ) {
-    if (Platform.OS === "ios") {
-      if (role === "developer") {
-        return "/developer-license";
-      }
-
-      if (role === "admin") {
-        return "/admin";
-      }
-
-      return "/(tabs)/property";
-    }
-
-    if (role === "owner") {
-      return "/owner/packages";
-    }
-
-    if (role === "agent") {
-      return "/agent/packages";
-    }
-
-    if (role === "developer") {
-      return "/developer-license";
-    }
-
     if (role === "admin") {
       return "/admin";
     }
@@ -459,7 +443,7 @@ export default function LoginScreen() {
   function getFinalRedirect(
     role: AllowedRole | null
   ) {
-    if (Platform.OS === "ios") {
+    if (role === "admin") {
       return getDefaultRedirect(role);
     }
 
@@ -657,7 +641,7 @@ export default function LoginScreen() {
     ) {
       finalRole =
         requestedRole ||
-        "owner";
+        "buyer";
 
       const {
         error: insertError,
@@ -919,6 +903,83 @@ export default function LoginScreen() {
       setAppleLoading(false);
       setGoogleLoading(true);
 
+      if (Platform.OS === "android") {
+        const nativeGoogle =
+          await signInWithNativeGoogle();
+
+        if (!nativeGoogle) {
+          setGoogleLoading(false);
+          return;
+        }
+
+        const {
+          error: signInError,
+        } =
+          await supabase.auth.signInWithIdToken(
+            {
+              provider:
+                "google",
+
+              token:
+                nativeGoogle.idToken,
+            }
+          );
+
+        if (signInError) {
+          throw signInError;
+        }
+
+        const {
+          data: {
+            session,
+          },
+          error:
+            sessionError,
+        } =
+          await supabase.auth.getSession();
+
+        if (sessionError) {
+          throw sessionError;
+        }
+
+        if (!session?.user) {
+          throw new Error(
+            ui.googleSessionError
+          );
+        }
+
+        await finishLogin({
+          userId:
+            session.user.id,
+
+          allowCreateProfile:
+            true,
+
+          requestedRole:
+            roleFromUrl ||
+            "buyer",
+
+          fallbackEmail:
+            session.user.email ||
+            nativeGoogle.email ||
+            "",
+
+          fallbackFullName:
+            String(
+              session.user
+                .user_metadata
+                ?.full_name ||
+              session.user
+                .user_metadata
+                ?.name ||
+              nativeGoogle.fullName ||
+              ""
+            ).trim(),
+        });
+
+        return;
+      }
+
       const redirectTo =
         Linking.createURL(
           "auth/callback"
@@ -1045,7 +1106,7 @@ export default function LoginScreen() {
 
         requestedRole:
           roleFromUrl ||
-          "owner",
+          "buyer",
 
         fallbackEmail:
           session.user.email ||
@@ -1207,7 +1268,7 @@ export default function LoginScreen() {
 
         requestedRole:
           roleFromUrl ||
-          "owner",
+          "buyer",
 
         fallbackEmail:
           session.user.email ||
@@ -1288,9 +1349,16 @@ export default function LoginScreen() {
             style={
               styles.backButton
             }
-            onPress={() =>
-              router.back()
-            }
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+                return;
+              }
+
+              router.replace(
+                "/(tabs)/property" as any
+              );
+            }}
           >
             <ArrowLeft
               color={BLACK}

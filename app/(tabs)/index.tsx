@@ -51,6 +51,7 @@ type Currency = "IDR" | "USD" | "AUD";
 type Listing = TetamoProperty;
 
 const tetamoLogo = require("../../assets/images/tetamo-logo.png");
+const tetamoPartnerIcon = require("../../assets/images/tetamo-partner-icon.png");
 
 const BLACK = "#111111";
 const CREAM = "#FBFAF7";
@@ -304,10 +305,37 @@ useEffect(() => {
     /*
      * Live notification updates
      */
+    const notificationChannelName =
+      `home-notifications-${currentUserId}`;
+
+    /*
+     * Supabase reuses an existing channel when
+     * the same topic already exists. During a
+     * remount / Fast Refresh, the previous Home
+     * channel may still be finishing cleanup.
+     *
+     * Remove that stale channel before attaching
+     * postgres_changes callbacks to a fresh one.
+     */
+    const existingChannel =
+      supabase
+        .getChannels()
+        .find(
+          (candidate) =>
+            candidate.topic ===
+            `realtime:${notificationChannelName}`
+        );
+
+    if (existingChannel) {
+      await supabase.removeChannel(
+        existingChannel
+      );
+    }
+
+    if (!mounted) return;
+
     channel = supabase
-      .channel(
-        `home-notifications-${currentUserId}`
-      )
+      .channel(notificationChannelName)
       .on(
         "postgres_changes",
         {
@@ -1127,10 +1155,6 @@ Is this property still available?`;
                     {t.saleSub}
                   </Text>
 
-                  <Text style={styles.goalCount}>
-                    {saleProperties.length}{" "}
-                    {t.properties}
-                  </Text>
                 </View>
 
                 <ChevronRight
@@ -1166,10 +1190,6 @@ Is this property still available?`;
                     {t.rentSub}
                   </Text>
 
-                  <Text style={styles.goalCount}>
-                    {rentProperties.length}{" "}
-                    {t.properties}
-                  </Text>
                 </View>
 
                 <ChevronRight
@@ -1450,6 +1470,46 @@ Is this property still available?`;
             />
           </Pressable>
         ) : null}
+
+        <View style={styles.partnerPromoCard}>
+          <Image
+            source={tetamoPartnerIcon}
+            style={styles.partnerPromoIcon}
+            resizeMode="cover"
+          />
+
+          <View style={styles.partnerPromoCopy}>
+            <Text style={styles.partnerPromoEyebrow}>
+              TETAMO PARTNER
+            </Text>
+
+            <Text style={styles.partnerPromoTitle}>
+              {language === "id"
+                ? "Ingin pasang iklan properti?"
+                : "Want to list your property?"}
+            </Text>
+
+            <Text style={styles.partnerPromoDescription}>
+              {language === "id"
+                ? "Download Tetamo Partner di iOS dan Android untuk memasang dan mengelola listing properti Anda."
+                : "Download Tetamo Partner on iOS and Android to post and manage your property listings."}
+            </Text>
+
+            <View style={styles.partnerPlatformRow}>
+              <View style={styles.partnerPlatformPill}>
+                <Text style={styles.partnerPlatformText}>
+                  iOS
+                </Text>
+              </View>
+
+              <View style={styles.partnerPlatformPill}>
+                <Text style={styles.partnerPlatformText}>
+                  Android
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
       </ScrollView>
 
       {/* ===================================
@@ -2262,7 +2322,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 18,
     paddingTop: 9,
-    paddingBottom: 130,
+    paddingBottom: 40,
   },
 
   /*
@@ -3197,6 +3257,77 @@ const styles = StyleSheet.create({
   exploreButtonText: {
     color: WHITE,
     fontSize: 11.5,
+    fontWeight: "800",
+  },
+
+  /*
+   * TETAMO PARTNER
+   */
+
+  partnerPromoCard: {
+    marginTop: 8,
+    marginBottom: 22,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: WHITE,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+
+  partnerPromoIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+  },
+
+  partnerPromoCopy: {
+    flex: 1,
+  },
+
+  partnerPromoEyebrow: {
+    color: GOLD_DARK,
+    fontSize: 8.5,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+  },
+
+  partnerPromoTitle: {
+    marginTop: 5,
+    color: BLACK,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "900",
+  },
+
+  partnerPromoDescription: {
+    marginTop: 5,
+    color: MUTED,
+    fontSize: 9.5,
+    lineHeight: 14,
+    fontWeight: "600",
+  },
+
+  partnerPlatformRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    gap: 7,
+  },
+
+  partnerPlatformPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: SOFT,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+
+  partnerPlatformText: {
+    color: BLACK,
+    fontSize: 8.5,
     fontWeight: "800",
   },
 

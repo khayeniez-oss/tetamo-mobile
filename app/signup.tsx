@@ -40,14 +40,12 @@ import {
   View,
 } from "react-native";
 
+import { signInWithNativeGoogle } from "../lib/google-native-auth";
 import { supabase } from "../lib/supabase";
 
 WebBrowser.maybeCompleteAuthSession();
 
-type AllowedRole =
-  | "owner"
-  | "agent"
-  | "developer";
+type AllowedRole = "buyer";
 
 type Language = "en" | "id";
 
@@ -74,9 +72,6 @@ const TERMS_URL =
 
 const PRIVACY_URL =
   `${TETAMO_SITE_URL}/kebijakan-privasi`;
-
-const SUBSCRIPTION_URL =
-  `${TETAMO_SITE_URL}/kebijakan-berlangganan`;
 
 /*
  * =====================================================
@@ -195,13 +190,8 @@ export default function SignupScreen() {
   const [language, setLanguage] =
     useState<Language>("en");
 
-  const [
-    selectedRole,
-    setSelectedRole,
-  ] =
-    useState<AllowedRole | null>(
-      null
-    );
+  const selectedRole: AllowedRole =
+    "buyer";
 
   const [
     phoneNumber,
@@ -277,7 +267,7 @@ export default function SignupScreen() {
           "Buat akun Tetamo",
 
         subtitle:
-          "Pilih cara Anda ingin menggunakan Tetamo.",
+          "Buat akun untuk mencari, menyimpan, dan menanyakan properti di Tetamo.",
 
         chooseRole:
           "Bagaimana Anda menggunakan Tetamo?",
@@ -313,7 +303,7 @@ export default function SignupScreen() {
           "Ganti",
 
         accountDetails:
-          "Buat akun Anda",
+          "Detail Anda",
 
         accountDetailsSub:
           "Lengkapi informasi dasar untuk melanjutkan.",
@@ -358,7 +348,7 @@ export default function SignupScreen() {
           "Menghubungkan...",
 
         socialNote:
-          "Untuk Google atau Apple, isi nomor WhatsApp dan setujui kebijakan Tetamo terlebih dahulu.",
+          "Untuk Google atau Apple, tidak perlu isi form di atas. Cukup setujui Syarat & Ketentuan dan Kebijakan Privasi Tetamo.",
 
         or: "atau",
 
@@ -407,7 +397,7 @@ export default function SignupScreen() {
           "Kata sandi minimal 6 karakter.",
 
         policyRequired:
-          "Silakan setujui Syarat & Ketentuan, Kebijakan Privasi, dan Kebijakan Berlangganan terlebih dahulu.",
+          "Silakan setujui Syarat & Ketentuan dan Kebijakan Privasi terlebih dahulu.",
 
         signupSuccess:
           "Akun berhasil dibuat. Silakan cek email Anda jika diminta konfirmasi.",
@@ -451,7 +441,7 @@ export default function SignupScreen() {
         "Create your Tetamo account",
 
       subtitle:
-        "Choose how you want to use Tetamo.",
+        "Create an account to discover, save and enquire about properties on Tetamo.",
 
       chooseRole:
         "How will you use Tetamo?",
@@ -487,7 +477,7 @@ export default function SignupScreen() {
         "Change",
 
       accountDetails:
-        "Create your account",
+        "Your details",
 
       accountDetailsSub:
         "Complete your basic information to continue.",
@@ -532,7 +522,7 @@ export default function SignupScreen() {
         "Connecting...",
 
       socialNote:
-        "For Google or Apple, enter your WhatsApp number and accept Tetamo's policies first.",
+        "For Google or Apple, you do not need to fill in the form above. Just accept Tetamo's Terms & Conditions and Privacy Policy.",
 
       or: "or",
 
@@ -581,7 +571,7 @@ export default function SignupScreen() {
         "Password must be at least 6 characters.",
 
       policyRequired:
-        "Please agree to the Terms, Privacy Policy, and Subscription Policy first.",
+        "Please agree to the Terms & Conditions and Privacy Policy first.",
 
       signupSuccess:
         "Account created successfully. Please check your email if confirmation is required.",
@@ -614,43 +604,6 @@ export default function SignupScreen() {
         "Apple signup failed.",
     };
   }, [isId]);
-
-  /*
-   * ===================================================
-   * ROLE LABEL
-   * ===================================================
-   */
-
-  const roleLabel =
-    useMemo(() => {
-      if (
-        selectedRole === "owner"
-      ) {
-        return isId
-          ? "Pemilik Properti"
-          : "Property Owner";
-      }
-
-      if (
-        selectedRole === "agent"
-      ) {
-        return isId
-          ? "Agen Properti"
-          : "Property Agent";
-      }
-
-      if (
-        selectedRole ===
-        "developer"
-      ) {
-        return "Developer";
-      }
-
-      return "";
-    }, [
-      selectedRole,
-      isId,
-    ]);
 
   const isBusy =
     loadingEmail ||
@@ -696,34 +649,14 @@ export default function SignupScreen() {
 
   /*
    * ===================================================
-   * ROLE REDIRECTS
+   * MARKETPLACE REDIRECT
    * ===================================================
    */
 
   function getRoleRedirect(
-    role: AllowedRole
+    _role: AllowedRole
   ) {
-    if (
-      Platform.OS === "ios"
-    ) {
-      if (
-        role === "developer"
-      ) {
-        return "/developer-license";
-      }
-
-      return "/(tabs)/property";
-    }
-
-    if (role === "owner") {
-      return "/owner/packages";
-    }
-
-    if (role === "agent") {
-      return "/agent/packages";
-    }
-
-    return "/developer-license";
+    return "/(tabs)/property";
   }
 
   /*
@@ -733,25 +666,6 @@ export default function SignupScreen() {
    */
 
   function validateSharedFields() {
-    if (!selectedRole) {
-      Alert.alert(
-        ui.emptyRole
-      );
-
-      return null;
-    }
-
-    if (
-      selectedRole ===
-      "developer"
-    ) {
-      router.push(
-        "/developer-license" as any
-      );
-
-      return null;
-    }
-
     const normalizedPhone =
       normalizePhoneNumber(
         phoneNumber
@@ -791,6 +705,24 @@ export default function SignupScreen() {
 
       phone:
         normalizedPhone,
+
+      fullName:
+        fullName.trim(),
+    };
+  }
+
+  function validateSocialSignupFields() {
+    if (!agreedToPolicies) {
+      Alert.alert(
+        ui.policyRequired
+      );
+
+      return null;
+    }
+
+    return {
+      role:
+        selectedRole,
 
       fullName:
         fullName.trim(),
@@ -891,9 +823,10 @@ export default function SignupScreen() {
     userEmail: string;
     role:
       | "owner"
-      | "agent";
+      | "agent"
+      | "buyer";
     name: string;
-    phone: string;
+    phone: string | null;
   }) {
     const { error } =
       await supabase
@@ -1042,7 +975,7 @@ export default function SignupScreen() {
 
   async function handleGoogleSignup() {
     const base =
-      validateSharedFields();
+      validateSocialSignupFields();
 
     if (!base) {
       return;
@@ -1052,6 +985,89 @@ export default function SignupScreen() {
       setLoadingGoogle(true);
       setLoadingEmail(false);
       setLoadingApple(false);
+
+      if (Platform.OS === "android") {
+        const nativeGoogle =
+          await signInWithNativeGoogle();
+
+        if (!nativeGoogle) {
+          return;
+        }
+
+        const {
+          error: signInError,
+        } =
+          await supabase.auth.signInWithIdToken(
+            {
+              provider:
+                "google",
+
+              token:
+                nativeGoogle.idToken,
+            }
+          );
+
+        if (signInError) {
+          throw signInError;
+        }
+
+        const {
+          data: {
+            session,
+          },
+          error:
+            sessionError,
+        } =
+          await supabase.auth.getSession();
+
+        if (sessionError) {
+          throw sessionError;
+        }
+
+        if (!session?.user) {
+          throw new Error(
+            ui.googleSessionError
+          );
+        }
+
+        await saveProfile({
+          userId:
+            session.user.id,
+
+          userEmail:
+            session.user.email ||
+            nativeGoogle.email ||
+            "",
+
+          role:
+            base.role,
+
+          name:
+            base.fullName ||
+            String(
+              session.user
+                .user_metadata
+                ?.full_name ||
+              session.user
+                .user_metadata
+                ?.name ||
+              nativeGoogle.fullName ||
+              ""
+            ).trim() ||
+            "Tetamo User",
+
+          phone:
+            null,
+        });
+
+        router.replace(
+          getRoleRedirect(
+            base.role
+          ) as any
+        );
+
+        return;
+      }
 
       const redirectTo =
         Linking.createURL(
@@ -1188,7 +1204,7 @@ export default function SignupScreen() {
           "Tetamo User",
 
         phone:
-          base.phone,
+          null,
       });
 
       router.replace(
@@ -1214,7 +1230,7 @@ export default function SignupScreen() {
 
   async function handleAppleSignup() {
     const base =
-      validateSharedFields();
+      validateSocialSignupFields();
 
     if (!base) {
       return;
@@ -1360,7 +1376,7 @@ export default function SignupScreen() {
           "Tetamo User",
 
         phone:
-          base.phone,
+          null,
       });
 
       router.replace(
@@ -1383,28 +1399,6 @@ export default function SignupScreen() {
     } finally {
       setLoadingApple(false);
     }
-  }
-
-  /*
-   * ===================================================
-   * ROLE SELECTION
-   * ===================================================
-   */
-
-  function handleSelectRole(
-    role: AllowedRole
-  ) {
-    if (
-      role === "developer"
-    ) {
-      router.push(
-        "/developer-license" as any
-      );
-
-      return;
-    }
-
-    setSelectedRole(role);
   }
 
   /*
@@ -1438,9 +1432,16 @@ export default function SignupScreen() {
             style={
               styles.backButton
             }
-            onPress={() =>
-              router.back()
-            }
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+                return;
+              }
+
+              router.replace(
+                "/(tabs)/property" as any
+              );
+            }}
           >
             <ArrowLeft
               color={BLACK}
@@ -1572,192 +1573,11 @@ export default function SignupScreen() {
             </Text>
           </View>
 
-          {/* =================================
-              ROLE SELECTION
-          ================================= */}
+          {/* =============================
+              ACCOUNT FORM
+          ============================= */}
 
-          {!selectedRole ? (
-            <View
-              style={styles.card}
-            >
-              <Text
-                style={
-                  styles.cardTitle
-                }
-              >
-                {ui.chooseRole}
-              </Text>
 
-              <Text
-                style={
-                  styles.cardSub
-                }
-              >
-                {
-                  ui.chooseRoleDesc
-                }
-              </Text>
-
-              <View
-                style={
-                  styles.roleList
-                }
-              >
-                <RoleCard
-                  icon={
-                    <UserRound
-                      color={GOLD_DARK}
-                      size={19}
-                    />
-                  }
-                  title={
-                    ui.ownerTitle
-                  }
-                  description={
-                    ui.ownerDesc
-                  }
-                  onPress={() =>
-                    handleSelectRole(
-                      "owner"
-                    )
-                  }
-                />
-
-                <RoleCard
-                  icon={
-                    <BriefcaseBusiness
-                      color={GOLD_DARK}
-                      size={19}
-                    />
-                  }
-                  title={
-                    ui.agentTitle
-                  }
-                  description={
-                    ui.agentDesc
-                  }
-                  onPress={() =>
-                    handleSelectRole(
-                      "agent"
-                    )
-                  }
-                />
-
-                <RoleCard
-                  icon={
-                    <Building2
-                      color={GOLD_DARK}
-                      size={19}
-                    />
-                  }
-                  title={
-                    ui.developerTitle
-                  }
-                  description={
-                    ui.developerDesc
-                  }
-                  badge={
-                    ui.requestQuote
-                  }
-                  onPress={() =>
-                    handleSelectRole(
-                      "developer"
-                    )
-                  }
-                />
-              </View>
-
-              <AuthFooter
-                already={ui.already}
-                login={ui.login}
-                onLogin={() =>
-                  router.push(
-                    "/login" as any
-                  )
-                }
-              />
-            </View>
-          ) : (
-            <>
-              {/* =============================
-                  SELECTED ROLE
-              ============================= */}
-
-              <View
-                style={
-                  styles.selectedRoleCard
-                }
-              >
-                <View
-                  style={
-                    styles.selectedRoleIcon
-                  }
-                >
-                  {selectedRole ===
-                  "agent" ? (
-                    <BriefcaseBusiness
-                      color={GOLD_DARK}
-                      size={18}
-                    />
-                  ) : (
-                    <UserRound
-                      color={GOLD_DARK}
-                      size={18}
-                    />
-                  )}
-                </View>
-
-                <View
-                  style={
-                    styles.selectedRoleCopy
-                  }
-                >
-                  <Text
-                    style={
-                      styles.smallLabel
-                    }
-                  >
-                    {
-                      ui.selectedRole
-                    }
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.selectedRoleText
-                    }
-                  >
-                    {roleLabel}
-                  </Text>
-                </View>
-
-                <Pressable
-                  style={
-                    styles.changeButton
-                  }
-                  onPress={() => {
-                    setSelectedRole(
-                      null
-                    );
-
-                    setAgreedToPolicies(
-                      false
-                    );
-                  }}
-                >
-                  <Text
-                    style={
-                      styles.changeButtonText
-                    }
-                  >
-                    {ui.change}
-                  </Text>
-                </Pressable>
-              </View>
-
-              {/* =============================
-                  ACCOUNT FORM
-              ============================= */}
 
               <View
                 style={styles.card}
@@ -1781,26 +1601,6 @@ export default function SignupScreen() {
                     ui.accountDetailsSub
                   }
                 </Text>
-
-                <FormInput
-                  label={ui.phone}
-                  value={
-                    phoneNumber
-                  }
-                  onChangeText={
-                    setPhoneNumber
-                  }
-                  placeholder={
-                    ui.phonePlaceholder
-                  }
-                  keyboardType="phone-pad"
-                  icon={
-                    <Phone
-                      color={GOLD_DARK}
-                      size={16}
-                    />
-                  }
-                />
 
                 <FormInput
                   label={
@@ -1837,6 +1637,26 @@ export default function SignupScreen() {
                   autoCapitalize="none"
                   icon={
                     <Mail
+                      color={GOLD_DARK}
+                      size={16}
+                    />
+                  }
+                />
+
+                <FormInput
+                  label={ui.phone}
+                  value={
+                    phoneNumber
+                  }
+                  onChangeText={
+                    setPhoneNumber
+                  }
+                  placeholder={
+                    ui.phonePlaceholder
+                  }
+                  keyboardType="phone-pad"
+                  icon={
+                    <Phone
                       color={GOLD_DARK}
                       size={16}
                     />
@@ -1992,22 +1812,6 @@ export default function SignupScreen() {
                       {ui.privacy}
                     </Text>
 
-                    {` ${ui.and} `}
-
-                    <Text
-                      style={
-                        styles.policyLink
-                      }
-                      onPress={() =>
-                        void openPolicyUrl(
-                          SUBSCRIPTION_URL
-                        )
-                      }
-                    >
-                      {
-                        ui.subscription
-                      }
-                    </Text>
                     .
                   </Text>
                 </View>
@@ -2200,17 +2004,11 @@ export default function SignupScreen() {
                   login={ui.login}
                   onLogin={() =>
                     router.push(
-                      `/login?role=${selectedRole}&next=${encodeURIComponent(
-                        getRoleRedirect(
-                          selectedRole
-                        )
-                      )}` as any
+                      "/login" as any
                     )
                   }
                 />
               </View>
-            </>
-          )}
 
           {/* =================================
               SECURITY NOTE

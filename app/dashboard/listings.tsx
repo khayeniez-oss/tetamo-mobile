@@ -695,7 +695,7 @@ export default function DashboardListingsScreen() {
       return;
     }
 
-    router.push("/add-listing?audience=owner" as any);
+    router.replace("/(tabs)/property" as any);
   }
 
   function goEdit(item: ListingRow) {

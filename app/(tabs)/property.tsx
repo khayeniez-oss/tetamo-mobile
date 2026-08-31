@@ -13,6 +13,8 @@ import {
   ChevronDown,
   ChevronRight,
   Heart,
+  Home,
+  KeyRound,
   Languages,
   MapPin,
   MessageCircle,
@@ -73,6 +75,10 @@ type PriceFilter =
 
 const tetamoLogo = require(
   "../../assets/images/tetamo-logo.png"
+);
+
+const tetamoPartnerIcon = require(
+  "../../assets/images/tetamo-partner-icon.png"
 );
 
 const BLACK = "#111111";
@@ -468,28 +474,6 @@ export default function PropertyScreen() {
       new Set(values)
     ).slice(0, 14);
   }, [properties]);
-
-  /*
-   * ========================================
-   * COUNTS
-   * ========================================
-   */
-
-  const saleCount = useMemo(
-    () =>
-      properties.filter(
-        isSaleProperty
-      ).length,
-    [properties]
-  );
-
-  const rentCount = useMemo(
-    () =>
-      properties.filter(
-        isRentProperty
-      ).length,
-    [properties]
-  );
 
   /*
    * ========================================
@@ -1214,32 +1198,6 @@ Is this property still available?`;
         </View>
 
         {/* ==================================
-            MARKETPLACE TITLE
-        ================================== */}
-
-        <View
-          style={
-            styles.marketplaceHeading
-          }
-        >
-          <Text
-            style={
-              styles.marketplaceTitle
-            }
-          >
-            {t.marketplace}
-          </Text>
-
-          <Text
-            style={
-              styles.marketplaceSub
-            }
-          >
-            {t.marketplaceSub}
-          </Text>
-        </View>
-
-        {/* ==================================
             SEARCH
         ================================== */}
 
@@ -1312,7 +1270,6 @@ Is this property still available?`;
         >
           <ModeTab
             label={t.all}
-            count={properties.length}
             active={
               viewMode === "all"
             }
@@ -1323,7 +1280,16 @@ Is this property still available?`;
 
           <ModeTab
             label={t.sale}
-            count={saleCount}
+            icon={
+              <Home
+                size={14}
+                color={
+                  viewMode === "sale"
+                    ? WHITE
+                    : GOLD_DARK
+                }
+              />
+            }
             active={
               viewMode === "sale"
             }
@@ -1334,7 +1300,16 @@ Is this property still available?`;
 
           <ModeTab
             label={t.rent}
-            count={rentCount}
+            icon={
+              <KeyRound
+                size={14}
+                color={
+                  viewMode === "rent"
+                    ? WHITE
+                    : GOLD_DARK
+                }
+              />
+            }
             active={
               viewMode === "rent"
             }
@@ -1652,39 +1627,22 @@ Is this property still available?`;
 
         {!loading ? (
           <>
-            <View
-              style={
-                styles.resultsHeader
-              }
-            >
-              <View>
+            {activeFilterCount > 0 ? (
+              <View
+                style={
+                  styles.resultsHeader
+                }
+              >
                 <Text
                   style={
-                    styles.resultCount
+                    styles.filteredLabel
                   }
                 >
-                  {
-                    filteredProperties.length
-                  }{" "}
-                  {filteredProperties.length ===
-                  1
-                    ? t.result
-                    : t.results}
+                  {activeFilterCount}{" "}
+                  {t.filter.toLowerCase()}
                 </Text>
-
-                {activeFilterCount >
-                0 ? (
-                  <Text
-                    style={
-                      styles.filteredLabel
-                    }
-                  >
-                    {activeFilterCount}{" "}
-                    {t.filter.toLowerCase()}
-                  </Text>
-                ) : null}
               </View>
-            </View>
+            ) : null}
 
             <ScrollView
               horizontal
@@ -1931,6 +1889,60 @@ Is this property still available?`;
             />
           </Pressable>
         ) : null}
+
+        {/* ==================================
+            TETAMO PARTNER
+        ================================== */}
+
+        <View style={styles.partnerPromoCard}>
+          <Image
+            source={tetamoPartnerIcon}
+            style={styles.partnerPromoIcon}
+            resizeMode="cover"
+          />
+
+          <View style={styles.partnerPromoCopy}>
+            <Text style={styles.partnerPromoEyebrow}>
+              TETAMO PARTNER
+            </Text>
+
+            <Text style={styles.partnerPromoTitle}>
+              {language === "id"
+                ? "Ingin pasang iklan properti?"
+                : "Want to list your property?"}
+            </Text>
+
+            <Text
+              style={styles.partnerPromoDescription}
+            >
+              {language === "id"
+                ? "Download Tetamo Partner di iOS dan Android untuk memasang dan mengelola listing properti Anda."
+                : "Download Tetamo Partner on iOS and Android to post and manage your property listings."}
+            </Text>
+
+            <View style={styles.partnerPlatformRow}>
+              <View
+                style={styles.partnerPlatformPill}
+              >
+                <Text
+                  style={styles.partnerPlatformText}
+                >
+                  iOS
+                </Text>
+              </View>
+
+              <View
+                style={styles.partnerPlatformPill}
+              >
+                <Text
+                  style={styles.partnerPlatformText}
+                >
+                  Android
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -1944,12 +1956,12 @@ Is this property still available?`;
 
 function ModeTab({
   label,
-  count,
+  icon,
   active,
   onPress,
 }: {
   label: string;
-  count: number;
+  icon?: React.ReactNode;
   active: boolean;
   onPress: () => void;
 }) {
@@ -1962,6 +1974,8 @@ function ModeTab({
       ]}
       onPress={onPress}
     >
+      {icon}
+
       <Text
         style={[
           styles.modeTabText,
@@ -1972,23 +1986,6 @@ function ModeTab({
         {label}
       </Text>
 
-      <View
-        style={[
-          styles.modeCount,
-          active &&
-            styles.modeCountActive,
-        ]}
-      >
-        <Text
-          style={[
-            styles.modeCountText,
-            active &&
-              styles.modeCountTextActive,
-          ]}
-        >
-          {count}
-        </Text>
-      </View>
     </Pressable>
   );
 }
@@ -2906,7 +2903,7 @@ const styles = StyleSheet.create({
     /*
      * Space for TetamoFooter
      */
-    paddingBottom: 125,
+    paddingBottom: 40,
   },
 
   /*
@@ -3189,7 +3186,7 @@ const styles = StyleSheet.create({
 
     gap: 8,
 
-    marginBottom: 11,
+    marginBottom: 9,
   },
 
   searchBox: {
@@ -3280,19 +3277,26 @@ const styles = StyleSheet.create({
   modeTabs: {
     flexDirection: "row",
 
-    gap: 7,
+    padding: 3,
 
-    marginBottom: 12,
+    marginBottom: 10,
+
+    borderRadius: 16,
+
+    backgroundColor: SOFT,
+
+    borderWidth: 1,
+    borderColor: BORDER,
   },
 
   modeTab: {
     flex: 1,
 
-    minHeight: 43,
+    minHeight: 36,
 
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
 
-    borderRadius: 14,
+    borderRadius: 12,
 
     flexDirection: "row",
     alignItems: "center",
@@ -3300,20 +3304,15 @@ const styles = StyleSheet.create({
 
     gap: 5,
 
-    backgroundColor: WHITE,
-
-    borderWidth: 1,
-    borderColor: BORDER,
+    backgroundColor: "transparent",
   },
 
   modeTabActive: {
     backgroundColor: BLACK,
-
-    borderColor: BLACK,
   },
 
   modeTabText: {
-    color: "#5F5A53",
+    color: "#69635B",
 
     fontSize: 10,
 
@@ -3322,6 +3321,7 @@ const styles = StyleSheet.create({
 
   modeTabTextActive: {
     color: WHITE,
+    fontWeight: "900",
   },
 
   modeCount: {
@@ -3522,45 +3522,45 @@ const styles = StyleSheet.create({
   },
 
   sortRow: {
-    gap: 6,
+    gap: 5,
 
-    paddingRight: 8,
+    paddingRight: 6,
 
-    marginBottom: 15,
+    marginBottom: 14,
   },
 
   sortChip: {
-    minHeight: 32,
+    minHeight: 30,
 
-    paddingHorizontal: 11,
+    paddingHorizontal: 10,
 
-    borderRadius: 11,
+    borderRadius: 999,
 
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: WHITE,
+    backgroundColor: "transparent",
 
     borderWidth: 1,
-    borderColor: BORDER,
+    borderColor: "#E8E1D7",
   },
 
   sortChipActive: {
-    backgroundColor: BLACK,
+    backgroundColor: GOLD_SOFT,
 
-    borderColor: BLACK,
+    borderColor: "#DCC47A",
   },
 
   sortChipText: {
-    color: "#6D675F",
+    color: "#777169",
 
-    fontSize: 9,
+    fontSize: 8.5,
 
     fontWeight: "700",
   },
 
   sortChipTextActive: {
-    color: WHITE,
+    color: GOLD_DARK,
 
     fontWeight: "900",
   },
@@ -4017,6 +4017,77 @@ const styles = StyleSheet.create({
 
     fontSize: 11,
 
+    fontWeight: "800",
+  },
+
+  /*
+   * TETAMO PARTNER
+   */
+
+  partnerPromoCard: {
+    marginTop: 18,
+    marginBottom: 22,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: WHITE,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+
+  partnerPromoIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+  },
+
+  partnerPromoCopy: {
+    flex: 1,
+  },
+
+  partnerPromoEyebrow: {
+    color: GOLD_DARK,
+    fontSize: 8.5,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+  },
+
+  partnerPromoTitle: {
+    marginTop: 5,
+    color: BLACK,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "900",
+  },
+
+  partnerPromoDescription: {
+    marginTop: 5,
+    color: MUTED,
+    fontSize: 9.5,
+    lineHeight: 14,
+    fontWeight: "600",
+  },
+
+  partnerPlatformRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    gap: 7,
+  },
+
+  partnerPlatformPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: SOFT,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+
+  partnerPlatformText: {
+    color: BLACK,
+    fontSize: 8.5,
     fontWeight: "800",
   },
 

@@ -260,7 +260,7 @@ export default function OwnerPackagesScreen() {
       profileRole === "developer" ||
       profileRole === "buyer"
     ) {
-      router.push(`/add-listing?role=${profileRole}` as any);
+      router.replace("/(tabs)/property" as any);
       return;
     }
 

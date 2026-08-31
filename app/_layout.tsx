@@ -6,6 +6,7 @@ import { View } from "react-native";
 
 import { ListingDraftProvider } from "../components/listing/ListingDraftContext";
 import TetamoFooter from "../components/navigation/TetamoFooter";
+import { supabase } from "../lib/supabase";
 
 function readNotificationString(
   data: Record<string, unknown>,
@@ -41,6 +42,80 @@ function buildRouteWithParams(
   return query
     ? `${pathname}?${query}`
     : pathname;
+}
+
+function isLegacyBusinessDestination(
+  destination: string,
+) {
+  const pathname =
+    destination.split("?")[0];
+
+  return (
+    pathname === "/dashboard/listings" ||
+    pathname === "/dashboard/leads" ||
+    pathname === "/dashboard/viewing-schedule" ||
+    pathname === "/dashboard/payments" ||
+    pathname === "/add-listing" ||
+    pathname.startsWith("/owner/") ||
+    pathname.startsWith("/agent/") ||
+    pathname.startsWith("/developer/")
+  );
+}
+
+async function getSafePushNotificationDestination(
+  destination: string,
+) {
+  if (
+    !isLegacyBusinessDestination(
+      destination,
+    )
+  ) {
+    return destination;
+  }
+
+  try {
+    const {
+      data: { user },
+    } =
+      await supabase.auth.getUser();
+
+    if (!user?.id) {
+      return "/dashboard/notifications";
+    }
+
+    const {
+      data: profile,
+      error,
+    } =
+      await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+    if (error) {
+      return "/dashboard/notifications";
+    }
+
+    const role =
+      normalizeNotificationType(
+        String(
+          profile?.role || ""
+        ),
+      );
+
+    /*
+     * Preserve existing Admin routing.
+     * Marketplace users stay consumer-side.
+     */
+    if (role === "admin") {
+      return destination;
+    }
+
+    return "/dashboard/notifications";
+  } catch {
+    return "/dashboard/notifications";
+  }
 }
 
 function getPushNotificationRoute(
@@ -278,13 +353,32 @@ function useNotificationObserver() {
     const destination =
       pendingDestination;
 
-    setPendingDestination(null);
+    let cancelled = false;
 
-    router.push(
-      destination as any,
-    );
+    async function navigatePendingNotification() {
+      const safeDestination =
+        await getSafePushNotificationDestination(
+          destination,
+        );
 
-    Notifications.clearLastNotificationResponse();
+      if (cancelled) {
+        return;
+      }
+
+      setPendingDestination(null);
+
+      router.push(
+        safeDestination as any,
+      );
+
+      Notifications.clearLastNotificationResponse();
+    }
+
+    void navigatePendingNotification();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     pendingDestination,
     rootNavigationState?.key,

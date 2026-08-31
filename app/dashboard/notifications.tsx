@@ -97,10 +97,22 @@ function normalizeType(value?: string | null) {
 }
 
 function getNotificationRoute(
-  item: NotificationRow
+  item: NotificationRow,
+  allowBusinessRoutes: boolean
 ) {
   const type =
     normalizeType(item.type);
+
+  /*
+   * Tetamo Marketplace is consumer-facing.
+   * Owner/Agent business destinations belong
+   * in Tetamo Partner.
+   *
+   * Preserve the existing Admin behaviour.
+   */
+  if (!allowBusinessRoutes) {
+    return null;
+  }
 
   /*
    * Leads / WhatsApp enquiries
@@ -314,6 +326,12 @@ export default function NotificationsScreen() {
     );
 
   const [
+    profileRole,
+    setProfileRole,
+  ] =
+    useState("");
+
+  const [
     notifications,
     setNotifications,
   ] =
@@ -507,6 +525,7 @@ export default function NotificationsScreen() {
             !user?.id
           ) {
             setUserId(null);
+            setProfileRole("");
             setNotifications(
               []
             );
@@ -520,6 +539,39 @@ export default function NotificationsScreen() {
           setUserId(
             user.id
           );
+
+          const {
+            data:
+              roleProfile,
+            error:
+              roleError,
+          } =
+            await supabase
+              .from(
+                "profiles"
+              )
+              .select(
+                "role"
+              )
+              .eq(
+                "id",
+                user.id
+              )
+              .maybeSingle();
+
+          if (
+            roleError
+          ) {
+            setProfileRole(
+              ""
+            );
+          } else {
+            setProfileRole(
+              normalizeType(
+                roleProfile?.role
+              )
+            );
+          }
 
           const [
             listResult,
@@ -930,7 +982,9 @@ export default function NotificationsScreen() {
 
     const destination =
       getNotificationRoute(
-        item
+        item,
+        profileRole ===
+          "admin"
       );
 
     if (!destination) {
@@ -1581,7 +1635,9 @@ export default function NotificationsScreen() {
 
               const destination =
                 getNotificationRoute(
-                  item
+                  item,
+                  profileRole ===
+                    "admin"
                 );
 
               const highPriority =

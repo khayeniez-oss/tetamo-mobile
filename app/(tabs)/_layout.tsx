@@ -12,7 +12,6 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="property" />
-      <Tabs.Screen name="add-listing" />
       <Tabs.Screen name="buyer" />
       <Tabs.Screen name="profile" />
     </Tabs>
